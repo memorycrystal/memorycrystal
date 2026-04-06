@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "id": "crystal",
+  "name": "Memory Crystal",
+  "version": "0.1.0",
+  "description": "Drop-in OpenClaw memory plugin using Convex + MCP tools.",
+  "entry": "./handler.js",
+  "hooks": {
+    "postTurn": {
+      "enabled": false,
+      "description": "Reserved for future memory auto-write flows."
+    },
+    "startup": {
+      "enabled": true,
+      "description": "Load plugin metadata on OpenClaw startup."
+    }
+  },
+  "capabilities": {
+    "tools": [
+      "crystal_remember",
+      "crystal_recall",
+      "crystal_what_do_i_know",
+      "crystal_why_did_we",
+      "crystal_forget",
+      "crystal_stats",
+      "crystal_checkpoint",
+      "crystal_wake"
+    ],
+    "mcpCommand": "/path/to/node",
+    "mcpArgs": [
+      "/path/to/openclaw-crystal/mcp-server/dist/index.js"
+    ]
+  },
+  "commands": {
+    "crystal-capture": {
+      "command": "/path/to/node",
+      "args": [
+        "/path/to/openclaw-crystal/plugin/capture-hook.js"
+      ],
+      "env": {
+        "CONVEX_URL": "https://rightful-mockingbird-389.convex.site",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "EMBEDDING_PROVIDER": "${EMBEDDING_PROVIDER}",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "GEMINI_EMBEDDING_MODEL": "${GEMINI_EMBEDDING_MODEL}",
+        "OBSIDIAN_VAULT_PATH": "/path/to/obsidian-vault",
+        "CRYSTAL_MCP_HOST": "127.0.0.1",
+        "CRYSTAL_MCP_PORT": "8788",
+        "CRYSTAL_ENV_FILE": "/path/to/openclaw-crystal/mcp-server/.env",
+        "CRYSTAL_NODE": "/path/to/node",
+        "CRYSTAL_PLUGIN_DIR": "/path/to/openclaw-crystal/plugin",
+        "CRYSTAL_ROOT": "/path/to/openclaw-crystal",
+        "CRYSTAL_MCP_MODE": "stdio"
+      }
+    },
+    "crystal-recall": {
+      "command": "/path/to/node",
+      "args": [
+        "/path/to/openclaw-crystal/plugin/recall-hook.js"
+      ],
+      "env": {
+        "CONVEX_URL": "https://rightful-mockingbird-389.convex.site",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "EMBEDDING_PROVIDER": "${EMBEDDING_PROVIDER}",
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "GEMINI_EMBEDDING_MODEL": "${GEMINI_EMBEDDING_MODEL}",
+        "OBSIDIAN_VAULT_PATH": "/path/to/obsidian-vault",
+        "CRYSTAL_MCP_HOST": "127.0.0.1",
+        "CRYSTAL_MCP_PORT": "8788",
+        "CRYSTAL_ENV_FILE": "/path/to/openclaw-crystal/mcp-server/.env",
+        "CRYSTAL_NODE": "/path/to/node",
+        "CRYSTAL_PLUGIN_DIR": "/path/to/openclaw-crystal/plugin",
+        "CRYSTAL_ROOT": "/path/to/openclaw-crystal",
+        "CRYSTAL_MCP_MODE": "stdio"
+      }
+    }
+  },
+  "env": {
+    "CRYSTAL_MCP_MODE": "sse",
+    "CRYSTAL_MCP_HOST": "127.0.0.1",
+    "CRYSTAL_MCP_PORT": "8788",
+    "CRYSTAL_ENV_FILE": "/path/to/openclaw-crystal/mcp-server/.env"
+  }
+}

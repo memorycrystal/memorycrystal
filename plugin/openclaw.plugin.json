@@ -1,0 +1,61 @@
+{
+  "id": "crystal-memory",
+  "kind": [
+    "memory",
+    "context-engine"
+  ],
+  "name": "Memory Crystal",
+  "description": "Persistent memory for AI agents via Memory Crystal",
+  "version": "0.7.7",
+  "entry": "index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+      "apiKey": {
+        "type": "string"
+      },
+      "convexUrl": {
+        "type": "string",
+        "default": "https://rightful-mockingbird-389.convex.site"
+      },
+      "defaultRecallMode": {
+        "type": "string",
+        "enum": [
+          "general",
+          "decision",
+          "project",
+          "people",
+          "workflow",
+          "conversation"
+        ],
+        "description": "Default recall mode for this agent. Controls which memory stores and categories are prioritized.",
+        "default": "general"
+      },
+      "defaultRecallLimit": {
+        "type": "number",
+        "description": "Default number of memories to recall per query.",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 20
+      },
+      "channelScope": {
+        "type": "string",
+        "description": "Optional. When set, all API calls are namespaced as {channelScope}:{peerId}. Use for multi-tenant or per-agent isolation. Example: 'coach'"
+      },
+      "localSummaryInjection": {
+        "type": "boolean",
+        "description": "Enable prompt-aware local summary injection. When true, relevant summaries from the local store are injected into the context window based on the current user query.",
+        "default": true
+      },
+      "localSummaryMaxTokens": {
+        "type": "number",
+        "description": "Maximum tokens to spend on injected relevant local summaries.",
+        "default": 2000,
+        "minimum": 0,
+        "maximum": 8000
+      }
+    }
+  }
+}

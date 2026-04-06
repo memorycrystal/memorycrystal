@@ -1,0 +1,11 @@
+[build]
+builder = "railpack"
+buildCommand = "npm install && npm run build"
+watchPatterns = ["/packages/mcp-server/**"]
+
+[deploy]
+startCommand = "node dist/index.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
