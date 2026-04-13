@@ -1,0 +1,57 @@
+---
+title: Factory Droid
+description: Connect Memory Crystal to Factory Droid using the repo's hosted MCP installer path.
+---
+
+
+Factory Droid can use Memory Crystal as its memory helper, just like other MCP-compatible coding assistants.
+
+## What this means in practice
+
+The repo names this integration **Factory Droid**.
+That should be the canonical public docs name, even if people casually say “Factory” or “Factory Drone.”
+
+## How it actually works
+
+Important repo surfaces:
+
+- `apps/web/public/install-droid-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`
+
+The installer handles:
+
+- CLI detection
+- auth flow
+- MCP registration
+- local Memory Crystal support file setup
+
+## Commands / examples
+
+Installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash
+```
+
+For purge behavior and safety notes, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- drifting from the actual script/CLI naming in the repo
+- assuming this page should describe a different product name than the repo uses
+- treating Factory Droid like a generic MCP client without documenting its dedicated installer
+
+## Source of truth
+
+Primary files behind this page:
+
+- `apps/web/public/install-droid-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`

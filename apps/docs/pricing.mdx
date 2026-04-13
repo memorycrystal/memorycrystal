@@ -1,0 +1,59 @@
+---
+title: Pricing
+description: How Memory Crystal is packaged today, how plan limits show up in the repo, and what changes across tiers.
+---
+
+
+Some people need a tiny memory box.
+Some need a much bigger one.
+Pricing is how Memory Crystal decides how much memory, how many messages, and how many hosted features each account gets.
+
+## What this means in practice
+
+The product currently has plan lanes such as:
+
+- Free
+- Starter / Pro-style paid lanes
+- Ultra
+- Unlimited / enterprise-style higher-capacity setups
+
+The most important practical differences are usually:
+
+- how many memories can be stored
+- how many short-term messages are retained
+- whether there are channel limits
+- how managed Gemini usage is capped or allowed
+
+## How it actually works
+
+The public product pages talk about pricing at a high level, but the repo-level source of truth for tier behavior is the shared limits model.
+
+Important source files:
+
+- `shared/tierLimits.ts`
+- `convex/crystal/geminiGuardrail.ts`
+- relevant backend enforcement paths in `convex/crystal/*`
+
+That means the docs should describe pricing in public/product language, while still grounding the technical claims in the actual tier limit definitions.
+
+## Commands / examples
+
+If you want to inspect the technical tier model directly in the repo, start with:
+
+- `shared/tierLimits.ts`
+- `README.md`
+
+## Common mistakes
+
+- treating marketing copy as the technical source of truth for limits
+- assuming hosted-tier behavior and self-hosted behavior are the same thing
+- forgetting that some limits affect storage, others affect message retention, and others affect model usage
+
+## Source of truth
+
+Primary files behind this page:
+
+- `shared/tierLimits.ts`
+- `README.md`
+- `apps/web/app/pricing/page.tsx`
+- `apps/web/app/data/releases.ts`

@@ -1,0 +1,57 @@
+---
+title: Memory endpoints
+description: The HTTP endpoints that capture, recall, search, trace, and inspect Memory Crystal state.
+---
+
+
+These are the HTTP doors for the memory side of the system.
+
+## What this means in practice
+
+Important endpoint families include:
+
+- capture
+- recall
+- search-messages
+- recent-messages
+- wake
+- checkpoint
+- trace
+- stats
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+
+The modern and legacy MCP packages both depend on this underlying memory/API surface, even though they package it differently.
+
+## Commands / examples
+
+Representative endpoints:
+
+- `POST /api/mcp/capture`
+- `POST /api/mcp/recall`
+- `POST /api/mcp/search-messages`
+- `POST /api/mcp/recent-messages`
+- `POST /api/mcp/wake`
+- `POST /api/mcp/checkpoint`
+- `POST /api/mcp/trace`
+- `GET /api/mcp/stats`
+
+## Common mistakes
+
+- assuming the endpoint list is the whole behavior without reading the surrounding logic in `mcp.ts`
+- mixing HTTP endpoints and MCP tool names without explaining the relationship
+- ignoring auth/rate-limit behavior when describing the API surface
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`

@@ -1,0 +1,67 @@
+---
+title: Authentication
+description: How Memory Crystal authenticates MCP and HTTP access, and which variables or headers matter in practice.
+---
+
+
+If Memory Crystal is a vault, the API key is the key that opens the vault.
+No key means no memory access.
+
+## What this means in practice
+
+Most HTTP-facing access uses:
+
+```http
+Authorization: Bearer <api-key>
+```
+
+You may also see environment variables like:
+
+- `MEMORY_CRYSTAL_API_KEY`
+- `MEMORY_CRYSTAL_API_URL`
+
+Those are especially important for MCP client and server setup.
+
+## How it actually works
+
+Repo evidence shows two important layers:
+
+1. **client/process configuration**
+   - environment variables for MCP servers and installers
+2. **HTTP request authentication**
+   - bearer token validation in backend request handling
+
+Relevant source material includes current HTTP auth helpers and MCP request flows.
+
+## Commands / examples
+
+Example process-level configuration:
+
+```bash
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site \
+MEMORY_CRYSTAL_API_KEY=your_api_key_here \
+npm run start --workspace packages/mcp-server
+```
+
+Example HTTP header:
+
+```http
+Authorization: Bearer <api-key>
+```
+
+## Common mistakes
+
+- mixing `CRYSTAL_API_KEY` and `MEMORY_CRYSTAL_API_KEY` without understanding which layer is consuming them
+- forgetting the backend URL for MCP server setups
+- assuming local install success means auth is valid
+
+## Source of truth
+
+Primary files behind this page:
+
+- `.env.example`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+- `convex/crystal/mcp.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `scripts/crystal-doctor.sh`

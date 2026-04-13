@@ -1,0 +1,72 @@
+---
+title: Organic Memory Overview
+description: What Organic Memory is, what exists today, and how to read the PRD without confusing vision for shipped behavior.
+---
+
+
+If normal Memory Crystal is a really good memory box, Organic Memory is the part that tries to **think ahead**.
+It looks for patterns, predicts what might matter next, and helps organize memory in the background.
+
+## What this means in practice
+
+Organic Memory is not just one feature.
+It is a group of background systems concerned with things like:
+
+- trace prediction
+- idea discovery
+- association maintenance
+- graph enrichment
+- periodic background cognition loops
+
+## How it actually works today
+
+The current implementation lives mainly under:
+
+- `convex/crystal/organic/`
+
+And its runtime scheduling ties into:
+
+- `convex/crons.ts`
+
+That means the safest way to document Organic Memory publicly is:
+
+- use the PRD for vision and intent
+- use the current `convex/crystal/organic/**` code for what actually exists now
+- clearly separate shipped behavior from future ideas
+
+## Commands / examples
+
+Organic Memory is primarily a backend/background system, so the most useful public examples are source-oriented:
+
+- inspect scheduling in `convex/crons.ts`
+- inspect implementation modules in `convex/crystal/organic/**`
+- use the public docs to understand what is current versus planned
+
+## Vision vs current state
+
+### Vision
+The PRD describes a larger cognition layer and future-facing ideas.
+
+### Current state
+The codebase currently provides a concrete subset of that vision through the Organic Memory modules and scheduled jobs that already exist.
+
+Public docs should explain both, but they must label them honestly.
+
+## Source of truth
+
+The main strategic design document is:
+
+- `docs/organic-memory/PRD-Organic-Memory.md`
+
+Related supporting documents include:
+
+- `docs/organic-memory/IMPLEMENTATION-PLAN.md`
+- `docs/organic-memory/OMC-Project-Brief.md`
+- `docs/organic-memory/MARCUS-BRIEF.md`
+
+Primary files behind this page:
+
+- `docs/organic-memory/PRD-Organic-Memory.md`
+- `docs/organic-memory/IMPLEMENTATION-PLAN.md`
+- `convex/crystal/organic/**`
+- `convex/crons.ts`

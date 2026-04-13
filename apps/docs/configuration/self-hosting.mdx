@@ -1,0 +1,44 @@
+---
+title: Self-Hosting
+description: The public self-hosting paths and where to look in the repo for supported deployment guidance.
+---
+
+
+Self-hosting means you run the important parts yourself instead of using Memory Crystal's hosted setup.
+
+## What this means in practice
+
+Public docs should describe the supported self-hosting paths without dragging private SaaS-only internals into the public docs.
+
+## How it actually works
+
+The strongest public sources are:
+
+- `packages/mcp-server/README.md`
+- `apps/docs/self-hosting/railway.mdx`
+- `.env.example`
+
+Those are the safest sources for what should be documented as supported public deployment behavior.
+
+## Commands / examples
+
+Typical self-hosting concerns include:
+
+- env vars
+- MCP server deployment
+- Railway/service-root setup
+- local run commands for the current MCP package
+
+## Common mistakes
+
+- mixing private SaaS architecture with public self-hosting guidance
+- documenting the root web app deployment as if it were the MCP deployment path
+- treating every internal deployment artifact as public-facing setup guidance
+
+## Source of truth
+
+Primary files behind this page:
+
+- `packages/mcp-server/README.md`
+- `apps/docs/self-hosting/railway.mdx`
+- `.env.example`

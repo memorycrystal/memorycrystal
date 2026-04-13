@@ -1,0 +1,59 @@
+---
+title: Recall tools
+description: The tools and backend flows that help Memory Crystal search across recent messages, durable memories, and relationships.
+---
+
+
+Recall tools help the AI look backward and bring the right memory back.
+
+## What this means in practice
+
+Recall-oriented flows include:
+
+- semantic recall
+- recent-message continuity
+- topic scans
+- decision archaeology
+- ownership lookups
+- dependency tracing
+- preflight retrieval
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`
+
+These files define how Memory Crystal ranks candidates, merges memory sources, and returns recall results.
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_recall`
+- `crystal_recent`
+- `crystal_search_messages`
+- `crystal_what_do_i_know`
+- `crystal_why_did_we`
+- `crystal_who_owns`
+- `crystal_explain_connection`
+- `crystal_dependency_chain`
+- `crystal_preflight`
+
+## Common mistakes
+
+- treating recall as a single feature instead of a family of related retrieval flows
+- assuming vector search alone explains the final ranking
+- ignoring the role of recent-message and scope-aware filtering
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`

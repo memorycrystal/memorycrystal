@@ -1,0 +1,56 @@
+---
+title: Plugin Options
+description: Which OpenClaw plugin knobs exist and where they are actually defined.
+---
+
+
+Plugin options are settings you give Memory Crystal so it knows how to connect and behave.
+
+## What this means in practice
+
+Important plugin-facing settings include things like:
+
+- API key / backend URL
+- default recall mode
+- default recall limit
+- optional channel scoping
+- local summary behavior
+
+## How it actually works
+
+The main plugin config shape is defined in:
+
+- `plugin/openclaw.plugin.json`
+
+The runtime behavior around those options is implemented in:
+
+- `plugin/index.js`
+
+Operational scripts also matter:
+
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-doctor.sh`
+
+## Commands / examples
+
+Safe validation:
+
+```bash
+npm run crystal:enable -- --dry-run
+npm run crystal:doctor
+```
+
+## Common mistakes
+
+- reading the legacy hook manifest and assuming it is the only config surface
+- documenting defaults without checking the actual plugin schema
+- forgetting the operational scripts that wire the plugin into OpenClaw
+
+## Source of truth
+
+Primary files behind this page:
+
+- `plugin/openclaw.plugin.json`
+- `plugin/index.js`
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-doctor.sh`

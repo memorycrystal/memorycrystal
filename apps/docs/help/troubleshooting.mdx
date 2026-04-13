@@ -1,0 +1,49 @@
+---
+title: Troubleshooting
+description: The first places to look when setup, auth, plugin wiring, or docs-driven flows go wrong.
+---
+
+
+If something feels broken, this page tells you where to look first.
+
+## What this means in practice
+
+Common problems include:
+
+- bad or missing API keys
+- wrong backend or MCP URL
+- stale OpenClaw plugin installs
+- local environment files missing
+- public docs repo / mirror / Mintlify mismatch
+
+## How it actually works
+
+The best operational troubleshooting sources are:
+
+- `scripts/crystal-doctor.sh`
+- `README.md`
+- `mcp-server/README.md`
+- `packages/mcp-server/README.md`
+
+## Commands / examples
+
+```bash
+npm run crystal:doctor
+npm run test:smoke
+```
+
+## Common mistakes
+
+- assuming every failure is a code bug instead of an environment issue
+- skipping the doctor script and debugging blind
+- forgetting that Mintlify/public-repo issues are deployment-source issues, not plugin/runtime issues
+
+## Source of truth
+
+Primary files behind this page:
+
+- `scripts/crystal-doctor.sh`
+- `README.md`
+- `.env.example`
+- `mcp-server/README.md`
+- `packages/mcp-server/README.md`

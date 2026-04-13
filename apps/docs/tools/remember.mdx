@@ -1,0 +1,52 @@
+---
+title: "Remember & edit"
+description: "The memory-writing side of the public tool surface: remember, checkpoint, edit, archive, and related maintenance actions."
+---
+
+
+These are the tools that help the AI put something into memory or change memory on purpose.
+
+## What this means in practice
+
+This family covers things like:
+
+- remembering a new fact or lesson
+- saving a checkpoint
+- editing an existing memory
+- archiving or forgetting a memory
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/mcp.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/checkpoints.ts`
+
+These files define how memory records are created, updated, archived, and checkpointed.
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_remember`
+- `crystal_checkpoint`
+- `crystal_forget`
+
+Related public surfaces:
+
+- checkpoint endpoints and memory-management flows exposed through the MCP/HTTP layer
+
+## Common mistakes
+
+- assuming manual remember and automatic capture are the same path
+- forgetting that checkpoints are a distinct concept from ordinary memories
+- documenting edit/archive flows without tying them to real backend logic
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/mcp.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/checkpoints.ts`

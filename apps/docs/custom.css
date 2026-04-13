@@ -1,0 +1,32 @@
+/* Memory Crystal design system overrides */
+/* border-radius: 0 everywhere — no exceptions */
+
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* Surface colors matching the main site */
+:root {
+  --mc-void: #1C272F;
+  --mc-surface: #1E2F3D;
+  --mc-elevated: #213A4D;
+  --mc-accent: #2180D6;
+  --mc-accent-hover: #4CC1E9;
+  --mc-text-primary: #E8F0F8;
+  --mc-text-secondary: #7A9AB5;
+  --mc-border: rgba(255, 255, 255, 0.07);
+}
+
+/* Make the Mintlify header logo read closer to the main site */
+.nav-logo {
+  height: 2.125rem !important;
+  width: auto !important;
+}
+
+@media (min-width: 1024px) {
+  .nav-logo {
+    height: 2.25rem !important;
+  }
+}

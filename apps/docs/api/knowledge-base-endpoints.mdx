@@ -1,0 +1,47 @@
+---
+title: Knowledge-base endpoints
+description: The HTTP endpoints that create, list, import, and query Knowledge Bases.
+---
+
+
+These are the HTTP doors for the Knowledge Base shelf.
+
+## What this means in practice
+
+Important endpoint families include:
+
+- list/create knowledge bases
+- import chunks
+- query a knowledge base
+- backfill or maintenance-related KB flows
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`
+
+## Commands / examples
+
+Representative endpoints:
+
+- `GET /api/knowledge-bases`
+- `POST /api/knowledge-bases`
+- `POST /api/knowledge-bases/:knowledgeBaseId/import`
+- `POST /api/knowledge-bases/:knowledgeBaseId/query`
+
+## Common mistakes
+
+- documenting KB endpoints without mentioning their relationship to the MCP KB tools
+- assuming imported data is the same as conversational memory
+- ignoring scope and tenancy when describing KB behavior
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`

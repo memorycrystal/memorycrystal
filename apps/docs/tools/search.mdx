@@ -1,0 +1,50 @@
+---
+title: Search & scope
+description: How Memory Crystal searches across messages and memories while respecting channel, client, and knowledge-base boundaries.
+---
+
+
+Search tools help the AI find the right memory without looking in the wrong places.
+
+## What this means in practice
+
+This includes:
+
+- message search
+- scoped memory visibility
+- knowledge-base-aware query behavior
+- client/channel isolation rules
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/messages.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/mcp.ts`
+
+The important public docs concept is that Memory Crystal does not just search “everything.”
+It applies visibility and scope rules first, then recall/search logic.
+
+## Commands / examples
+
+Examples:
+
+- `crystal_search_messages`
+- scoped recall/query flows in the MCP surface
+
+## Common mistakes
+
+- treating search and recall as if they are identical
+- forgetting that scoped channels and KB visibility affect results
+- documenting cross-client behavior without checking the actual filtering rules
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/messages.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/mcp.ts`

@@ -1,0 +1,65 @@
+---
+title: How Memory Works
+description: Understand the full memory flow from capture to recall to long-term storage.
+---
+
+
+Memory Crystal listens, remembers the important parts, and brings the right memory back when your AI needs it.
+
+## What this means in practice
+
+The system is not just a note list.
+It combines:
+
+- short-term message history
+- long-term durable memories
+- ranking and filtering
+- knowledge-base retrieval
+- optional background enrichment
+
+That means your AI gets context that is both **recent** and **relevant**.
+
+## How it actually works
+
+High-level flow:
+
+1. a message arrives
+2. recent context and memory candidates are gathered
+3. candidates are ranked
+4. the best context is injected or returned
+5. the conversation is captured
+6. durable memories can be extracted and stored
+
+Important source areas:
+
+- `plugin/recall-hook.js`
+- `plugin/capture-hook.js`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+
+## Commands / examples
+
+A user-facing install entrypoint is:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+After setup, tool-based clients can use flows like:
+
+- `crystal_recall`
+- `crystal_recent`
+- `crystal_search_messages`
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`

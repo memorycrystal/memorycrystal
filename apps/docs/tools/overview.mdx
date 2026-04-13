@@ -1,0 +1,101 @@
+---
+title: Tools Overview
+description: Understand what the Memory Crystal tool surface is for, how it is grouped, and where the current definitions live.
+---
+
+
+Memory Crystal gives your AI a set of buttons.
+Some buttons help it **remember**.
+Some help it **search**.
+Some help it **explain** what it already knows.
+Some help it work with **knowledge bases**.
+
+## What this means in practice
+
+The tool surface is split across categories such as:
+
+- recall/search
+- remember/edit/checkpoint/forget
+- recent message and trace flows
+- knowledge-base tools
+- ownership/dependency/explanation helpers
+
+Different integrations expose these tools in slightly different ways, but the public surface should stay conceptually consistent.
+
+## Tool families
+
+### Memory lookup
+Examples:
+- `crystal_recall`
+- `crystal_recent`
+- `crystal_search_messages`
+- `crystal_trace`
+
+### Memory writing and maintenance
+Examples:
+- `crystal_remember`
+- `crystal_checkpoint`
+- `crystal_forget`
+- edit/update flows
+
+### Reasoning helpers
+Examples:
+- `crystal_what_do_i_know`
+- `crystal_why_did_we`
+- `crystal_who_owns`
+- `crystal_explain_connection`
+- `crystal_dependency_chain`
+- `crystal_preflight`
+
+### Knowledge bases
+Examples:
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+
+## How it actually works
+
+The current HTTP-oriented tool/API behavior is mainly grounded in:
+
+- `convex/crystal/mcp.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+
+## Commands / examples
+
+Examples of setup commands tied to the tool surface:
+
+```bash
+claude mcp add memory-crystal --transport http http://localhost:3100/mcp
+```
+
+```bash
+codex mcp add memory-crystal --url http://localhost:3100/mcp
+```
+
+Examples of tool names you should expect to see documented or exposed:
+
+- `crystal_recall`
+- `crystal_remember`
+- `crystal_recent`
+- `crystal_search_messages`
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+
+## Common mistakes
+
+- treating the deprecated MCP package and the current package as identical
+- assuming every tool is visible in every host the same way
+- documenting tools without tying them back to actual code or endpoint behavior
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/mcp.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+- `README.md`

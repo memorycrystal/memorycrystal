@@ -1,0 +1,99 @@
+---
+title: Environment Variables
+description: Key environment variables for hosted MCP usage, self-hosting, and backend services.
+---
+
+
+These are the labels that tell your self-hosted setup where to connect and which secrets to use.
+
+## What this means in practice
+
+Memory Crystal uses several environment variables across the backend, MCP layers, and plugin/install flows.
+
+## Most important variables
+
+### API keys
+
+- `CRYSTAL_API_KEY` — primary API key for Gemini-backed embeddings and related backend operations
+- `GEMINI_API_KEY` — legacy fallback if `CRYSTAL_API_KEY` is not set
+- `OPENAI_API_KEY` — still present in parts of the repo and some workflows
+- `MEMORY_CRYSTAL_API_KEY` — preferred client-facing API key variable for MCP clients
+
+## Backend URLs
+
+- `CONVEX_URL` — Convex deployment URL
+- `MEMORY_CRYSTAL_API_URL` — preferred client-facing backend base URL for MCP clients
+
+Legacy aliases still exist in some paths, but the docs should prefer the `MEMORY_CRYSTAL_*` names for client setup.
+
+## MCP / local runtime
+
+- `CRYSTAL_MCP_MODE`
+- `CRYSTAL_MCP_HOST`
+- `CRYSTAL_MCP_PORT`
+
+## Embeddings / provider selection
+
+- `EMBEDDING_PROVIDER` — currently important for backend behavior
+- `GEMINI_EMBEDDING_MODEL`
+
+## Local content / storage
+
+- `OBSIDIAN_VAULT_PATH`
+
+## Example
+
+From `.env.example`:
+
+```env
+CONVEX_URL=https://your-deployment.convex.cloud
+CRYSTAL_API_KEY=
+GEMINI_API_KEY=
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2-preview
+OPENAI_API_KEY=sk-...
+OBSIDIAN_VAULT_PATH=/path/to/your/obsidian/vault
+CRYSTAL_MCP_MODE=stdio
+CRYSTAL_MCP_HOST=127.0.0.1
+CRYSTAL_MCP_PORT=8788
+EMBEDDING_PROVIDER=gemini
+MEMORY_CRYSTAL_API_KEY=
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site
+```
+
+## How it actually works
+
+Different variables matter to different layers:
+
+- backend/runtime
+- MCP client/server setup
+- plugin installation and local health checks
+
+For local command-launched MCP, use `CRYSTAL_MCP_MODE=stdio`.
+Use `CRYSTAL_MCP_MODE=http` only when you explicitly want the deprecated local network MCP listener.
+
+## Commands / examples
+
+Example check:
+
+```bash
+npm run crystal:doctor
+```
+
+## Doctor script behavior
+
+The repo's doctor/smoke checks read these variables and will fail or warn when key values are missing.
+
+For example, with `EMBEDDING_PROVIDER=gemini`, the doctor expects a valid `CRYSTAL_API_KEY` or `GEMINI_API_KEY`.
+
+## Related docs
+
+- [Installation](/installation)
+- [Railway Deployment](/self-hosting/railway)
+- [MCP Server](/integrations/mcp-server)
+
+## Source of truth
+
+- `.env.example`
+- `scripts/crystal-doctor.sh`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`

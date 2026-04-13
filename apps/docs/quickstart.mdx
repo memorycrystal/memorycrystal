@@ -1,0 +1,73 @@
+---
+title: Quick Start
+description: Get Memory Crystal working quickly, then follow the best setup path for your AI client.
+---
+
+Pick your AI client, run the setup command, and verify that Memory Crystal is connected.
+
+## Pick your platform
+
+<AccordionGroup>
+  <Accordion title="OpenClaw — all-in-one installer">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/crystal | bash
+    ```
+    See [OpenClaw Plugin](/integrations/openclaw-plugin) for configuration details.
+  </Accordion>
+  <Accordion title="Claude Code — dedicated MCP installer">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+    ```
+    See [Claude Code](/integrations/claude-code) for configuration details.
+  </Accordion>
+  <Accordion title="Codex CLI — dedicated MCP installer">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+    ```
+    See [Codex CLI](/integrations/codex-cli) for configuration details.
+  </Accordion>
+  <Accordion title="Factory Droid — dedicated MCP installer">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+    ```
+    See [Factory Droid](/integrations/factory-droid) for configuration details.
+  </Accordion>
+  <Accordion title="Claude Desktop — legacy compatibility path">
+    Use the config shown on the [Claude Desktop](/integrations/claude-desktop) page.
+  </Accordion>
+</AccordionGroup>
+
+## Choose a deployment mode
+
+| Mode | Best for | Details |
+| --- | --- | --- |
+| **Cloud** (recommended) | Easiest setup, shared memory across devices | Uses Memory Crystal's hosted backend |
+| **Self-hosted** | Full control over infrastructure and data | Uses your own Convex deployment |
+| **Local** | Single-machine, no cloud sync needed | Uses local SQLite storage only |
+
+## Get an API key
+
+If you use Cloud or Self-hosted mode, you need a key.
+
+1. Visit [memorycrystal.ai/dashboard](https://memorycrystal.ai/dashboard)
+2. Create or open your account
+3. Go to **API Keys**
+4. Create a key and save it somewhere safe
+
+<Warning>The dashboard only shows the key once.</Warning>
+
+## Verify your setup
+
+```bash
+npm run crystal:doctor
+```
+
+This checks tooling, environment variables, plugin wiring, and install health.
+
+```bash
+npm run test:smoke
+```
+
+<Tip>
+**Common mistakes** — using the deprecated Claude Desktop path when you mean Claude Code, using the generic installer when your client has a dedicated one, or skipping verification.
+</Tip>

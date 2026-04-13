@@ -1,0 +1,130 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Memory Crystal",
+  "favicon": "https://memorycrystal.ai/apple-touch-icon.png",
+  "logo": {
+    "light": "/logo/logo-trimmed.png",
+    "dark": "/logo/logo-trimmed.png",
+    "href": "https://docs.memorycrystal.ai/"
+  },
+  "colors": {
+    "primary": "#2180D6",
+    "light": "#4CC1E9",
+    "dark": "#1C549F"
+  },
+  "background": {
+    "color": {
+      "dark": "#1C272F",
+      "light": "#F4F8FC"
+    }
+  },
+  "fonts": {
+    "family": "Oxanium",
+    "heading": {
+      "family": "Inter",
+      "weight": 600
+    },
+    "body": {
+      "family": "Oxanium",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/memorycrystal/memorycrystal"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "pricing",
+              "changelog"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/memory-layers",
+              "concepts/context-engine",
+              "concepts/memory-stores",
+              "concepts/knowledge-bases"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/openclaw-plugin",
+              "integrations/mcp-server",
+              "integrations/claude-code",
+              "integrations/claude-desktop",
+              "integrations/codex-cli",
+              "integrations/factory-droid"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment-variables",
+              "configuration/plugin-options",
+              "configuration/self-hosting"
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "help/uninstall",
+              "help/troubleshooting",
+              "help/faq"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Tools & API",
+        "groups": [
+          {
+            "group": "Memory Tools",
+            "pages": [
+              "tools/overview",
+              "tools/recall",
+              "tools/remember",
+              "tools/search"
+            ]
+          },
+          {
+            "group": "Knowledge Bases",
+            "pages": [
+              "tools/knowledge-bases/overview",
+              "tools/knowledge-bases/import"
+            ]
+          },
+          {
+            "group": "HTTP API",
+            "pages": [
+              "api/authentication",
+              "api/memory-endpoints",
+              "api/knowledge-base-endpoints"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "css": "/custom.css",
+  "styling": {
+    "latex": false,
+    "codeblocks": "system"
+  }
+}
