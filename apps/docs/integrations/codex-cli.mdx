@@ -1,0 +1,65 @@
+---
+title: Codex CLI
+description: Connect Memory Crystal to Codex CLI and understand both the installer path and direct MCP registration.
+---
+
+
+Codex can connect to Memory Crystal so it remembers project facts, rules, and past work instead of acting like every run is the first run.
+
+## What this means in practice
+
+Codex CLI uses the **current MCP path**.
+The repo supports both:
+
+- a Codex-specific installer
+- direct MCP registration
+
+## How it actually works
+
+Important repo surfaces:
+
+- `apps/web/public/install-codex-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`
+
+The installer handles:
+
+- detecting the Codex CLI
+- obtaining or validating the API key
+- wiring Codex config for the Memory Crystal MCP endpoint
+
+## Commands / examples
+
+Installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+```
+
+Direct registration:
+
+```bash
+codex mcp add memory-crystal --url http://localhost:3100/mcp
+```
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash
+```
+
+For purge behavior and safety notes, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- mixing the older deprecated package instructions into the current Codex flow
+- assuming Codex config and Claude config are identical
+- documenting hosted and local MCP URLs as if they were interchangeable without context
+
+## Source of truth
+
+Primary files behind this page:
+
+- `apps/web/public/install-codex-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`

@@ -1,0 +1,99 @@
+---
+title: crystal_edit
+description: Update an existing memory in Memory Crystal.
+---
+
+## What it does
+
+Updates an existing memory by its ID, allowing you to correct errors, add new information, change memory classification, or update tags. Only the fields you provide will be modified; unspecified fields remain unchanged.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| memoryId | string | Yes | — | ID of the memory to update |
+| title | string | No | — | New title for the memory |
+| content | string | No | — | New content body |
+| tags | string[] | No | — | New array of tags |
+| store | string | No | — | New memory store: `sensory`, `episodic`, `semantic`, `procedural`, or `prospective` |
+| category | string | No | — | New category: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, or `conversation` |
+
+## Returns
+
+```json
+{
+  "success": true,
+  "memoryId": "string",
+  "message": "Updated memory {memoryId}"
+}
+```
+
+**Field descriptions:**
+- `success` — Whether the update succeeded
+- `memoryId` — The updated memory's ID (echo of input)
+- `message` — Confirmation message
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Fix a typo in an existing memory
+crystal_edit({
+  memoryId: "abc123def456",
+  content: "Use PostgreSQL for session storage because concurrent writes are needed"
+})
+
+// Result:
+// {
+//   "success": true,
+//   "memoryId": "abc123def456",
+//   "message": "Updated memory abc123def456"
+// }
+```
+
+### Advanced usage
+
+```javascript
+// Promote a lesson from sensory to semantic store and retag
+crystal_edit({
+  memoryId: "xyz789",
+  store: "semantic",
+  category: "lesson",
+  tags: ["postgres", "reliability", "database-choice"],
+  title: "PostgreSQL concurrency vs SQLite lock contention"
+})
+
+// Move a fact to a different category and update content
+crystal_edit({
+  memoryId: "mem_abc",
+  category: "rule",
+  content: "Always use prepared statements to prevent SQL injection"
+})
+```
+
+## When to use this vs alternatives
+
+- **`crystal_edit`** — When you know the exact memory ID and want to modify it surgically
+- **`crystal_remember`** — When you want to save a new memory (not update existing)
+- **`crystal_forget`** — When you want to remove or archive a memory instead of editing it
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| Invalid memoryId | Missing, empty, or non-existent ID | Provide a valid memory ID from recall results |
+| Invalid store value | Not one of the 5 allowed stores | Use: `sensory`, `episodic`, `semantic`, `procedural`, or `prospective` |
+| Invalid category value | Not one of the 9 allowed categories | Use: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, or `conversation` |
+| tags is not an array | Malformed tag input | Pass tags as `["tag1", "tag2"]` |
+| Authentication failed | Invalid Convex JWT or API key | Verify auth configuration in Convex client setup |
+| Memory not found | ID does not exist or was deleted | Verify ID against recent recall results |
+
+## Notes
+
+- At least one field besides `memoryId` must be provided (editing nothing is a no-op)
+- All string fields are trimmed of leading/trailing whitespace
+- Category and store enums are case-sensitive and must match exactly
+- Tags are deduplicated automatically on save
+- Editing a memory updates its `lastAccessedAt` timestamp
+- The update is transactional — either all fields succeed or the entire operation fails

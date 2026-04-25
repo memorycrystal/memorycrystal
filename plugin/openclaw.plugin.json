@@ -1,0 +1,112 @@
+{
+  "id": "crystal-memory",
+  "kind": [
+    "memory",
+    "context-engine"
+  ],
+  "name": "Memory Crystal",
+  "description": "Persistent memory for AI agents via Memory Crystal",
+  "version": "0.8.0",
+  "entry": "index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+      "apiKey": {
+        "type": "string"
+      },
+      "convexUrl": {
+        "type": "string",
+        "default": "https://convex.memorycrystal.ai"
+      },
+      "defaultRecallMode": {
+        "type": "string",
+        "enum": [
+          "general",
+          "decision",
+          "project",
+          "people",
+          "workflow",
+          "conversation"
+        ],
+        "description": "Default recall mode for this agent. Controls which memory stores and categories are prioritized.",
+        "default": "general"
+      },
+      "defaultRecallLimit": {
+        "type": "number",
+        "description": "Default number of memories to recall per query. Lower values reduce per-turn injection volume for hot long-lived sessions.",
+        "default": 4,
+        "minimum": 1,
+        "maximum": 20
+      },
+      "debugRecallOutput": {
+        "type": "boolean",
+        "description": "Debug mode. When true, recall-style prompts inject the full wake/recall/search/recent payload and instruct the agent to print it before answering.",
+        "default": false
+      },
+      "channelScope": {
+        "type": "string",
+        "description": "Optional. When set, all API calls are namespaced as {channelScope}:{peerId}. Use for multi-tenant or per-agent isolation. Example: 'myapp'"
+      },
+      "agentScopePolicies": {
+        "type": "array",
+        "description": "Optional. Per-agent channel scope policies. Use this to mix peer-scoped agents (client isolation) and shared agents (open knowledge across chats) under one API key. When an agentId matches the current session, this policy overrides the global channelScope.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentId",
+            "scope",
+            "mode"
+          ],
+          "properties": {
+            "agentId": {
+              "type": "string",
+              "description": "Agent/session identifier, e.g. 'coach' or 'dm-replies'."
+            },
+            "scope": {
+              "type": "string",
+              "description": "Memory Crystal scope prefix for this agent, e.g. 'morrow-coach' or 'morrow-team'."
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "peer",
+                "shared"
+              ],
+              "description": "peer = per-user/per-peer isolation (`scope:{peerId}`), shared = one shared bucket across chats (`scope:main`)."
+            }
+          }
+        }
+      },
+      "localSummaryInjection": {
+        "type": "boolean",
+        "description": "Enable prompt-aware local summary injection. When true, relevant summaries from the local store are injected into the context window based on the current user query. Off by default because injection volume compounds on long-lived sessions; turn on per-agent when you need it.",
+        "default": false
+      },
+      "localStoreEnabled": {
+        "type": "boolean",
+        "description": "Enable the optional local SQLite store used for local summary injection and helper tools. Recommended off for long-running gateway deployments unless you explicitly need local compaction.",
+        "default": false
+      },
+      "contextEngineMode": {
+        "type": "string",
+        "enum": [
+          "full",
+          "reduced",
+          "hook-only"
+        ],
+        "description": "Controls how aggressively Memory Crystal participates in the OpenClaw context-engine lifecycle. full = richest context-engine behavior, reduced = bounded assembly/compaction, hook-only = lifecycle hooks and tools only.",
+        "default": "reduced"
+      },
+      "localSummaryMaxTokens": {
+        "type": "number",
+        "description": "Maximum tokens to spend on injected relevant local summaries.",
+        "default": 2000,
+        "minimum": 0,
+        "maximum": 8000
+      }
+    }
+  }
+}

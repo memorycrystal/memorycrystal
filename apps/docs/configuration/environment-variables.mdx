@@ -1,0 +1,87 @@
+---
+title: Environment Variables
+description: Which variables matter, who uses them, and how they map to the install scripts, MCP servers, and backend runtime.
+---
+
+
+Environment variables are little labels that tell the program important secrets and addresses.
+They answer questions like:
+
+- Where is the backend?
+- Which API key should I use?
+- Where is my local vault?
+
+## What this means in practice
+
+Important variables across the repo include:
+
+### Client / MCP-facing
+- `MEMORY_CRYSTAL_API_KEY`
+- `MEMORY_CRYSTAL_API_URL`
+
+### Backend / embedding/runtime
+- `CRYSTAL_API_KEY`
+- `GEMINI_API_KEY`
+- `GEMINI_EMBEDDING_MODEL`
+- `EMBEDDING_PROVIDER`
+- `CONVEX_URL`
+- `OPENAI_API_KEY`
+- `OBSIDIAN_VAULT_PATH`
+
+### Local MCP/process wiring
+- `CRYSTAL_MCP_MODE`
+- `CRYSTAL_MCP_HOST`
+- `CRYSTAL_MCP_PORT`
+
+## How it actually works
+
+Different layers use different names:
+
+- the docs and modern MCP setup prefer `MEMORY_CRYSTAL_*`
+- some older or backend paths still use `CRYSTAL_*` and provider-specific variables
+
+The right thing to document is not just the variable name, but **which surface consumes it**.
+
+## Commands / examples
+
+Example from `.env.example`:
+
+```env
+CONVEX_URL=https://your-deployment.convex.cloud
+CRYSTAL_API_KEY=
+GEMINI_API_KEY=
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2-preview
+OPENAI_API_KEY=sk-...
+OBSIDIAN_VAULT_PATH=/path/to/your/obsidian/vault
+CRYSTAL_MCP_MODE=stdio
+CRYSTAL_MCP_HOST=127.0.0.1
+CRYSTAL_MCP_PORT=8788
+EMBEDDING_PROVIDER=gemini
+MEMORY_CRYSTAL_API_KEY=
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site
+```
+
+Use `CRYSTAL_MCP_MODE=stdio` for command-launched local MCP.
+Reserve `CRYSTAL_MCP_MODE=http` for the deprecated local network MCP listener.
+
+Helpful verification command:
+
+```bash
+npm run crystal:doctor
+```
+
+## Common mistakes
+
+- setting only `MEMORY_CRYSTAL_API_KEY` when a backend path is expecting `CRYSTAL_API_KEY`
+- forgetting `MEMORY_CRYSTAL_API_URL` for MCP server setups
+- assuming smoke-test failures are always code failures instead of environment misconfiguration
+
+## Source of truth
+
+Primary files behind this page:
+
+- `.env.example`
+- `scripts/crystal-doctor.sh`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+- `apps/web/public/install.sh`

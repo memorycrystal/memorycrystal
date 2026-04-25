@@ -1,0 +1,287 @@
+---
+title: Memory endpoints
+description: The HTTP endpoints that capture, recall, search, trace, and inspect Memory Crystal state.
+---
+
+
+These are the HTTP doors for the memory side of the system.
+
+## What this means in practice
+
+Important endpoint families include:
+
+- capture
+- recall
+- search-messages
+- recent-messages
+- wake
+- checkpoint
+- trace
+- stats
+
+Important related tool surfaces include:
+
+- `crystal_recall`
+- `crystal_search_messages`
+- `crystal_recent`
+- `crystal_debug_recall`
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+
+The modern and legacy MCP packages both depend on this underlying memory/API surface, even though they package it differently.
+
+## Endpoint Reference
+
+### Session Initialization
+
+#### `POST /api/mcp/wake`
+
+Fetch the last session summary and recent messages to initialize a new session.
+
+**Request:**
+```json
+{
+  "channel": "claude-code",
+  "userId": "user_123"
+}
+```
+
+**Response:**
+```json
+{
+  "lastSessionSummary": "Yesterday's meeting covered Q2 roadmap...",
+  "recentMessages": [
+    { "timestamp": 1681234567890, "role": "user", "text": "..." },
+    { "timestamp": 1681234568000, "role": "assistant", "text": "..." }
+  ]
+}
+```
+
+### Memory Recall
+
+#### `POST /api/mcp/recall`
+
+Vector search over memories by semantic query.
+
+**Request:**
+```json
+{
+  "query": "authentication implementation details",
+  "limit": 5,
+  "channel": "claude-code",
+  "agentId": "assistant"
+}
+```
+
+**Response:**
+```json
+{
+  "memories": [
+    {
+      "id": "mem_123",
+      "title": "API key hashing strategy",
+      "content": "Keys are hashed with SHA256 before storage...",
+      "store": "semantic",
+      "category": "decision",
+      "relevance": 0.89,
+      "createdAt": 1681234567890
+    }
+  ]
+}
+```
+
+**Optional request fields:**
+
+- `channel` — channel/scope context, including peer-scoped or shared-main values
+- `agentId` — agent identifier used when resolving knowledge-base visibility for mixed private/shared deployments
+
+<Note>
+**Peer-first fallback (new in 0.7.15).** If `channel` is omitted on a peer-facing call, recall fails-closed on any knowledge base with a concrete peer scope. Previously the guard silently upgraded unscoped callers to management-level visibility. Always pass the peer channel (e.g. `morrow-coach:511172388`) from a peer session.
+</Note>
+
+**Behavior notes:**
+
+- the live MCP recall path computes one query embedding and reuses it across semantic memory recall and message-search evidence
+- identical repeated HTTP recall requests can reuse the short-lived query embedding cache
+- KB results are merged after normal memory recall, with agent/scope-aware visibility rules
+
+### Message Search
+
+#### `POST /api/mcp/search-messages`
+
+Exact/keyword search over raw message transcripts.
+
+**Request:**
+```json
+{
+  "query": "rate limit",
+  "limit": 10,
+  "channel": "claude-code"
+}
+```
+
+**Response:**
+```json
+{
+  "turns": [
+    {
+      "timestamp": 1681234567890,
+      "messages": [
+        { "role": "user", "text": "What are the rate limits?" },
+        { "role": "assistant", "text": "Free tier: 100 req/min, Pro: 500 req/min..." }
+      ]
+    }
+  ]
+}
+```
+
+#### `POST /api/mcp/recent-messages`
+
+Fetch N most recent messages without vector search cost.
+
+**Request:**
+```json
+{
+  "limit": 20,
+  "channel": "claude-code"
+}
+```
+
+**Response:**
+```json
+{
+  "messages": [
+    { "timestamp": 1681234567890, "role": "user", "text": "..." }
+  ]
+}
+```
+
+### Memory Management
+
+#### `POST /api/mcp/capture`
+
+Store a new memory (typically called after AI response completes).
+
+**Request:**
+```json
+{
+  "title": "Decided to use Convex for state management",
+  "content": "Convex mutations provide automatic retries and transactional guarantees...",
+  "store": "semantic",
+  "category": "decision",
+  "channel": "claude-code"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "mem_456",
+  "embedding": [0.12, -0.45, ...],
+  "createdAt": 1681234567890
+}
+```
+
+#### `POST /api/mcp/checkpoint`
+
+Mark a session milestone.
+
+**Request:**
+```json
+{
+  "label": "Completed authentication module",
+  "description": "Implemented API key creation, validation, and rate limiting. Next: write tests."
+}
+```
+
+**Response:**
+```json
+{
+  "id": "ckpt_789",
+  "timestamp": 1681234567890
+}
+```
+
+#### `POST /api/mcp/trace`
+
+Retrieve the original conversation context for a memory.
+
+**Request:**
+```json
+{
+  "memoryId": "mem_123"
+}
+```
+
+**Response:**
+```json
+{
+  "memory": { "id": "mem_123", "title": "...", "content": "..." },
+  "sourceConversation": [
+    { "role": "user", "text": "How should we handle auth?" },
+    { "role": "assistant", "text": "We should hash keys before storage..." }
+  ],
+  "contextBefore": [...],
+  "contextAfter": [...]
+}
+```
+
+### System
+
+#### `GET /api/mcp/stats`
+
+Memory store health and usage.
+
+**Response:**
+```json
+{
+  "memoryCount": {
+    "byStore": { "semantic": 124, "episodic": 89, "procedural": 34 },
+    "byCategory": { "decision": 45, "lesson": 38, "fact": 125 }
+  },
+  "ttlStatus": {
+    "free_tier_expires_in_days": 7,
+    "messages_stored": 543
+  },
+  "usage": {
+    "tier": "pro",
+    "memory_limit": 5000,
+    "memories_used": 247,
+    "percent_used": 4.94
+  }
+}
+```
+
+## Usage Pattern: Full Turn
+
+Typical agentic flow:
+
+1. **Session start:** `POST /api/mcp/wake` → prime context
+2. **Before work:** `POST /api/mcp/recall` with relevant query → semantic context
+3. **After response:** `POST /api/mcp/capture` with extracted memory
+4. **Optional:** `POST /api/mcp/checkpoint` if turning point reached
+
+For debugging:
+
+- Add `debugRecallOutput=true` query param to recall endpoints to get verbose output including all search results, filtering, and prompt injections
+- Use `POST /api/mcp/trace` to understand memory provenance
+
+## Common mistakes
+
+- assuming the endpoint list is the whole behavior without reading the surrounding logic in `mcp.ts`
+- mixing HTTP endpoints and MCP tool names without explaining the relationship
+- ignoring auth/rate-limit behavior when describing the API surface
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`

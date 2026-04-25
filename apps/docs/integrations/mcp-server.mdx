@@ -1,0 +1,85 @@
+---
+title: MCP Server
+description: Understand the current and legacy MCP server paths, what they expose, and which client should use which path.
+---
+
+
+An MCP server is a tool box your AI can open.
+Memory Crystal gives that tool box memory tools like “remember this”, “search old conversations”, and “look inside a knowledge base”.
+
+## What this means in practice
+
+There are **two MCP server stories** in this repo:
+
+### Current path
+- `packages/mcp-server/`
+- Streamable HTTP MCP
+- best for modern MCP-capable clients
+
+### Legacy path
+- `mcp-server/`
+- deprecated stdio/HTTP server
+- still relevant for older compatibility paths like Claude Desktop
+
+## Which clients use which path?
+
+### Use the current Streamable HTTP MCP path for:
+- Claude Code
+- Codex CLI
+- Factory Droid
+- other clients that support Streamable HTTP MCP
+
+### Use the deprecated stdio/HTTP package for:
+- Claude Desktop
+- older or compatibility-driven setups
+
+When you launch the deprecated package as a command for a client, set `CRYSTAL_MCP_MODE=stdio`. Reserve `http` for the explicit local network listener.
+
+## How it actually works
+
+The current package (`packages/mcp-server`) wraps Memory Crystal's hosted HTTP API and exposes a Streamable HTTP MCP endpoint.
+
+The deprecated package (`mcp-server`) exposes the older local stdio/HTTP form of the same memory tool surface.
+
+Core tool areas include:
+
+- recall and search
+- remember and checkpoint
+- wake/trace/stats
+- knowledge-base list/query/import
+
+## Commands / examples
+
+Current package local run example:
+
+```bash
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site \
+MEMORY_CRYSTAL_API_KEY=your_api_key_here \
+npm run start --workspace packages/mcp-server
+```
+
+Example client registration:
+
+```bash
+claude mcp add memory-crystal --transport http http://localhost:3100/mcp
+```
+
+```bash
+codex mcp add memory-crystal --url http://localhost:3100/mcp
+```
+
+## Common mistakes
+
+- using the deprecated package when a client supports the current HTTP transport
+- confusing hosted backend auth with local process config
+- documenting Claude Desktop like it uses the same path as Claude Code
+
+## Source of truth
+
+Primary files behind this page:
+
+- `packages/mcp-server/README.md`
+- `packages/mcp-server/package.json`
+- `packages/mcp-server/railway.toml`
+- `mcp-server/README.md`
+- `mcp-server/src/index.ts`

@@ -1,0 +1,124 @@
+---
+title: Installation
+description: Choose the right installation path for hosted Memory Crystal, OpenClaw, or MCP clients.
+---
+
+
+Installation is how you connect Memory Crystal to your AI helper and choose where the memory should live.
+
+## What this means in practice
+
+Memory Crystal currently has two main integration models:
+
+1. **OpenClaw Plugin** for automatic capture + recall
+2. **MCP-based integrations** for Claude Code, Codex CLI, Factory Droid, Claude Desktop, and other MCP clients
+
+For OpenClaw installs, the current installer now:
+
+- auto-enables full context-engine ownership when local SQLite is actually available
+- preserves explicit existing config instead of overwriting it
+- supports a one-key mixed-scope model where some agents are peer-scoped and others are shared/open
+
+## How it actually works
+
+The installation story in this repo is spread across:
+
+- public install scripts under `apps/web/public/`
+- plugin setup scripts under `scripts/`
+- MCP server READMEs and package entrypoints
+- environment variable examples in `.env.example`
+
+## Hosted Memory Crystal
+
+The fastest path is to use the hosted Memory Crystal service and connect your client with a Memory Crystal API key.
+
+You will need:
+
+- a Memory Crystal API key
+- a supported client
+- for MCP clients, either the hosted MCP endpoint or the deprecated stdio/HTTP package depending on the client
+
+## Recommended install paths
+
+| Client | Recommended install path |
+| --- | --- |
+| OpenClaw | [OpenClaw Plugin](/integrations/openclaw-plugin) |
+| Claude Code | [Claude Code](/integrations/claude-code) |
+| Codex CLI | [Codex CLI](/integrations/codex-cli) |
+| Factory Droid | [Factory Droid](/integrations/factory-droid) |
+| Claude Desktop | [Claude Desktop](/integrations/claude-desktop) |
+
+## MCP server variants
+
+### Current path: Streamable HTTP MCP
+
+This is the mainline MCP path now. It is documented in:
+
+- [MCP Server](/integrations/mcp-server)
+
+Use this for:
+
+- Claude Code
+- Codex CLI
+- Factory Droid
+- other MCP clients that support Streamable HTTP MCP
+
+### Legacy path: deprecated stdio/HTTP MCP package
+
+This still exists for compatibility and is currently the documented Claude Desktop path.
+
+Use this for:
+
+- Claude Desktop
+- any environment that still expects the older local compatibility package instead of the hosted Streamable HTTP endpoint
+
+## Self-hosting
+
+If you want to host the backend yourself, see:
+
+- [Railway deployment](/self-hosting/railway)
+- [Environment variables](/self-hosting/environment-variables)
+
+## Local docs preview
+
+Mintlify docs for this repo live under `apps/docs`.
+
+To preview locally:
+
+```bash
+cd apps/docs
+npx mint dev
+```
+
+## Commands / examples
+
+Primary installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+### Mixed private + shared agents on one key
+
+If you run multiple agents under one Memory Crystal account:
+
+- keep coach/client-facing agents in **peer** mode
+- put internal/content agents in **shared** mode
+
+This is configured with `agentScopePolicies` in the OpenClaw plugin config, not with multiple API keys.
+
+## Next steps
+
+After installation:
+
+- run through [Quickstart](/quickstart)
+- verify tool access with `crystal_wake`, `crystal_remember`, and `crystal_recall`
+
+## Source of truth
+
+- `apps/web/public/install.sh`
+- `apps/web/public/install-claude-mcp.sh`
+- `apps/web/public/install-codex-mcp.sh`
+- `apps/web/public/install-droid-mcp.sh`
+- `scripts/crystal-enable.sh`
+- `.env.example`

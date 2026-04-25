@@ -1,0 +1,131 @@
+export const metadata = {
+  title: "crystal_search_messages",
+  description: "Semantic search over short-term memory messages",
+};
+
+# Search Messages
+
+Semantic search over short-term memory messages.
+
+## What it does
+
+Performs semantic similarity search across your raw conversation messages (short-term memory). Useful for finding recent conversations, specific discussions, or earlier context that may not have been extracted into long-term memories yet.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | Search query (minimum 1 character) |
+| `limit` | number | No | Maximum results to return (default: 10, clamped to 1+) |
+| `channel` | string | No | Filter by channel (e.g., "slack", "discord", "email") |
+| `sinceMs` | number | No | Only search messages after this Unix timestamp (ms) |
+
+## Returns
+
+Returns formatted message results and JSON:
+
+```
+## Message Search Results
+Query: "database migration"
+
+1. [assistant] The migration to PostgreSQL requires... (score: 0.94)
+   timestamp: 2026-04-16 14:30:00
+
+2. [user] Should we run the migration on a Friday? (score: 0.89)
+   timestamp: 2026-04-15 10:15:00
+```
+
+And structured JSON:
+```json
+{
+  "query": "database migration",
+  "results": [
+    {
+      "_id": "msg_123",
+      "role": "assistant",
+      "content": "The migration to PostgreSQL requires...",
+      "channel": "slack",
+      "timestamp": 1713284400000,
+      "score": 0.94
+    }
+  ],
+  "limit": 10,
+  "channel": "slack"
+}
+```
+
+## Examples
+
+### Search recent conversations
+
+```
+crystal_search_messages(query="authentication bug fix")
+```
+
+Returns messages matching "authentication bug fix" from recent conversations.
+
+### Search within a time window
+
+```
+crystal_search_messages(
+  query="API redesign",
+  sinceMs=1713177600000,
+  limit=5
+)
+```
+
+Searches for "API redesign" only in messages after April 15, 2026, returning top 5 results.
+
+### Search channel-specific messages
+
+```
+crystal_search_messages(
+  query="Q2 roadmap",
+  channel="slack",
+  limit=10
+)
+```
+
+Returns messages about "Q2 roadmap" from Slack channels only.
+
+### Quick recent lookup
+
+```
+crystal_search_messages(query="Sarah", limit=3)
+```
+
+Finds the 3 most recent messages mentioning Sarah.
+
+## When to use
+
+- **Find recent context** — Quickly locate a conversation from earlier today or this week
+- **Recall details** — Remember specifics from a discussion before it was extracted into memories
+- **Search by channel** — Find messages from a specific source (Slack, Discord, email, etc.)
+- **Temporal search** — Search only recent messages or messages within a date range
+- **Verify information** — Double-check details directly from conversation history
+
+## Comparison to Other Tools
+
+| Tool | Search Across | Best For |
+|------|---|---|
+| `crystal_search_messages` | Raw STM messages | Finding recent conversations verbatim |
+| `crystal_recall` | Extracted memories (LTM) | Finding synthesized facts and decisions |
+| `crystal_query_knowledge_base` | Imported KB chunks | Searching specific documents or channels |
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `query is required` | No search query provided | Provide a search string (1+ characters) |
+| `channel must be a string` | Invalid channel type | Pass a string like "slack" or "discord" |
+| Embedding service unavailable | OpenAI embeddings down | Retry in a moment |
+
+## Notes
+
+- Searches are case-insensitive
+- Results are ranked by semantic similarity score (0-1, higher = better match)
+- Limit defaults to 10 if not provided or invalid
+- sinceMs uses Unix millisecond timestamps (e.g., `Date.now()`)
+- API-key clients embed server-side; JWT clients embed locally
+- Message retention depends on your Memory Crystal tier (Free: 7 days, Pro: 30 days, Ultra: 90 days)
+- Short-term messages are eventually archived; use `crystal_recall` for long-term facts

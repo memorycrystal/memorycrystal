@@ -1,0 +1,78 @@
+---
+title: Source of Truth
+description: Coverage matrix for the public docs and the repo files each page should stay aligned with.
+---
+
+This page is the maintenance map for `apps/docs`.
+
+## Why this exists
+
+Memory Crystal has source material spread across code, scripts, READMEs, and internal design docs.
+The public docs should not guess. They should point back to the exact repo files that own the truth.
+
+## Coverage matrix
+
+| Repo area | Visibility | Public docs destination | Primary source files |
+| --- | --- | --- | --- |
+| Top-level product overview | public-direct | `introduction`, `quickstart`, `pricing` | `README.md`, `apps/web/app/page.tsx`, `apps/web/app/layout.tsx` |
+| OpenClaw plugin runtime | public-direct | `integrations/openclaw-plugin`, `configuration/plugin-options` | `plugin/index.js`, `plugin/openclaw.plugin.json`, `plugin/openclaw-hook.json` |
+| Plugin install / enable flows | public-direct | `quickstart`, `configuration/environment-variables`, `help/troubleshooting` | `scripts/crystal-enable.sh`, `scripts/crystal-doctor.sh`, `apps/web/public/install.sh` |
+| Current Streamable HTTP MCP server | public-direct | `integrations/mcp-server`, `tools/*`, `api/*` | `packages/mcp-server/README.md`, `packages/mcp-server/**` |
+| Deprecated stdio/HTTP MCP server | public-distilled | `integrations/mcp-server`, `integrations/claude-desktop` | `mcp-server/README.md`, `mcp-server/src/index.ts` |
+| Convex memory/tool HTTP surface | public-direct | `tools/overview`, `api/authentication`, `api/memory-endpoints`, `api/knowledge-base-endpoints` | `convex/crystal/mcp.ts`, `convex/crystal/knowledgeHttp.ts` |
+| Core memory model | public-direct | `concepts/memory-layers`, `concepts/context-engine`, `concepts/memory-stores`, `concepts/knowledge-bases` | `README.md`, `convex/schema.ts`, `convex/crystal/recall.ts`, `shared/tierLimits.ts` |
+| Organic Memory current behavior | public-distilled | `organic/overview`, later organic pages | `convex/crystal/organic/**`, `convex/crons.ts`, `docs/organic-memory/PRD-Organic-Memory.md` |
+| Organic Memory future vision | private-internal | distilled notes only, not mirrored verbatim | `docs/organic-memory/PRD-Organic-Memory.md`, related planning docs |
+| Branding / visual shell | public-direct | `apps/docs/docs.json`, shell assets | `apps/docs/logo/*`, `apps/web/app/globals.css`, `apps/web/app/layout.tsx` |
+| Environment / auth setup | public-direct | `configuration/environment-variables`, `api/authentication`, `help/troubleshooting` | `.env.example`, `scripts/crystal-doctor.sh` |
+| Public install scripts for clients | public-direct | `quickstart`, integration pages | `apps/web/public/install-claude-mcp.sh`, `install-codex-mcp.sh`, `install-droid-mcp.sh`, `install.sh` |
+| Internal planning markdown | private-internal | do not mirror | `docs/**`, `AGENTS.md`, `CLAUDE.md` |
+
+## Page depth tiers
+
+### Tier A — flagship pages
+These pages should always include:
+- **Plain-language summary**
+- **What this means in practice**
+- **How it actually works**
+- **Commands / examples**
+- **Source of truth**
+
+Tier A pages for the first implementation batch:
+- `introduction`
+- `quickstart`
+- `integrations/mcp-server`
+- `integrations/openclaw-plugin`
+- `tools/overview`
+- `api/authentication`
+- `organic/overview`
+- `configuration/environment-variables`
+
+### Tier B — support/reference pages
+These pages should include:
+- concise explanation
+- practical usage notes
+- examples when relevant
+- source links
+
+### Tier C — internal/private source material
+These pages are **not** public docs.
+They can inform public docs, but they should not be mirrored directly.
+
+## Freshness triggers
+
+Update `apps/docs` when any of these change:
+
+- install scripts under `apps/web/public/`
+- `packages/mcp-server/README.md` or `mcp-server/README.md`
+- plugin config fields or plugin wiring files
+- `convex/crystal/mcp.ts` or `convex/crystal/knowledgeHttp.ts`
+- `.env.example`
+- `shared/tierLimits.ts`
+- `convex/crystal/organic/**` or `convex/crons.ts`
+- brand assets or design tokens used by the docs shell
+
+## Public mirror rule
+
+The public mirror should expose public docs from `apps/docs`.
+Internal markdown in `docs/` and agent instruction files should stay out of the public mirror.

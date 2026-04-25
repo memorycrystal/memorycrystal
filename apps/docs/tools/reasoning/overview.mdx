@@ -1,0 +1,76 @@
+---
+title: Reasoning tools
+description: Memory graph traversal and reasoning helpers for exploring relationships, ownership, and decision archaeology.
+---
+
+## What this means in practice
+
+Reasoning tools help the AI explore Memory Crystal's knowledge graph to understand context beyond simple retrieval. Instead of just finding a memory, these tools answer:
+
+- What do I know about X?
+- Who owns or manages Y?
+- Why did we make decision Z?
+- How is concept A connected to concept B?
+- What depends on what?
+
+## How it actually works
+
+These tools operate on Memory Crystal's semantic graph layer:
+
+- **Vector search** finds candidate memories by semantic similarity
+- **Graph traversal** explores relationships between memories (mentions, decides_in, depends_on, owns, etc.)
+- **Ranking** prioritizes results by recency, strength, and relationship type
+- **Scope filtering** (for multi-tenant systems) ensures memories from different channels/projects don't bleed together
+
+Key repo surfaces:
+
+- `convex/crystal/recall.ts` — Core recall logic shared across all reasoning tools
+- `convex/crystal/recallRanking.ts` — Ranking and filtering logic
+- `convex/crystal/graph.ts` — Knowledge graph mutations and queries
+- `convex/crystal/mcp.ts` — MCP tool definitions
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_what_do_i_know` — Broad topic scan
+- `crystal_why_did_we` — Reason archaeology for decisions
+- `crystal_who_owns` — Ownership and responsibility lookup
+- `crystal_explain_connection` — Relationship explorer between two entities
+- `crystal_dependency_chain` — Find what depends on what
+
+## When to use each
+
+| Tool | Use when | Example |
+|---|---|---|
+| **`crystal_what_do_i_know`** | You want an overview of everything known about a topic, across all memory stores | "What do I know about Convex auth?" |
+| **`crystal_why_did_we`** | You want to understand the reasoning behind a past decision | "Why did we use Convex instead of Supabase?" |
+| **`crystal_who_owns`** | You want to find who is responsible for or assigned to something | "Who owns the mobile release?" |
+| **`crystal_explain_connection`** | You want to understand how two concepts or entities are related | "How does the session layer connect to the recall pipeline?" |
+| **`crystal_dependency_chain`** | You want to trace what depends on a decision or component | "What depends on Postgres connection pooling?" |
+
+## Differences from recall and search
+
+| Tool Family | Purpose | Returns |
+|---|---|---|
+| **Recall** (`crystal_recall`, `crystal_recent`) | Fast retrieval of relevant memories before each response | Top-K memories, ranked by relevance |
+| **Search** (`crystal_search_messages`) | Find messages by keyword or phrase | Messages matching the search pattern |
+| **Reasoning** (`crystal_what_do_i_know`, `crystal_why_did_we`, etc.) | Explore relationships and ownership; answer "why" and "how" questions | Structured graphs of related memories, ownership chains, decision rationale |
+
+**Key difference**: Recall is *reactive* (triggered before every response), while reasoning tools are *exploratory* (called when you need to understand structure or relationships).
+
+## Common mistakes
+
+- Using `crystal_recall` when you should use `crystal_what_do_i_know` for broad topic scans
+- Forgetting that reasoning tools require explicit queries — they don't auto-trigger like recall
+- Conflating `crystal_why_did_we` (decision archaeology) with `crystal_recall` (memory retrieval)
+- Using `crystal_who_owns` for a concept that doesn't have explicit ownership metadata
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/graph.ts`
+- `convex/crystal/mcp.ts`

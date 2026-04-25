@@ -1,0 +1,57 @@
+{
+  "name": "memorycrystal",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "mcp-server"
+  ],
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "crystal:init": "bash scripts/crystal-init.sh",
+    "crystal:bootstrap": "bash scripts/crystal-bootstrap.sh",
+    "crystal:doctor": "bash scripts/crystal-doctor.sh",
+    "crystal:enable": "bash scripts/crystal-enable.sh",
+    "crystal:disable": "bash scripts/crystal-disable.sh",
+    "crystal:e2e": "bash scripts/crystal-e2e.sh",
+    "convex:deploy": "CONVEX_DEPLOYMENT=prod:rightful-mockingbird-389 npx convex deploy",
+    "test:smoke": "bash scripts/crystal-doctor.sh --smoke",
+    "test:capture-e2e": "node scripts/test-capture-e2e.cjs",
+    "install:hooks": "node scripts/install-hooks.mjs",
+    "sync:public": "node scripts/sync-public.mjs --dry-run",
+    "install:sweeper": "node scripts/install-launchd-plist.mjs",
+    "convex:local:up": "bash scripts/convex-local-up.sh",
+    "convex:local:down": "bash scripts/convex-local-down.sh",
+    "convex:local:doctor": "bash scripts/convex-local-doctor.sh",
+    "convex:local:reset": "bash scripts/convex-local-down.sh --wipe && npm run convex:local:up",
+    "convex:local:seed": "node --experimental-strip-types scripts/convex-local-seed.ts",
+    "convex:local:auth-keys": "node --experimental-strip-types scripts/convex-local-auth-keys.ts",
+    "convex:local:provision-env": "node --experimental-strip-types scripts/convex-local-provision-env.ts",
+    "convex:local:write-env": "node --experimental-strip-types scripts/convex-local-write-env.ts"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "convex": "^1.35.1",
+    "convex-test": "^0.0.41",
+    "eslint-plugin-local-rules": "^3.0.2",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "router": {
+      "path-to-regexp": "8.4.0"
+    },
+    "vite": "7.3.2",
+    "hono": "4.12.14",
+    "@hono/node-server": "1.19.13"
+  },
+  "optionalDependencies": {
+    "lightningcss-darwin-arm64": "1.31.1",
+    "lightningcss-darwin-x64": "1.31.1",
+    "lightningcss-linux-arm64-gnu": "1.31.1",
+    "lightningcss-linux-x64-gnu": "1.31.1"
+  },
+  "packageManager": "npm@10.9.4"
+}

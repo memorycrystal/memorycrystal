@@ -1,0 +1,81 @@
+---
+title: Railway Deployment
+description: Deploy the Memory Crystal web app or MCP server on Railway.
+---
+
+
+Railway is one place you can run the parts of Memory Crystal that need a server.
+
+## What this means in practice
+
+This repo contains more than one deployable surface, so Railway setup matters.
+
+## Web app deployment
+
+The Next.js web dashboard lives under:
+
+- `apps/web`
+
+The repo root already includes a `railway.toml` aimed at the web app.
+
+## MCP server deployment
+
+The current Streamable HTTP MCP server lives under:
+
+- `packages/mcp-server`
+
+That service has its own package-local Railway config and should be deployed separately from the web app.
+
+## Important monorepo note
+
+If Railway uses the repo-root config by default, it may boot the web app instead of the MCP server.
+
+For the MCP service, use the package-local settings described in `packages/mcp-server/README.md`.
+
+## MCP server service settings
+
+For Railway MCP deployment, use:
+
+- **Root Directory:** `/packages/mcp-server`
+- **Railway Config File:** `/packages/mcp-server/railway.toml`
+- **Port:** `3100`
+
+## How it actually works
+
+This matters because Railway can accidentally use the wrong config in a monorepo if you point it at the wrong root.
+
+The public docs should emphasize the MCP server package-local deployment path instead of implying the root web app config is correct for every service.
+
+## Commands / examples
+
+Typical start command for the package-local MCP service:
+
+```bash
+npm run start --workspace packages/mcp-server
+```
+
+## Build / start model
+
+The package-local setup handles:
+
+- install
+- build
+- start
+- healthcheck routing
+
+## What to verify after deploy
+
+- the service health endpoint responds
+- the MCP endpoint is reachable
+- your client can authenticate with `Authorization: Bearer <api-key>`
+
+## Related docs
+
+- [Environment Variables](/self-hosting/environment-variables)
+- [MCP Server](/integrations/mcp-server)
+
+## Source of truth
+
+- `packages/mcp-server/README.md`
+- `packages/mcp-server/railway.toml`
+- `apps/docs/self-hosting/environment-variables.mdx`

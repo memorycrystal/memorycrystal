@@ -1,0 +1,115 @@
+---
+title: Plugin Options
+description: Which OpenClaw plugin knobs exist and where they are actually defined.
+---
+
+
+Plugin options are settings you give Memory Crystal so it knows how to connect and behave.
+
+## What this means in practice
+
+Important plugin-facing settings include things like:
+
+- API key / backend URL
+- default recall mode
+- default recall limit
+- optional global channel scoping
+- optional per-agent scope policies
+- local summary behavior
+
+## Most important options
+
+| Option | Type | Default | What it does |
+| --- | --- | --- | --- |
+| `apiKey` | string | — | Memory Crystal API key used for hosted HTTP/API calls |
+| `convexUrl` | string | managed backend | Hosted/backend base URL |
+| `defaultRecallMode` | string | `general` | Default mode for `crystal_recall`-style queries |
+| `defaultRecallLimit` | number | `4` | Default per-query recall fan-in |
+| `channelScope` | string | — | Legacy/global scope prefix. When set alone, captures and recalls resolve as `{channelScope}:{peerId}` |
+| `agentScopePolicies` | array | — | **New.** Per-agent override layer so one API key can mix peer-scoped and shared/open agents |
+| `localStoreEnabled` | boolean | `false` in schema, auto-enabled by installer when SQLite is available | Enables the optional local SQLite store used for local context/compaction |
+| `contextEngineMode` | string | `reduced` in schema, auto-promoted to `full` by installer when SQLite is available | Controls whether Memory Crystal owns full context-engine behavior |
+| `localSummaryInjection` | boolean | `false` | Enables local summary injection from the SQLite store |
+| `localSummaryMaxTokens` | number | `2000` | Token budget for local injected summaries |
+
+## One API key, mixed agent scopes
+
+The shipped model now supports **one API key for both private and shared agents**.
+
+Use:
+
+- `mode: "peer"` for agents like `coach` or `coach-beta`
+  - captures/recalls resolve to `scope:{peerId}`
+  - use this for strict per-client isolation
+- `mode: "shared"` for internal/content agents like `dm-replies`, `ask-cass`, `social-media`, etc.
+  - captures/recalls resolve to `scope:main`
+  - use this for open/shared knowledge across chats
+
+Example:
+
+```json
+{
+  "channelScope": "morrow-coach",
+  "agentScopePolicies": [
+    { "agentId": "coach", "scope": "morrow-coach", "mode": "peer" },
+    { "agentId": "coach-beta", "scope": "morrow-coach", "mode": "peer" },
+    { "agentId": "dm-replies", "scope": "morrow-team", "mode": "shared" },
+    { "agentId": "ask-cass", "scope": "morrow-team", "mode": "shared" }
+  ]
+}
+```
+
+Behavior:
+
+- explicit `agentScopePolicies` override `channelScope`
+- if no policy matches, Memory Crystal falls back to the legacy/global `channelScope`
+- this preserves backward compatibility for existing installs
+
+## Installer behavior
+
+The installer/enabler is now conservative:
+
+- if you already set `contextEngineMode`, `localStoreEnabled`, or `dbPath`, it **preserves** those choices
+- if local SQLite (`better-sqlite3`) is available and you have **not** explicitly configured those fields, it automatically enables:
+  - `localStoreEnabled: true`
+  - `contextEngineMode: "full"`
+- if SQLite is unavailable, it leaves installs safely in reduced mode
+
+## How it actually works
+
+The main plugin config shape is defined in:
+
+- `plugin/openclaw.plugin.json`
+
+The runtime behavior around those options is implemented in:
+
+- `plugin/index.js`
+
+Operational scripts also matter:
+
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-doctor.sh`
+
+## Commands / examples
+
+Safe validation:
+
+```bash
+npm run crystal:enable -- --dry-run
+npm run crystal:doctor
+```
+
+## Common mistakes
+
+- reading the legacy hook manifest and assuming it is the only config surface
+- documenting defaults without checking the actual plugin schema
+- forgetting the operational scripts that wire the plugin into OpenClaw
+
+## Source of truth
+
+Primary files behind this page:
+
+- `plugin/openclaw.plugin.json`
+- `plugin/index.js`
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-doctor.sh`

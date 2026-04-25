@@ -1,0 +1,62 @@
+---
+title: Claude Desktop
+description: Connect Memory Crystal to Claude Desktop using the deprecated compatibility path documented in the repo.
+---
+
+
+Claude Desktop can still talk to Memory Crystal, but it uses the older kind of connection in this repo.
+
+## What this means in practice
+
+Claude Desktop is currently documented through the **deprecated stdio/HTTP MCP package**, not the preferred modern Streamable HTTP package.
+
+That distinction matters because the setup steps and assumptions are different from Claude Code.
+
+## How it actually works
+
+Important repo surfaces:
+
+- `mcp-server/README.md`
+- `mcp-server/src/index.ts`
+- `.env.example`
+
+This path is public and documented, but it should be described as a compatibility path, not the mainline path for all clients.
+
+## Commands / examples
+
+Add this to:
+
+```text
+~/.claude/claude_desktop_config.json
+```
+
+```json
+{
+  "mcpServers": {
+    "memory-crystal": {
+      "command": "crystal-mcp",
+      "env": {
+        "CRYSTAL_MCP_MODE": "stdio",
+        "MEMORY_CRYSTAL_API_KEY": "your-api-key-here",
+        "MEMORY_CRYSTAL_API_URL": "https://your-deployment.convex.site"
+      }
+    }
+  }
+}
+```
+
+`CRYSTAL_MCP_MODE=stdio` matters here because the deprecated local package can also run an explicit local HTTP listener. Claude Desktop's command-launched path should use stdio.
+
+## Common mistakes
+
+- assuming Claude Desktop uses the same preferred setup as Claude Code
+- documenting the deprecated package as if it were the current default
+- forgetting to explain why this path still exists
+
+## Source of truth
+
+Primary files behind this page:
+
+- `mcp-server/README.md`
+- `mcp-server/src/index.ts`
+- `.env.example`

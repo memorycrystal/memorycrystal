@@ -1,0 +1,132 @@
+export const metadata = {
+  title: "crystal_explain_connection",
+  description: "Explain how two entities are connected in your knowledge graph",
+};
+
+# Explain Connection
+
+Explain how two entities are connected in your knowledge graph.
+
+## What it does
+
+Traces relationships between two entities to show direct connections and indirect paths through intermediaries. Returns direct relationships, multi-hop paths, and supporting memories that establish the connections.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entityA` | string | Yes | First entity (e.g., "Sarah", "API", "authentication") |
+| `entityB` | string | Yes | Second entity (e.g., "database", "frontend", "Q2 goals") |
+| `channel` | string | No | Peer-scoped channel key (e.g. `morrow-coach:511172388`). When set, filters results to memories in that channel. New in 0.7.15. |
+
+## Returns
+
+Returns connection information containing:
+
+- **directRelations**: Direct relationships between the entities (if any)
+- **indirectPaths**: Multi-hop paths through intermediaries
+- **supportingMemories**: Memories that establish the connections
+
+Example response:
+```json
+{
+  "entityA": "Sarah",
+  "entityB": "API",
+  "directRelations": [
+    {
+      "fromLabel": "Sarah",
+      "toLabel": "API",
+      "relationType": "owns",
+      "confidence": 0.94,
+      "evidenceMemoryIds": ["mem789"]
+    }
+  ],
+  "indirectPaths": [
+    {
+      "type": "A_to_X_to_B",
+      "viaLabel": "Backend Team",
+      "viaNodeType": "group",
+      "path": {
+        "first": {
+          "fromLabel": "Sarah",
+          "relationType": "leads"
+        },
+        "second": {
+          "toLabel": "API",
+          "relationType": "owns"
+        }
+      }
+    }
+  ],
+  "supportingMemories": [
+    {
+      "title": "Sarah leads Backend Team",
+      "store": "semantic"
+    }
+  ]
+}
+```
+
+## Examples
+
+### Find direct connection
+
+```
+crystal_explain_connection(
+  entityA="Sarah",
+  entityB="notification service"
+)
+```
+
+Returns whether Sarah owns or manages the notification service, or if there's a path through other entities.
+
+### Trace organizational structure
+
+```
+crystal_explain_connection(
+  entityA="Backend Team",
+  entityB="Q2 goals"
+)
+```
+
+Shows how the Backend Team relates to Q2 goals (directly or through intermediate entities like projects or initiatives).
+
+### Understand data flow
+
+```
+crystal_explain_connection(
+  entityA="API",
+  entityB="PostgreSQL database"
+)
+```
+
+Returns how the API is connected to the database, including direct dependencies or paths through other systems.
+
+## When to use
+
+- **Understand relationships** — When you need to see how different entities relate to each other
+- **Trace dependencies** — Find how changes to one system might impact another
+- **Clarify organizational structure** — See how people, teams, and projects connect
+- **Audit impact** — Before making changes, understand what else might be affected
+- **Onboard new team members** — Show how different components and people relate
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `entityA is required` | Missing first entity | Provide both entity names |
+| `entityB is required` | Missing second entity | Provide both entity names |
+| No connections found | Entities don't have a relationship in the graph | Check entity names; add memories to establish connections |
+
+## Notes
+
+### Peer scoping (new in 0.7.15)
+
+Hosted / API-key consumers can now pass an explicit `channel` to scope results to a peer. Previously this tool's API-key path silently ignored channel and returned cross-channel results; as of 0.7.15, the HTTP recall branch forwards the filter consistently with JWT clients. Omit `channel` only when you intend the broadest (management-style) result set.
+
+- Direct relationships are found first; indirect paths use multi-hop traversal
+- Confidence scores indicate the strength of each relationship
+- Paths are ordered by likely relevance (shorter paths typically appear first)
+- Supporting memories show which observations or decisions established the connections
+- API-key clients use a recall-based fallback if the full graph query is unavailable
+- If both entities exist but are unconnected, the response will show "No direct relationships" and "No indirect paths"

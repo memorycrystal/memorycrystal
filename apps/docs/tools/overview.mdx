@@ -1,0 +1,163 @@
+---
+title: Tools Overview
+description: Complete reference to Memory Crystal's 18+ tools, grouped by function with decision trees and recommended usage patterns.
+---
+
+Memory Crystal exposes 18+ tools across five families. Each tool addresses a specific use case in the memory lifecycle: recalling context, writing memories, reasoning about what you know, and working with knowledge bases.
+
+For OpenClaw/plugin-backed sessions, tool calls can also carry **agent-aware scope** implicitly:
+
+- peer-scoped agents search/write under `scope:{peerId}`
+- shared agents search/write under `scope:main`
+
+## Tool Families
+
+### Memory Lookup (5 tools)
+
+Semantic and lexical search over stored memories and messages.
+
+- **`crystal_recall`** — Vector search over memories (both STM and LTM) by semantic query
+- **`crystal_search_messages`** — Exact/keyword search over raw message transcripts
+- **`crystal_recent`** — Fetch N most recent messages without embedding cost
+- **`crystal_trace`** — Follow memory back to its source conversation and extract context
+- **`crystal_wake`** — Session initialization: fetch last session summary + recent messages
+
+### Memory Writing & Maintenance (5 tools)
+
+Capture, update, and manage the memory store.
+
+- **`crystal_remember`** — Extract and save a new memory (or batch of memories)
+- **`crystal_checkpoint`** — Label a significant session milestone with label + description
+- **`crystal_edit`** — Update existing memory (content, tags, metadata)
+- **`crystal_forget`** — Archive or permanently delete a memory by ID
+- **`crystal_import_knowledge`** — Batch-import external documents into a knowledge base
+
+### Reasoning Helpers (6 tools)
+
+Introspect, explain, and traverse the memory graph.
+
+- **`crystal_what_do_i_know`** — Broad topic scan: summarize everything known about a concept
+- **`crystal_why_did_we`** — Decision archaeology: trace why a choice was made
+- **`crystal_who_owns`** — Ownership lookup: find who manages a project, person, or entity
+- **`crystal_explain_connection`** — Trace how two entities are related
+- **`crystal_dependency_chain`** — Map task or goal dependencies
+- **`crystal_preflight`** — Pre-action checklist: rules and lessons before destructive/production actions
+
+### Knowledge Base Management (3 tools)
+
+Create, organize, and query external knowledge bases.
+
+- **`crystal_list_knowledge_bases`** — List all knowledge bases in the workspace
+- **`crystal_query_knowledge_base`** — Vector search a single knowledge base
+- **`crystal_import_knowledge`** — Bulk-import chunks into a knowledge base
+
+### Stats & Ideas (2 tools)
+
+Observe system state and brainstorm.
+
+- **`crystal_stats`** — Memory store health: count by category/store, tier usage, TTL status
+- **`crystal_ideas`** — Generate contextual ideas or action items from memory graph
+
+---
+
+## Decision Tree: Pick Your Tool
+
+**"I want to find a memory by meaning"**
+→ Use `crystal_recall` with semantic query
+
+**"I want exact transcript / phrase search"**
+→ Use `crystal_search_messages` or `crystal_recent`
+
+**"I want a broad topic summary"**
+→ Use `crystal_what_do_i_know`
+
+**"I want to understand why we did something"**
+→ Use `crystal_why_did_we` (decisions) or `crystal_explain_connection` (entities)
+
+**"I want to save new memories"**
+→ Use `crystal_remember`
+
+**"I want to update or delete a memory"**
+→ Use `crystal_edit` or `crystal_forget`
+
+**"I want to mark a session milestone"**
+→ Use `crystal_checkpoint`
+
+**"I want to use external documents"**
+→ Use `crystal_import_knowledge` then `crystal_query_knowledge_base`
+
+**"I want to check rules before a risky action"**
+→ Use `crystal_preflight`
+
+**"I want to see what's stored"**
+→ Use `crystal_stats`
+
+---
+
+## Quick Reference Table
+
+| Tool | Purpose | Input | Output | Cost |
+|------|---------|-------|--------|------|
+| `crystal_recall` | Semantic memory search | query, limit, channel | memories + relevance scores | embedding |
+| `crystal_search_messages` | Transcript keyword search | query, limit | message turns | none |
+| `crystal_recent` | Recent messages (no search) | limit, channel | messages chronologically | none |
+| `crystal_trace` | Memory → source conversation | memory_id | conversation context | none |
+| `crystal_wake` | Session init + recap | channel | last session summary + recent | none |
+| `crystal_remember` | Save new memory | title, content, store, category | memory ID | embedding |
+| `crystal_checkpoint` | Session milestone | label, description | checkpoint ID | none |
+| `crystal_edit` | Update memory | memory_id, updates | success | embedding (if content changes) |
+| `crystal_forget` | Delete memory | memory_id | success | none |
+| `crystal_import_knowledge` | Bulk KB import | kb_id, chunks | import_id | chunking + embedding |
+| `crystal_what_do_i_know` | Topic scan | topic, limit | all facts, lessons, rules on topic | vector search |
+| `crystal_why_did_we` | Decision trace | decision, limit | decisions + context | semantic search |
+| `crystal_who_owns` | Ownership lookup | entity, limit | owner + context | semantic search |
+| `crystal_explain_connection` | Entity relationships | entity_1, entity_2, limit | connection path | semantic search |
+| `crystal_dependency_chain` | Task/goal deps | goal, limit | dependency tree | semantic search |
+| `crystal_preflight` | Risk checklist | action description, limit | rules, lessons, warnings | semantic search |
+| `crystal_list_knowledge_bases` | List KBs | (none) | KB list + metadata | none |
+| `crystal_query_knowledge_base` | KB search | kb_id, query, limit, agent/channel-aware scope | chunks + relevance | embedding |
+| `crystal_stats` | Store health | (none) | counts, TTL, usage | none |
+| `crystal_ideas` | Brainstorm context | (none) | ideas + action items | graph traversal |
+
+---
+
+## For AI Agents: Recommended Call Order
+
+When building agentic workflows, follow this pattern:
+
+1. **`crystal_preflight`** — Check rules/lessons before risky actions (create, modify, deploy)
+2. **`crystal_recall`** — Load relevant context at turn start
+3. **[Do work]** — Your agent logic
+4. **`crystal_remember`** — Capture key facts/decisions
+5. **`crystal_checkpoint`** — Mark session end if significant
+
+This ensures safety checks run first, context is primed early, and captures happen last.
+
+---
+
+## Integration Points
+
+Memory Crystal is available via:
+
+- **MCP** — Claude, Codex, Gemini via model context protocol (stdio or HTTP)
+- **HTTP API** — Direct endpoint calls with bearer token auth
+- **OpenClaw plugin** — Automatic hooks (recall before response, capture after response)
+
+All integrations expose the same conceptual tool surface, though some may filter tools by capability or tier.
+
+### Scope-aware behavior
+
+The hosted/plugin-backed tools now support a one-key mixed-scope pattern:
+
+- **private/client agents** → peer-scoped memories and KBs
+- **shared/internal agents** → shared `:main` KBs and memories
+
+In normal OpenClaw use, the plugin resolves this automatically from the active agent/session config.
+
+---
+
+## Source of Truth
+
+- Implementation: `convex/crystal/mcp.ts`, `convex/crystal/knowledgeHttp.ts`
+- MCP server: `mcp-server/src/tools/`
+- Schema: `convex/schema.ts` (valid store/category values)
