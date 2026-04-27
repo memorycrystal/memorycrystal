@@ -1,0 +1,93 @@
+---
+title: Codex CLI
+description: Connect Memory Crystal to Codex CLI and understand both the installer path and direct MCP registration.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure this target for hosted cloud or local Docker Convex and creates config backups before writing.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets codex-cli
+```
+
+For native Windows PowerShell, use:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets codex-cli
+```
+
+For local data storage, add `--backend local` in Bash or `-Backend local` in PowerShell. See [Local-First Setup](/configuration/local-first).
+
+
+
+Codex can connect to Memory Crystal so it remembers project facts, rules, and past work instead of acting like every run is the first run.
+
+## What this means in practice
+
+Codex CLI uses the **current MCP path**.
+The repo supports both:
+
+- a Codex-specific installer
+- direct MCP registration
+
+## How it actually works
+
+Important repo surfaces:
+
+- `apps/web/public/install-codex-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`
+
+The installer handles:
+
+- detecting the Codex CLI
+- obtaining or validating the API key
+- wiring Codex config for the Memory Crystal MCP endpoint
+
+## Universal installer path
+
+The recommended first install path is the universal installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Use it when you want Memory Crystal to detect Codex CLI, ask before changing config, and offer cloud or local-first backend mode. The dedicated commands below remain useful for single-client installs and compatibility.
+
+## Commands / examples
+
+Installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+```
+
+Direct registration:
+
+```bash
+codex mcp add memory-crystal --url http://localhost:3100/mcp
+```
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash
+```
+
+For purge behavior and safety notes, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- mixing the older deprecated package instructions into the current Codex flow
+- assuming Codex config and Claude config are identical
+- documenting hosted and local MCP URLs as if they were interchangeable without context
+
+## Source of truth
+
+Primary files behind this page:
+
+- `apps/web/public/install-codex-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`

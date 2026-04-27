@@ -1,0 +1,64 @@
+---
+title: Memory Layers
+description: Understand how short-term and long-term memory work together in Memory Crystal.
+---
+
+
+Memory Crystal uses two shelves.
+
+- One shelf is for **what just happened**.
+- One shelf is for **what should stay important later**.
+
+That way your AI can remember both the recent conversation and the bigger lessons.
+
+## What this means in practice
+
+The two main layers are:
+
+### Short-term memory (STM)
+This stores recent or raw conversation history.
+It helps with continuity, exact wording, and “what were we just talking about?” questions.
+
+### Long-term memory (LTM)
+This stores distilled durable memories like facts, rules, decisions, goals, and workflows.
+It helps with cross-session continuity and high-value recall.
+
+## How it actually works
+
+The repo implements these layers through:
+
+- `crystalMessages` for short-term/raw message storage
+- `crystalMemories` for durable long-term memory records
+
+Important sources:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/schema.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+
+## Commands / examples
+
+Useful companion docs:
+
+- [Context Engine](/concepts/context-engine)
+- [Memory Stores](/concepts/memory-stores)
+- [Knowledge Bases](/concepts/knowledge-bases)
+
+## Common mistakes
+
+- thinking “messages” and “memories” are the same table or concept
+- assuming all stored text is permanent
+- forgetting that recent message continuity and durable memory retrieval solve different problems
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/schema.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`

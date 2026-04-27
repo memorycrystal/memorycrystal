@@ -1,0 +1,125 @@
+---
+title: "Stats & diagnostics"
+description: "Get health metrics and memory usage statistics for Memory Crystal."
+---
+
+Retrieve aggregate statistics about your Memory Crystal memory store including counts, strength distribution, capture rate, and strongest memories.
+
+## What this means in practice
+
+Use `crystal_stats` to:
+
+- Monitor total memory count and archive status
+- Understand memory distribution across stores (sensory, episodic, semantic, procedural, prospective)
+- Check recent capture activity (captures in the last 24 hours)
+- Identify the strongest memories by strength score
+- Assess overall health and usage patterns
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `channel` | string | No | Optional channel identifier. If provided, stats are scoped to that channel. |
+
+## Returns
+
+```json
+{
+  "totalMemories": 342,
+  "archivedCount": 28,
+  "avgStrength": 0.756,
+  "recentCaptures": 12,
+  "byStore": {
+    "sensory": 89,
+    "episodic": 156,
+    "semantic": 54,
+    "procedural": 32,
+    "prospective": 11
+  },
+  "strongest": [
+    {
+      "title": "Chose Convex over Supabase for backend",
+      "store": "semantic",
+      "strength": 0.95,
+      "category": "decision",
+      "id": "mem_xyz123"
+    },
+    {
+      "title": "Deploy via Railway + git push",
+      "store": "procedural",
+      "strength": 0.91,
+      "category": "workflow",
+      "id": "mem_abc456"
+    }
+  ]
+}
+```
+
+The response also includes a formatted markdown summary:
+
+```
+## Memory Crystal Stats
+- Total memories: 342
+- Archived memories: 28
+- Average strength: 0.756
+- Captures last 24h: 12
+
+## Store counts
+- sensory: 89
+- episodic: 156
+- semantic: 54
+- procedural: 32
+- prospective: 11
+
+## Strongest
+1. Chose Convex over Supabase for backend (semantic) — 0.95
+2. Deploy via Railway + git push (procedural) — 0.91
+```
+
+## Examples
+
+**Get global stats:**
+
+```json
+{}
+```
+
+**Get stats for a specific channel:**
+
+```json
+{
+  "channel": "dev-team"
+}
+```
+
+## Interpreting the results
+
+- **`totalMemories`** — cumulative memories ever created (including archived)
+- **`archivedCount`** — memories marked as archived; not recalled by default
+- **`avgStrength`** — mean strength across all active memories; indicates overall salience
+- **`recentCaptures`** — automatic captures in the last 24 hours from `crystal_capture` hook
+- **`byStore`** — distribution across the five memory types
+- **`strongest`** — top-N memories by strength; useful for identifying what the system prioritizes
+
+## When to use vs alternatives
+
+| Use case | Tool |
+|----------|------|
+| Overall health & usage snapshot | **`crystal_stats`** |
+| Recall a specific memory by query | `crystal_recall` |
+| List all memories (not summary) | Use dashboard or `crystal_what_do_i_know` |
+| Check recent messages | `crystal_recent` |
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Embedding service unavailable | The API cannot reach the embedding backend. | Retry; check service health. |
+| Memory Crystal not configured | Environment variables not set. | Ensure `MEMORY_CRYSTAL_API_URL` and `MEMORY_CRYSTAL_API_KEY` are defined. |
+| Invalid channel | Channel identifier is malformed or does not exist. | Verify the channel name. |
+
+## Source of truth
+
+- `mcp-server/src/tools/stats.ts` — tool definition
+- `convex/crystal/stats.ts` — backend calculation logic
+- `apps/web/app/(dashboard)/` — stats visualization in the dashboard

@@ -1,0 +1,121 @@
+---
+title: Uninstall
+description: Safely disconnect Memory Crystal from supported runtimes and CLIs without guessing at config files.
+---
+
+If you need to remove Memory Crystal, use the platform-specific uninstall script instead of editing config files by hand.
+
+Default behavior is intentionally conservative:
+
+- remove the Memory Crystal integration wiring for that platform
+- preserve unrelated hooks and MCP entries
+- keep shared `~/.memory-crystal` support files unless you explicitly pass `--purge`
+
+## OpenClaw
+
+Use this when Memory Crystal is installed as the OpenClaw plugin.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash
+```
+
+Optional full plugin removal:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --purge
+```
+
+What it does:
+
+- removes the `crystal-memory` plugin wiring from `openclaw.json`
+- clears the internal hook command mapping
+- resets the OpenClaw memory slot back to `memory-core`
+- restarts the OpenClaw gateway when the CLI is available
+
+## Claude Code
+
+Use this when you installed the Memory Crystal MCP integration for Claude Code.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-claude-mcp.sh | bash
+```
+
+Optional purge of local helper files:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-claude-mcp.sh | bash -s -- --purge
+```
+
+What it does:
+
+- removes the `memory-crystal` MCP server from Claude config
+- removes Memory Crystal hook entries from `~/.claude/settings.json`
+- preserves any unrelated Claude hooks
+
+## Codex CLI
+
+Use this when you installed the Memory Crystal MCP integration for Codex CLI.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash
+```
+
+Optional purge of local helper files:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash -s -- --purge
+```
+
+What it does:
+
+- removes the `memory-crystal` MCP block from `~/.codex/config.toml`
+- removes Memory Crystal hook entries from `~/.codex/hooks.json`
+- preserves unrelated Codex hooks and feature settings
+
+## Factory Droid
+
+Use this when you installed the Memory Crystal MCP integration for Factory Droid.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash
+```
+
+Optional purge of local helper files:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash -s -- --purge
+```
+
+What it does:
+
+- removes the `memory-crystal` MCP server from Factory Droid
+- removes Memory Crystal hook entries from `~/.factory/settings.json`
+- preserves unrelated Factory Droid hooks
+
+
+## When to use `--purge`
+
+Use `--purge` only when you want to remove the local Memory Crystal helper files from `~/.memory-crystal` on that machine.
+
+Do not use `--purge` if:
+
+- another supported client on the same machine still uses Memory Crystal
+- you want to keep the local helper files for a later reinstall
+
+If you are debugging a bad install rather than leaving the product entirely, start with the default uninstall path, then reinstall cleanly.
+
+
+## Local-first rollback
+
+For local-first installs, uninstalling a client integration and stopping the local backend are separate actions.
+
+1. Run the client-specific uninstall command above for each configured client.
+2. If you only want to switch back to cloud mode, restore the installer-created config backup or re-run the installer and choose cloud.
+3. Stop the local Docker backend with the installed artifact's down or rollback command:
+
+   ```bash
+   ~/.memorycrystal/local-backend/<version>/bin/rollback
+   ```
+4. Keep the local backend directory until you are sure you do not need its data or rollback metadata.
+
+Do not delete local backend data directories as a troubleshooting step unless you intentionally want to remove local memories.

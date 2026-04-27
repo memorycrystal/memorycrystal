@@ -1,0 +1,295 @@
+---
+title: Rate Limits
+description: Tier-based API request limits, per-endpoint budgets, and retry strategies.
+---
+
+Memory Crystal implements tier-based rate limiting to ensure fair usage and protect infrastructure. Limits are per-user and per-minute.
+
+## Tier Limits
+
+Rate limits are enforced per user, per minute, based on their subscription tier.
+
+| Tier | Requests/Minute | Concurrent Requests | Embedding Calls/Day |
+|------|-----------------|---------------------|---------------------|
+| Free | 100 | 2 | 50 |
+| Starter | 250 | 5 | 200 |
+| Pro | 500 | 10 | 500 |
+| Ultra | 2,000 | 50 | 5,000 |
+| Unlimited | Unlimited | Unlimited | Unlimited |
+
+## Per-Endpoint Budgets
+
+Different endpoints have different costs based on computational complexity:
+
+### Low Cost (1 credit)
+- `GET /api/mcp/stats` — no search
+- `GET /api/knowledge-bases` — list only
+- `POST /api/mcp/recent-messages` — retrieval only
+- `POST /api/mcp/checkpoint` — write only
+- `POST /api/mcp/forget` — delete only
+- `POST /api/mcp/trace` — lookup only
+
+### Medium Cost (5 credits)
+- `POST /api/mcp/search-messages` — lexical search
+- `POST /api/mcp/capture` — write + embedding
+- `POST /api/knowledge-bases` — create KB
+- `POST /api/knowledge-bases/:id/import` — batch import (cost scales with chunk count)
+
+### High Cost (10 credits)
+- `POST /api/mcp/recall` — vector search (embedding query)
+- `POST /api/knowledge-bases/:id/query` — KB vector search
+- `POST /api/mcp/edit` — update + re-embedding
+
+**What does this mean?**
+
+A Free tier user (100 req/min) can make:
+- 100 calls to low-cost endpoints per minute
+- 20 calls to medium-cost endpoints per minute
+- 10 calls to high-cost endpoints per minute
+
+Costs are counted against a shared pool, so a mix of calls reduces overall throughput.
+
+## Rate Limit Headers
+
+Every response includes rate limit information:
+
+```http
+X-RateLimit-Limit: 100          # Max requests/minute for this user's tier
+X-RateLimit-Remaining: 87       # Requests remaining in current window
+X-RateLimit-Reset: 1681234567   # Unix timestamp when window resets
+Retry-After: 45                 # Seconds to wait before retry (if rate-limited)
+```
+
+## Handling Rate Limits
+
+### Response: 429 Too Many Requests
+
+When you exceed the limit:
+
+```json
+{
+  "error": "Rate limit exceeded",
+  "retryAfterMs": 45000
+}
+```
+
+### Retry Strategy
+
+Implement exponential backoff:
+
+```javascript
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const delay = parseInt(retryAfter || '60') * 1000;
+      
+      console.log(`Rate limited. Retrying after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      continue;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    return response.json();
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+
+// Usage
+const result = await fetchWithRetry(
+  'https://your-deployment/api/mcp/recall',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ query: 'authentication', limit: 5 })
+  }
+);
+```
+
+### Python Example
+
+```python
+import time
+import requests
+from backoff import expo, on_exception
+
+@on_exception(expo, requests.exceptions.HTTPError, max_tries=5)
+def fetch_memory(query):
+    response = requests.post(
+        'https://your-deployment/api/mcp/recall',
+        headers={
+            'Authorization': f'Bearer {API_KEY}',
+            'Content-Type': 'application/json'
+        },
+        json={'query': query, 'limit': 5},
+        timeout=10
+    )
+    
+    if response.status_code == 429:
+        retry_after = int(response.headers.get('Retry-After', 60))
+        print(f'Rate limited. Waiting {retry_after}s...')
+        time.sleep(retry_after)
+        raise requests.exceptions.HTTPError(response=response)
+    
+    response.raise_for_status()
+    return response.json()
+
+result = fetch_memory('authentication strategy')
+```
+
+## Optimization Strategies
+
+### 1. Batch Requests
+
+Instead of 10 individual recall requests, batch them:
+
+```javascript
+// ❌ Bad: 10 separate calls
+for (const query of queries) {
+  const results = await fetchRecall(query);
+}
+
+// ✅ Good: 1 call per query type, then distribute results
+const allResults = await Promise.all(
+  queries.map(q => fetchRecall(q))
+);
+```
+
+### 2. Use Low-Cost Endpoints
+
+Prefer `crystal_recent` over `crystal_recall` when recent context is sufficient:
+
+```javascript
+// ❌ High cost
+const memories = await recall({ query: 'recent context', limit: 10 });
+
+// ✅ Low cost
+const recent = await recentMessages({ limit: 20 });
+```
+
+### 3. Cache Results Locally
+
+Don't repeat the same query within a minute:
+
+```javascript
+const cache = new Map();
+
+async function cachedRecall(query) {
+  if (cache.has(query)) {
+    console.log('Using cached result');
+    return cache.get(query);
+  }
+  
+  const result = await recall({ query, limit: 5 });
+  cache.set(query, result);
+  return result;
+}
+```
+
+### 4. Increase Tier
+
+If you consistently hit limits:
+
+| Scenario | Recommendation |
+|----------|-----------------|
+| 3+ API calls per user session | Upgrade to Pro |
+| 10+ embedding operations daily | Upgrade to Pro/Ultra |
+| Batch imports > 1000 chunks | Use Ultra tier |
+| Building a production app | Use Pro at minimum |
+
+## Monitoring Rate Limit Usage
+
+### Check Current Usage
+
+```bash
+curl https://your-deployment/api/mcp/stats \
+  -H "Authorization: Bearer $API_KEY" | jq '.usage'
+```
+
+### Parse Headers After Each Request
+
+```bash
+curl -i https://your-deployment/api/mcp/recall \
+  -H "Authorization: Bearer $API_KEY" \
+  -d '{"query": "test", "limit": 1}' | grep X-RateLimit
+```
+
+Output:
+```
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 487
+X-RateLimit-Reset: 1681234567
+```
+
+### Set up Alerts
+
+Monitor `X-RateLimit-Remaining` in your logs. Alert when it falls below 20% of limit:
+
+```javascript
+function checkRateLimitHealth(remaining, limit) {
+  const threshold = limit * 0.2;
+  if (remaining < threshold) {
+    console.warn(`⚠️ Approaching rate limit: ${remaining}/${limit} remaining`);
+    // Send alert to Slack, PagerDuty, etc.
+  }
+}
+```
+
+## Burst Handling
+
+Memory Crystal allows brief bursts above the per-minute average:
+
+- **Soft limit (90% of tier):** Warning only
+- **Hard limit (100% of tier):** Rate-limited (429)
+
+This means you can have short spikes without penalty, but sustained high usage will hit the limit.
+
+## Special Cases
+
+### Shared API Keys
+
+If multiple users or services share one API key:
+
+1. All requests count against the same tier limit
+2. One heavy user can starve others
+3. **Solution:** Use separate API keys per user/service
+
+### Batch Imports
+
+Large imports are rate-limited per-chunk:
+
+```javascript
+// Chunking strategy for large imports
+const chunkSize = 100;
+for (let i = 0; i < allChunks.length; i += chunkSize) {
+  const batch = allChunks.slice(i, i + chunkSize);
+  await import({ chunks: batch });
+  
+  // Wait between batches to avoid hitting limit
+  if (i + chunkSize < allChunks.length) {
+    await sleep(1000);
+  }
+}
+```
+
+## Contact Support
+
+If you need:
+- Higher rate limits for legitimate use
+- Whitelist/priority handling for batch jobs
+- Custom SLA agreements
+
+Reach out to support@memorycrystal.com with:
+- Your tier
+- Current usage pattern
+- Intended use case
+- Requested limits

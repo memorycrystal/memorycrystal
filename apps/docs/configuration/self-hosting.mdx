@@ -1,0 +1,37 @@
+---
+title: Self-Hosting
+description: Public self-hosting paths and how they differ from local-first installs.
+---
+
+Self-hosting means you run important infrastructure yourself instead of using Memory Crystal's hosted backend.
+
+## Pick the right path
+
+| Path | Use when | Start here |
+| --- | --- | --- |
+| Local-first Docker backend | You want Memory Crystal data on one machine with installer-managed Docker Convex | [Local-First Setup](/configuration/local-first) |
+| External self-hosted backend | You operate your own service/deployment | [Railway deployment](/self-hosting/railway) |
+| Hosted cloud | You want the simplest managed path | [Quick Start](/quickstart) |
+
+Local-first still uses hosted Memory Crystal auth/license. External self-hosting may require additional environment variables and deployment setup.
+
+## Public boundary
+
+Public docs should explain supported deployment behavior without exposing hosted SaaS-only internals such as billing, admin, private dashboard code, or internal planning docs.
+
+## Source material
+
+The strongest public sources are:
+
+- `mcp-server/README.md`
+- `apps/docs/self-hosting/railway.mdx`
+- `.env.example`
+- `scripts/convex-local-up.sh`
+- `scripts/convex-local-doctor.sh`
+
+## Common mistakes
+
+- treating local-first as accountless/offline licensing
+- mixing private SaaS architecture with public self-hosting guidance
+- documenting the root web app deployment as if it were the MCP deployment path
+- linking public users to internal contributor docs instead of the public local-first guide

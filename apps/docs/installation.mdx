@@ -1,0 +1,104 @@
+---
+title: Installation
+description: Choose the universal installer, local-first mode, or a single-client install path.
+---
+
+Installation connects Memory Crystal to your AI client and chooses where Memory Crystal data should live.
+
+## Primary installer
+
+For Bash environments:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+For native Windows PowerShell, use the PowerShell companion when available for your release:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -UseBasicParsing | iex
+```
+
+The universal installer is the preferred path because it can detect supported clients, ask before changing each target, choose cloud or local-first backend mode, and print rollback guidance.
+
+## Backend choices
+
+| Backend | What it uses | Notes |
+| --- | --- | --- |
+| Cloud | Hosted Memory Crystal backend | Recommended for most users |
+| Local-first | Docker Convex on `127.0.0.1` | Data plane is local; hosted auth/license is still required |
+| External self-hosted | Operator-provided Convex URL | Advanced path when supported by your release |
+
+Read [Local-First Setup](/configuration/local-first) before choosing local mode. It documents Docker requirements, local dashboard URLs, config backups, local credential behavior, and rollback.
+
+## Supported clients
+
+| Client | Recommended path |
+| --- | --- |
+| OpenClaw | Universal installer, then accept the OpenClaw prompt |
+| Claude Code | Universal installer, or [Claude Code](/integrations/claude-code) single-client installer |
+| Claude Desktop | Universal installer when supported, otherwise [Claude Desktop](/integrations/claude-desktop) manual config |
+| Codex CLI | Universal installer, or [Codex CLI](/integrations/codex-cli) single-client installer |
+| Factory Droid | Universal installer, or [Factory Droid](/integrations/factory-droid) single-client installer |
+| Generic MCP | Universal installer generic MCP prompt, or [MCP Server](/integrations/mcp-server) |
+
+## Single-client installer paths
+
+These paths remain available for compatibility and focused installs:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+OpenClaw uses the primary `/crystal` installer.
+
+## Safety guarantees installers should preserve
+
+- ask before configuring each detected client
+- create a backup before every config mutation
+- validate JSON/TOML where applicable before and after writes
+- restore the previous config when validation fails
+- redact API keys, bearer tokens, device codes, and local credentials from logs
+- avoid package-manager or service changes without a prompt
+
+## Self-hosting
+
+For infrastructure-oriented self-hosting, see:
+
+- [Self-Hosting](/configuration/self-hosting)
+- [Railway deployment](/self-hosting/railway)
+- [Environment variables](/self-hosting/environment-variables)
+
+## Docs preview
+
+Mintlify docs for this repo live under `apps/docs`.
+
+```bash
+cd apps/docs
+npx mint dev
+```
+
+## Backend choices
+
+| Backend | Endpoint shape | Notes |
+| --- | --- | --- |
+| Cloud hosted | `https://api.memorycrystal.ai/mcp` | Default and easiest setup |
+| Local Docker Convex | `http://127.0.0.1:3211/api/mcp` | Local data plane with hosted auth/license bridge |
+| External self-hosted | your Convex site URL | Advanced operators; verify your deployment and auth policy |
+
+- run through [Quickstart](/quickstart)
+- verify tool access with `crystal_wake`, `crystal_remember`, and `crystal_recall`
+- keep the printed config backup path until you have verified the client works
+
+## Source of truth
+
+- `apps/web/public/install.sh`
+- `apps/web/public/install.ps1`
+- `apps/web/public/install-claude-mcp.sh`
+- `apps/web/public/install-codex-mcp.sh`
+- `apps/web/public/install-droid-mcp.sh`
+- `scripts/convex-local-*.sh`
+- `scripts/convex-local-*.ts`
+- `.env.example`

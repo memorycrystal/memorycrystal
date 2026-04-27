@@ -1,0 +1,128 @@
+---
+title: "Query knowledge base"
+description: "Search within a specific Memory Crystal knowledge base by semantic similarity."
+---
+
+Query a knowledge base to search for relevant chunks by semantic similarity.
+
+## What this means in practice
+
+When you have organized information into a knowledge base (via import or chunking), use `crystal_query_knowledge_base` to:
+
+- Retrieve relevant information by semantic meaning (not just keyword match)
+- Scope queries to a specific knowledge base
+- Filter by agent or channel if the knowledge base supports it
+- Limit results to reduce noise and context overhead
+
+This matters most for mixed private/shared deployments:
+
+- private KBs can stay peer-scoped for coach/client isolation
+- shared training KBs can live at `scope: "...:main"` with `peerScopePolicy: "permissive"`
+- the backend now supports querying those shared-main KBs from peer-scoped coach sessions when the agent is allowed
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `knowledgeBaseId` | string | Conditional | The ID of the knowledge base to query. Either this or `knowledgeBaseName` is required. |
+| `knowledgeBaseName` | string | Conditional | The human-readable name of the knowledge base. Either this or `knowledgeBaseId` is required. |
+| `query` | string | Yes | The search query. Automatically embedded and searched against KB chunks. |
+| `limit` | number | No | Maximum results to return. Default: unspecified. Range: 1–20. |
+| `agentId` | string | No | Optional agent identifier for scoped queries. |
+| `channel` | string | No | Optional channel identifier for scoped queries. |
+
+## Returns
+
+```json
+{
+  "chunks": [
+    {
+      "id": "chunk_abc123",
+      "content": "The queried knowledge base chunk content.",
+      "metadata": {
+        "score": 0.92,
+        "source": "import_name",
+        "title": "Optional chunk title"
+      }
+    }
+  ],
+  "totalCount": 1,
+  "query": "user's search query",
+  "knowledgeBaseId": "kb_xyz789"
+}
+```
+
+## Examples
+
+**Basic query by name:**
+
+```json
+{
+  "knowledgeBaseName": "Product API Docs",
+  "query": "How do I authenticate with the API?"
+}
+```
+
+**Query by ID with result limit:**
+
+```json
+{
+  "knowledgeBaseId": "kb_abc123",
+  "query": "pricing tiers",
+  "limit": 5
+}
+```
+
+**Scoped query for a specific agent:**
+
+```json
+{
+  "knowledgeBaseName": "Engineering Handbook",
+  "query": "deployment checklist",
+  "agentId": "release-agent",
+  "limit": 3
+}
+```
+
+**Shared-main KB queried from a peer-scoped coach session:**
+
+```json
+{
+  "knowledgeBaseName": "Social Posts",
+  "query": "Nice Guy Triangle sexless marriages",
+  "agentId": "coach",
+  "channel": "morrow-coach:511172388",
+  "limit": 5
+}
+```
+
+## When to use vs alternatives
+
+| Use case | Tool |
+|----------|------|
+| Search a specific knowledge base by semantic meaning | **`crystal_query_knowledge_base`** |
+| Semantic search across all memories (not KBs) | `crystal_recall` |
+| Exact text match in messages | `crystal_search_messages` |
+| Get all KBs available to the user | `crystal_list_knowledge_bases` |
+| Import or create a new knowledge base | Use dashboard or API |
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `Knowledge base not found` | The specified ID or name doesn't exist or is not accessible. | Verify the KB name/ID via `crystal_list_knowledge_bases`. |
+| `query is required` | No query parameter was provided. | Provide a non-empty `query` string. |
+| `knowledgeBaseId or knowledgeBaseName is required` | Neither ID nor name was provided. | Provide at least one identifier. |
+| Empty results | The query matched no chunks above the similarity threshold. | Try a simpler or more general query. |
+
+## Source of truth
+
+- `mcp-server/src/tools/query-knowledge-base.ts` — tool definition and HTTP handler
+- `convex/crystal/knowledgeBases.ts` — backend query logic
+- `apps/web/app/(dashboard)/knowledge-bases/` — KB management UI
+
+## Notes
+
+### Chunk-level peer scope filter (new in 0.7.15)
+
+Both the `queryKnowledgeBase` action and the internal `getKBMemoriesInternal` path now apply a chunk-level peer scope filter that mirrors the KB-level visibility guard. A permissive shared KB will return its parent-scoped chunks plus chunks explicitly scoped to the requesting peer; cross-peer chunks are dropped. Trailing-colon channels (e.g. `morrow-coach:`) fail closed.

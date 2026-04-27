@@ -1,0 +1,100 @@
+export const metadata = {
+  title: "crystal_why_did_we",
+  description: "Investigate the reasoning and evidence behind past decisions",
+};
+
+# Why Did We
+
+Decision archaeology across Memory Crystal decision memories.
+
+## What it does
+
+Searches your decision memory store to understand the reasoning, evidence, and context behind a past decision. Returns the decision thread along with supporting memories across all memory stores.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `decision` | string | Yes | The decision to investigate (minimum 3 characters). Example: "use Convex instead of Supabase" |
+| `limit` | number | No | Maximum number of memories to return (1-20, default: 8) |
+| `channel` | string | No | Peer-scoped channel key (e.g. `morrow-coach:511172388`). When set, filters results to memories in that channel. New in 0.7.15. |
+
+## Returns
+
+Returns a structured response containing:
+
+- **reasoning**: A summary of the primary decision thread
+- **relatedMemories**: Array of decision memories with store, title, content, and strength
+
+Example response:
+```json
+{
+  "reasoning": "Primary threads around \"chose PostgreSQL over SQLite\"",
+  "relatedMemories": [
+    {
+      "memoryId": "v1234...",
+      "store": "semantic",
+      "title": "PostgreSQL for concurrent writes",
+      "content": "We chose PostgreSQL because our session storage needs concurrent writes with ACID guarantees...",
+      "strength": 0.95
+    }
+  ]
+}
+```
+
+## Examples
+
+### Understanding an architecture decision
+
+```
+crystal_why_did_we(decision="chose Convex mutations over HTTP actions")
+```
+
+Returns the original reasoning, trade-offs considered, and supporting memories from your decision record.
+
+### Investigating a product choice
+
+```
+crystal_why_did_we(decision="use Obsidian vault for memory export")
+```
+
+Returns why you selected Obsidian, what alternatives were evaluated, and any constraints that drove the decision.
+
+### Tracing a technical constraint
+
+```
+crystal_why_did_we(
+  decision="session storage architecture",
+  limit=5
+)
+```
+
+Returns the top 5 memories related to your session storage decisions, including the reasoning thread.
+
+## When to use
+
+- **Understanding past decisions** — When you need to remember why a technical choice was made
+- **Evaluating alternatives** — Before reconsidering a past decision, see what trade-offs drove it
+- **Onboarding** — Help new team members understand the reasoning behind key decisions
+- **Audit trail** — Maintain a record of decision rationale for compliance or documentation
+- **Preventing rework** — Avoid revisiting decisions that were already carefully evaluated
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `decision is required` | No decision parameter provided | Provide a decision string (minimum 3 characters) |
+| `limit must be a number` | Invalid limit type | Pass a number between 1-20 |
+| `embedding service unavailable` | OpenAI embeddings service down | Retry in a few moments |
+
+## Notes
+
+### Peer scoping (new in 0.7.15)
+
+Hosted / API-key consumers can now pass an explicit `channel` to scope results to a peer. Previously this tool's API-key path silently ignored channel and returned cross-channel results; as of 0.7.15, the HTTP recall branch forwards the filter consistently with JWT clients. Omit `channel` only when you intend the broadest (management-style) result set.
+
+- The decision archaeology process filters to decision-category memories, then performs vector similarity search
+- API-key clients (hosted mode) use the HTTP recall endpoint; JWT clients use the Convex action path
+- Results are ranked by similarity to your query and memory strength
+- Empty results indicate no decision memories matching the query — check your search terms
+- The reasoning summary is synthesized from matching memories; if no memories match, you'll get "No clear decision thread was surfaced"

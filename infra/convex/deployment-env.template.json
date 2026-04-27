@@ -1,0 +1,22 @@
+{
+  "required": {
+    "CRYSTAL_API_KEY": { "source": "copy-from-prod-env", "stub": null },
+    "GEMINI_EMBEDDING_MODEL": { "source": "literal", "value": "gemini-embedding-2-preview" },
+    "EMBEDDING_PROVIDER": { "source": "literal", "value": "gemini" }
+  },
+  "optional-but-recommended": {
+    "AUTH_GITHUB_ID": { "source": "copy-from-prod-env", "stub": "local-dev-stub-github-id" },
+    "AUTH_GITHUB_SECRET": { "source": "copy-from-prod-env", "stub": "local-dev-stub-github-secret" },
+    "AUTH_GOOGLE_ID": { "source": "copy-from-prod-env", "stub": "local-dev-stub-google-id" },
+    "AUTH_GOOGLE_SECRET": { "source": "copy-from-prod-env", "stub": "local-dev-stub-google-secret" },
+    "OPENAI_API_KEY": { "source": "copy-from-prod-env", "stub": "sk-local-dev-stub" },
+    "POLAR_WEBHOOK_SECRET": { "source": "literal", "value": "local-dev-polar-webhook-secret" },
+    "SENDGRID_API_KEY": { "source": "literal", "value": "local-dev-sendgrid-stub" },
+    "MEMORY_CRYSTAL_API_KEY": { "source": "literal", "value": "local-dev-bearer-token" }
+  },
+  "flags": {
+    "CRYSTAL_BACKEND": "local",
+    "CRYSTAL_LOCAL_LLM_STUB": "1",
+    "CRYSTAL_EMAIL_DRY_RUN": "1"
+  }
+}

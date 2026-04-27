@@ -1,0 +1,103 @@
+export const metadata = {
+  title: "crystal_who_owns",
+  description: "Find who owns, manages, or is assigned to an entity in your knowledge graph",
+};
+
+# Who Owns
+
+Find who owns, manages, or is assigned to an entity in your knowledge graph.
+
+## What it does
+
+Queries the knowledge graph to identify ownership chains and responsibilities. Returns both who owns an entity and what that entity owns, along with confidence scores and evidence memories.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entity` | string | Yes | The entity name to look up (e.g., "API", "backend", "Sarah", "marketing project") |
+| `channel` | string | No | Peer-scoped channel key (e.g. `morrow-coach:511172388`). When set, filters results to memories in that channel. New in 0.7.15. |
+
+## Returns
+
+Returns ownership information with two directions:
+
+- **owners**: Entities that own/manage the queried entity, with confidence scores and evidence memories
+- **ownedBy**: Entities that the queried entity owns/manages
+
+Example response:
+```json
+{
+  "entity": "authentication system",
+  "owners": [
+    {
+      "label": "Sarah Chen",
+      "nodeType": "person",
+      "relationType": "owns",
+      "confidence": 0.92,
+      "evidenceMemoryIds": ["mem123", "mem456"]
+    }
+  ],
+  "ownedBy": [
+    {
+      "label": "API",
+      "nodeType": "project",
+      "relationType": "depends_on",
+      "confidence": 0.88
+    }
+  ]
+}
+```
+
+## Examples
+
+### Find project owner
+
+```
+crystal_who_owns(entity="Q2 roadmap")
+```
+
+Returns who owns the Q2 roadmap project and what responsibilities fall under it.
+
+### Identify system ownership
+
+```
+crystal_who_owns(entity="notification service")
+```
+
+Returns the person or team responsible for the notification service, with supporting evidence from your memory.
+
+### Understand person's scope
+
+```
+crystal_who_owns(entity="James")
+```
+
+Returns what James owns and who James reports to, with confidence levels and evidence.
+
+## When to use
+
+- **Clarify responsibilities** — When you need to know who owns a system or project
+- **Find the right person** — Identify who to contact about a specific component
+- **Understand scope** — See what a person or team is responsible for
+- **Validate assignments** — Check if ownership has changed since last recorded
+- **Audit accountability** — Ensure all critical systems have clear ownership
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `entity is required` | No entity parameter provided | Provide an entity name (person, project, system, etc.) |
+| No ownership found | Entity exists but has no ownership relationships in the graph | Check if the entity name is correct; add ownership memories via `crystal_remember` |
+
+## Notes
+
+### Peer scoping (new in 0.7.15)
+
+Hosted / API-key consumers can now pass an explicit `channel` to scope results to a peer. Previously this tool's API-key path silently ignored channel and returned cross-channel results; as of 0.7.15, the HTTP recall branch forwards the filter consistently with JWT clients. Omit `channel` only when you intend the broadest (management-style) result set.
+
+- Confidence scores indicate how strongly the system believes in the ownership relationship
+- Evidence memory IDs link back to the decisions or observations that established the relationship
+- Relationships are extracted from memories and assembled into a knowledge graph
+- API-key clients use a recall-based fallback if the graph query is unavailable
+- The graph represents explicit ownership relationships; informal or implicit ownership may not be captured

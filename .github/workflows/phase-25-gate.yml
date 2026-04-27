@@ -1,0 +1,24 @@
+name: phase-2.5-gate
+
+on: [pull_request]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if guard touched
+        id: touched
+        run: |
+          git diff --name-only origin/${{ github.base_ref }}... \
+            | grep -q 'convex/crystal/knowledgeBases.ts' && echo "hit=1" >> $GITHUB_OUTPUT || echo "hit=0" >> $GITHUB_OUTPUT
+      - name: Require attestation when guard touched
+        if: steps.touched.outputs.hit == '1'
+        run: |
+          test -f .omc/plans/phase-2.5-attestation.json || { echo "Missing Phase 2.5 attestation"; exit 1; }
+          jq -e '.status == "CLEAN" or (.status == "REDACTED" and .redacted_config_sha and .restart_timestamp)' \
+            .omc/plans/phase-2.5-attestation.json \
+            || { echo "Attestation status invalid"; exit 1; }
+          jq -e '(now - (.scan_timestamp | fromdateiso8601)) < 86400' \
+            .omc/plans/phase-2.5-attestation.json \
+            || { echo "Scan older than 24h"; exit 1; }

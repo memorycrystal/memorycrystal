@@ -1,0 +1,44 @@
+---
+title: Models
+description: How Organic Memory thinks about model presets today and how to separate implemented configuration from future planning.
+---
+
+
+Different jobs need different brains.
+Some jobs need a tiny fast brain. Some need a stronger one.
+
+## What this means in practice
+
+The Organic Memory model story has two layers:
+
+- the PRD's larger model strategy
+- the current preset/config implementation visible in code
+
+## How it actually works
+
+Current public-safe evidence includes:
+
+- `convex/crystal/organic/models.ts`
+- `convex/crystal/organic/tick.ts`
+- `docs/organic-memory/PRD-Organic-Memory.md`
+
+`organic/models.ts` is especially useful because it shows the currently defined model presets and labels.
+
+## Commands / examples
+
+If you want the clearest technical source, inspect:
+
+- `convex/crystal/organic/models.ts`
+
+## Common mistakes
+
+- treating every PRD model idea as currently implemented
+- documenting old provider assumptions without checking the current preset file
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/organic/models.ts`
+- `convex/crystal/organic/tick.ts`
+- `docs/organic-memory/PRD-Organic-Memory.md`

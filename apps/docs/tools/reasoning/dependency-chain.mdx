@@ -1,0 +1,123 @@
+export const metadata = {
+  title: "crystal_dependency_chain",
+  description: "Trace the dependency chain for a goal, project, or task",
+};
+
+# Dependency Chain
+
+Trace the dependency chain for a goal, project, or task in your knowledge graph.
+
+## What it does
+
+Maps out all dependencies for a given entity by traversing the knowledge graph to a specified depth. Returns a hierarchical view of what an entity depends on, organized by level, with confidence scores and evidence.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `entity` | string | Yes | The goal, project, or task to trace dependencies for (e.g., "Q2 launch", "API redesign", "onboarding flow") |
+| `maxDepth` | number | No | Maximum depth to traverse (1-5, default: 3) |
+| `channel` | string | No | Peer-scoped channel key (e.g. `morrow-coach:511172388`). When set, filters results to memories in that channel. New in 0.7.15. |
+
+## Returns
+
+Returns dependency information containing:
+
+- **chain**: Array of dependencies organized by depth level
+- **totalNodes**: Total count of nodes in the dependency chain
+
+Each chain entry contains:
+- **depth**: Level in the dependency tree (1 = direct dependencies)
+- **label**: Name of the dependency
+- **nodeType**: Type of node (person, project, goal, tool, etc.)
+- **relationType**: Type of relationship (depends_on, needs, etc.)
+- **confidence**: Confidence score for the relationship
+- **evidenceMemoryIds**: Memories that establish this dependency
+
+Example response:
+```json
+{
+  "entity": "Q2 launch",
+  "chain": [
+    {
+      "depth": 1,
+      "label": "API redesign",
+      "nodeType": "project",
+      "relationType": "depends_on",
+      "confidence": 0.92,
+      "evidenceMemoryIds": ["mem123"]
+    },
+    {
+      "depth": 2,
+      "label": "Database schema update",
+      "nodeType": "project",
+      "relationType": "depends_on",
+      "confidence": 0.87,
+      "evidenceMemoryIds": ["mem456"]
+    }
+  ],
+  "totalNodes": 7
+}
+```
+
+## Examples
+
+### Plan project work
+
+```
+crystal_dependency_chain(entity="Q2 launch")
+```
+
+Returns all tasks and projects that Q2 launch depends on, organized by depth, helping you identify critical path items.
+
+### Understand blocking issues
+
+```
+crystal_dependency_chain(
+  entity="mobile app release",
+  maxDepth=2
+)
+```
+
+Shows what the mobile app release depends on (depth 1) and what those dependencies depend on (depth 2), up to 2 levels deep.
+
+### Trace goal dependencies
+
+```
+crystal_dependency_chain(
+  entity="improve API performance",
+  maxDepth=5
+)
+```
+
+Maps the complete dependency tree for improving API performance, going up to 5 levels deep.
+
+## When to use
+
+- **Plan work** — Identify all tasks needed before starting a project
+- **Find critical path** — Understand which dependencies are blocking progress
+- **Estimate timelines** — See what work must be sequential vs. parallel
+- **Identify bottlenecks** — Spot dependencies that many things rely on
+- **Risk assessment** — Understand how changes to a dependency affect downstream work
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| `entity is required` | No entity parameter provided | Provide a goal, project, or task name |
+| `maxDepth must be a number` | Invalid depth type | Pass a number between 1-5 |
+| No dependencies found | Entity exists but has no dependencies in the graph | Check the entity name; add dependency memories via `crystal_remember` |
+
+## Notes
+
+### Peer scoping (new in 0.7.15)
+
+Hosted / API-key consumers can now pass an explicit `channel` to scope results to a peer. Previously this tool's API-key path silently ignored channel and returned cross-channel results; as of 0.7.15, the HTTP recall branch forwards the filter consistently with JWT clients. Omit `channel` only when you intend the broadest (management-style) result set.
+
+- Depth is clamped to 1-5 automatically (min: 1, max: 5)
+- Default depth of 3 captures most practical dependency trees
+- Results are organized by level for easy scanning
+- Evidence memory IDs link back to where dependencies were recorded
+- Total node count includes all nodes across all depths
+- Circular dependencies are handled gracefully and will not cause infinite loops
+- API-key clients use a recall-based fallback if the full graph query is unavailable

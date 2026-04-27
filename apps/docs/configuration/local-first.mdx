@@ -1,0 +1,132 @@
+---
+title: Local-First Setup
+description: Run Memory Crystal with a local Docker Convex data plane while keeping hosted auth and license checks.
+---
+
+Local-first mode keeps your Memory Crystal data plane on your machine and still uses the hosted Memory Crystal account flow for auth and license entitlement.
+
+<Warning>
+Local-first is not accountless mode. You still sign in with Memory Crystal so the installer can validate your license before it provisions local credentials.
+</Warning>
+
+## Recommended command
+
+For macOS, Linux, WSL, and Git Bash environments, use the universal installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+For native Windows PowerShell, use the PowerShell companion when it is available for your release:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -UseBasicParsing | iex
+```
+
+The installer detects supported clients, summarizes what it found, and asks before configuring each target.
+
+## Cloud vs local
+
+| Mode | Data plane | Auth / license | Best for |
+| --- | --- | --- | --- |
+| Cloud | Hosted Memory Crystal backend | Hosted Memory Crystal | Easiest setup and multi-device memory |
+| Local | Docker Convex on `127.0.0.1` | Hosted Memory Crystal | Single-machine data control with licensed access |
+| External self-hosted | Your Convex deployment | Hosted Memory Crystal unless documented otherwise | Advanced operators |
+
+## What runs locally
+
+Local mode installs or verifies a versioned local backend artifact under:
+
+```text
+~/.memorycrystal/local-backend/<version>
+```
+
+That artifact is the end-user distribution for local Convex assets. It should include install, doctor, upgrade, and rollback entrypoints so you do not need a repository checkout.
+
+Expected local endpoints after setup:
+
+| Service | URL |
+| --- | --- |
+| Convex backend | `http://127.0.0.1:3210` |
+| Convex HTTP actions / site | `http://127.0.0.1:3211` |
+| Convex dashboard | `http://127.0.0.1:6791` |
+
+The dashboard is for local backend/data inspection. Hosted billing, admin, and production account-management surfaces are not part of the public local dashboard.
+
+## Supported client prompts
+
+The universal installer is the primary path for:
+
+- Claude Code
+- Claude Desktop
+- Codex CLI
+- Factory Droid
+- OpenClaw
+- generic MCP clients
+
+For each detected client, it asks whether to configure Memory Crystal. Declining a target should leave that client's config untouched.
+
+## Prerequisites
+
+Local mode needs:
+
+- Docker CLI and a running Docker daemon
+- ports `3210`, `3211`, and `6791` available on `127.0.0.1`
+- a Memory Crystal account with the required entitlement
+- a supported shell: Bash for macOS/Linux/WSL/Git Bash, or native PowerShell on Windows
+
+The installer may offer best-effort Docker guidance. It should not run package-manager or service changes without a prompt.
+
+## Backup and rollback behavior
+
+Before editing supported client config files, the installer should create timestamped backups with owner-only permissions where the platform supports it.
+
+If validation fails after a config mutation, the installer should restore the previous config and explain what failed.
+
+Common rollback actions:
+
+1. Restore the config backup printed by the installer.
+2. Re-run cloud mode if you want the client to use the hosted backend again.
+3. Stop the local backend with the artifact-local rollback or down command.
+4. Keep or remove old `~/.memorycrystal/local-backend/<version>` directories according to your backup policy.
+
+See [Uninstall](/help/uninstall) for client-specific removal commands.
+
+## Auth and local credentials
+
+Local mode performs hosted device auth first. After license validation, the installer provisions a local credential for the Docker Convex backend.
+
+The intended safety model is:
+
+- raw hosted bearer/device tokens are not stored in client config
+- local Convex stores hashed local credentials only
+- cleartext local tokens are written only where the client needs them
+- reinstall and upgrade preserve a stable local user mapping for existing local data
+- revoked or expired hosted entitlement fails closed after any documented grace window
+
+If re-auth is required, re-run the installer or use the release's documented re-auth command.
+
+1. Re-run the universal installer and choose **Cloud hosted backend**.
+2. Restore a client config backup if you need to undo a specific client change.
+3. Stop the local backend with the artifact rollback/down command:
+
+| Symptom | Check |
+| --- | --- |
+| Installer says Docker is unavailable | Start Docker Desktop or Docker Engine, then re-run local mode |
+| Local dashboard does not load | Check that port `6791` is free and the local backend doctor passes |
+| Client still uses cloud after local setup | Verify you accepted that client prompt and that its config points to `127.0.0.1` |
+| Auth fails during local setup | Sign in again and confirm your Memory Crystal entitlement is active |
+| Rollback needed | Restore the printed config backup, then run cloud mode or uninstall |
+
+## Source of truth
+
+Primary repo files behind this page:
+
+- `apps/web/public/install.sh`
+- `apps/web/public/install.ps1`
+- `scripts/convex-local-up.sh`
+- `scripts/convex-local-down.sh`
+- `scripts/convex-local-doctor.sh`
+- `scripts/convex-local-auth-keys.ts`
+- `scripts/convex-local-provision-env.ts`
+- `scripts/convex-local-write-env.ts`

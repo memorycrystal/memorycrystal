@@ -1,0 +1,277 @@
+---
+title: Knowledge-base endpoints
+description: The HTTP endpoints that create, list, import, and query Knowledge Bases.
+---
+
+
+These are the HTTP doors for the Knowledge Base shelf.
+
+## What this means in practice
+
+Important endpoint families include:
+
+- list/create knowledge bases
+- patch knowledge-base metadata and scope policy
+- import chunks
+- query a knowledge base
+- backfill or maintenance-related KB flows
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`
+
+## Endpoint Reference
+
+### List Knowledge Bases
+
+#### `GET /api/knowledge-bases`
+
+Retrieve all knowledge bases for the authenticated user.
+
+This endpoint is agent/scope aware when you pass query parameters like:
+
+- `agentId`
+- `scope`
+
+**Request:**
+```bash
+curl -X GET https://your-deployment.convex.site/api/knowledge-bases \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY"
+```
+
+**Response:**
+```json
+{
+  "knowledgeBases": [
+    {
+      "id": "kb_123",
+      "name": "Product Docs",
+      "description": "API reference and guides",
+      "chunkCount": 245,
+      "createdAt": 1681234567890,
+      "updatedAt": 1681234567890
+    },
+    {
+      "id": "kb_456",
+      "name": "Internal Wiki",
+      "description": "Architecture decisions and runbooks",
+      "chunkCount": 89,
+      "createdAt": 1681234567000,
+      "updatedAt": 1681234567000
+    }
+  ]
+}
+```
+
+### Create Knowledge Base
+
+#### `POST /api/knowledge-bases`
+
+Create a new knowledge base.
+
+**Request:**
+```json
+{
+  "name": "Q3 Planning Docs",
+  "description": "Quarterly planning materials and decisions",
+  "agentIds": ["coach", "dm-replies"],
+  "scope": "morrow-team:main",
+  "peerScopePolicy": "permissive"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "kb_789",
+  "name": "Q3 Planning Docs",
+  "description": "Quarterly planning materials and decisions",
+  "chunkCount": 0,
+  "createdAt": 1681234567890
+}
+```
+
+### Import Chunks
+
+#### `POST /api/knowledge-bases/:knowledgeBaseId/import`
+
+Bulk-import document chunks into a knowledge base.
+
+**Request:**
+```json
+{
+  "chunks": [
+    {
+      "content": "# API Authentication\n\nAll requests require a Bearer token...",
+      "metadata": {
+        "title": "Authentication Guide",
+        "sourceUrl": "https://docs.example.com/auth",
+        "chunkIndex": 0,
+        "totalChunks": 5
+      }
+    },
+    {
+      "content": "API keys are generated via the dashboard...",
+      "metadata": {
+        "title": "Authentication Guide",
+        "sourceUrl": "https://docs.example.com/auth",
+        "chunkIndex": 1,
+        "totalChunks": 5
+      }
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "importId": "imp_123",
+  "chunksProcessed": 2,
+  "embeddingsCreated": 2,
+  "timestamp": 1681234567890
+}
+```
+
+**Behavior:**
+- Each chunk is embedded using the same model as memories (text-embedding-3-small)
+- Duplicate chunks are deduplicated within the batch
+- Deduplication uses SHA256 hash of content
+- Failed chunks are logged but don't block the import
+
+### Patch Knowledge Base
+
+#### `PATCH /api/knowledge-bases/:knowledgeBaseId`
+
+Update metadata and visibility policy.
+
+Example:
+
+```json
+{
+  "agentIds": ["coach", "coach-beta", "dm-replies", "ask-cass"],
+  "scope": "morrow-team:main",
+  "peerScopePolicy": "permissive"
+}
+```
+
+Use this when converting a KB from agent-private to shared-open access under one API key.
+
+### Query Knowledge Base
+
+#### `POST /api/knowledge-bases/:knowledgeBaseId/query`
+
+Vector search a knowledge base by semantic query.
+
+**Request:**
+```json
+{
+  "query": "how do I set up authentication",
+  "limit": 5,
+  "threshold": 0.6
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "chunkId": "chunk_123",
+      "content": "All requests require a Bearer token in the Authorization header...",
+      "metadata": {
+        "title": "Authentication Guide",
+        "sourceUrl": "https://docs.example.com/auth",
+        "chunkIndex": 0
+      },
+      "relevance": 0.92
+    },
+    {
+      "chunkId": "chunk_124",
+      "content": "API keys are generated via the dashboard. Each key is unique to a user...",
+      "metadata": {
+        "title": "Authentication Guide",
+        "sourceUrl": "https://docs.example.com/auth",
+        "chunkIndex": 1
+      },
+      "relevance": 0.87
+    }
+  ]
+}
+```
+
+<Note>
+**Chunk-level peer scope filter (new in 0.7.15).** Both the `queryKnowledgeBase` action and the internal KB-chunk reader now apply a chunk-level peer scope filter that mirrors the KB-level visibility guard. A permissive shared KB will return its parent-scoped chunks plus chunks explicitly scoped to the requesting peer. Cross-peer chunks are dropped. Trailing-colon channels (e.g. `morrow-coach:`) fail closed and return no chunks.
+</Note>
+
+**Parameters:**
+- `query` (required): The semantic query string
+- `limit` (optional): Maximum results to return (default: 10, max: 50)
+- `threshold` (optional): Minimum relevance score 0–1 (default: 0.0, all results)
+- `agentId` (optional): Agent visibility context
+- `channel` (optional): Channel/scope context
+
+## Usage Patterns
+
+### Example 1: Import API Documentation
+
+```bash
+# Extract chunks from your docs
+python extract_chunks.py docs/ > chunks.json
+
+# Import into a KB
+curl -X POST https://your-deployment.convex.site/api/knowledge-bases/kb_123/import \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @chunks.json
+```
+
+### Example 2: Query Documentation Before Response
+
+In an agent workflow:
+
+```
+1. User asks question
+2. Query KB: crystal_query_knowledge_base(kb_id="kb_123", query=user_question)
+3. Inject retrieved chunks into context
+4. Generate response
+5. Call crystal_remember to save key insights
+```
+
+### Scope and Tenancy
+
+Knowledge bases are:
+- **Per-user** — isolated by userId from authentication token
+- **Agent/scope aware** — visibility can differ for peer-scoped vs shared-main agent lanes
+- **Persistent** — survive session restarts
+
+### Shared-main KB pattern
+
+To make one training KB available to many agents/chats under one key:
+
+- set `scope` to something like `morrow-team:main`
+- set `peerScopePolicy` to `"permissive"`
+- include all allowed agent IDs in `agentIds`
+
+To keep private client notes private:
+
+- keep `agentIds: ["coach"]`
+- do **not** move them to a shared `:main` scope
+
+## Common mistakes
+
+- documenting KB endpoints without mentioning their relationship to the MCP KB tools
+- assuming imported data is the same as conversational memory
+- ignoring scope and tenancy when describing KB behavior
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`

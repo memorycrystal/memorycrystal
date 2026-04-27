@@ -1,0 +1,80 @@
+---
+title: Introduction
+description: Memory Crystal is a persistent memory layer that helps AI agents remember context, decisions, and workflows across sessions.
+---
+
+> Current release: **v0.8.1**. See the [changelog](/changelog) for what shipped, and use the [uninstall guide](/help/uninstall) when you need a clean rollback.
+
+Imagine your AI helper has a backpack.
+Usually, every time you start a new chat, the backpack gets emptied and the helper forgets everything.
+Memory Crystal gives the helper a **memory backpack that stays packed**.
+It can remember what you were doing, what rules matter, and what you already figured out.
+
+## What this means in practice
+
+Memory Crystal is for people who are tired of repeating themselves to their AI.
+It helps when you want your assistant to remember things like:
+
+- the architecture you already chose
+- the commands your project uses
+- who owns what
+- what failed before
+- which docs or notes matter for this task
+
+It currently ships as:
+
+- an **OpenClaw plugin**
+- an **MCP server** for compatible clients
+- a **Convex-backed memory backend**
+- a **web product/dashboard**
+
+## How it actually works
+
+At a high level, Memory Crystal does two jobs:
+
+1. **Capture** — it records useful conversational and operational context.
+2. **Recall** — it brings back the right memories before the next response or through tools.
+
+The repo is split into major surfaces:
+
+- `plugin/` — OpenClaw plugin and automatic hook-based memory flows
+- `convex/` — backend schema, memory logic, HTTP endpoints, Organic Memory
+- `mcp-server/` — deprecated stdio/HTTP MCP server
+- `packages/mcp-server/` — current Streamable HTTP MCP server
+- `apps/web/` — product site, dashboard, install assets, and brand source material
+- `apps/docs/` — public Mintlify docs
+- `scripts/` — installation, doctor, enable/disable, migration helpers
+
+## A tiny example
+
+Without Memory Crystal:
+- you tell the AI “we deploy with Convex and keep product docs in Mintlify”
+- tomorrow it forgets
+
+With Memory Crystal:
+- that fact can be captured and retrieved again when it matters
+- the assistant starts closer to the truth instead of from zero
+
+## Commands / examples
+
+The main public install entrypoint is:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Useful follow-up docs:
+- [Quick Start](/quickstart)
+- [OpenClaw Plugin](/integrations/openclaw-plugin)
+- [MCP Server](/integrations/mcp-server)
+- [Tools Overview](/tools/overview)
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `apps/web/app/page.tsx`
+- `apps/web/app/layout.tsx`
+- `apps/docs/meta/source-of-truth.mdx`
