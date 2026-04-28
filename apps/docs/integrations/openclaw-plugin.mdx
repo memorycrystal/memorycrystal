@@ -1,0 +1,119 @@
+---
+title: OpenClaw Plugin
+description: Understand how the OpenClaw plugin captures, recalls, and wires Memory Crystal into the OpenClaw lifecycle.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure this target for hosted cloud or local Docker Convex and creates config backups before writing.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets openclaw
+```
+
+For native Windows PowerShell, use:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets openclaw
+```
+
+For local data storage, add `--backend local` in Bash or `-Backend local` in PowerShell. See [Local-First Setup](/configuration/local-first).
+
+
+
+The OpenClaw plugin is the automatic version of Memory Crystal.
+Instead of waiting for your AI to remember to use tools, the plugin quietly does memory work for you in the background.
+
+## What this means in practice
+
+If you use OpenClaw, this is usually the easiest and most automatic Memory Crystal integration.
+It can:
+
+- capture conversations after model output
+- recall relevant context before the next model call
+- wire tools and memory behavior into the OpenClaw runtime
+
+## Quick install
+
+If you want the fastest public install path, run:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+That installer handles the OpenClaw plugin path, asks before modifying config, creates backups, and walks you through Cloud vs Local Docker Convex backend choices.
+
+## How it actually works
+
+Key files:
+
+- `plugin/index.js` — main plugin entry
+- `plugin/handler.js` — legacy compatibility entry
+- `plugin/capture-hook.js` — capture flow
+- `plugin/recall-hook.js` — recall flow
+- `plugin/openclaw.plugin.json` — modern plugin manifest
+- `plugin/openclaw-hook.json` — legacy hook manifest
+
+Operational scripts:
+
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-disable.sh`
+- `scripts/crystal-bootstrap.sh`
+- `scripts/crystal-doctor.sh`
+
+## Universal installer path
+
+The recommended first install path is the universal installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Use it when you want Memory Crystal to detect OpenClaw, ask before changing config, and offer cloud or local-first backend mode. The dedicated commands below remain useful for single-client installs and compatibility.
+
+## Commands / examples
+
+Useful commands:
+
+```bash
+npm run crystal:bootstrap
+npm run crystal:enable
+npm run crystal:disable
+npm run crystal:doctor
+```
+
+Safe dry-run checks:
+
+```bash
+npm run crystal:enable -- --dry-run
+npm run crystal:disable -- --dry-run
+```
+
+## Uninstall
+
+Use the public uninstall script when you want to disconnect Memory Crystal cleanly:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash
+```
+
+For rollback details and purge behavior, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- editing `~/.openclaw/openclaw.json` directly from a running AI session
+- deleting `handler.js` even though older installs may still use it
+- assuming the plugin and MCP-only mode are the same thing
+- assuming local mode removes hosted account/license checks
+
+## Source of truth
+
+Primary files behind this page:
+
+- `plugin/index.js`
+- `plugin/openclaw.plugin.json`
+- `plugin/openclaw-hook.json`
+- `scripts/crystal-enable.sh`
+- `scripts/crystal-doctor.sh`
+- `README.md`

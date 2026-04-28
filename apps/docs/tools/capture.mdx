@@ -1,0 +1,143 @@
+---
+title: crystal_capture
+description: Capture a memory into Memory Crystal.
+---
+
+## What it does
+
+Saves a memory into the long-term memory (LTM) store with a title, content, memory store classification, category, and optional tags. Use this to explicitly preserve important facts, decisions, lessons, and goals for future recall. Memories are embedded, deduplicated, and indexed for semantic search.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| title | string | Yes | — | Short descriptive title (5-80 chars recommended). What is this memory about? |
+| content | string | Yes | — | Full content of the memory. Context, reasoning, and details go here. |
+| store | string | Yes | — | Memory layer: `sensory`, `episodic`, `semantic`, `procedural`, or `prospective`. See guide below. |
+| category | string | Yes | — | Memory type: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, or `conversation`. |
+| tags | array | Yes | — | Array of string tags for organizing and filtering memories (e.g., `["convex", "architecture"]`). |
+| arousal | number | No | — | Emotional weight 0-1 (0=neutral, 1=highly significant). Optional. |
+| confidence | number | No | — | Confidence in accuracy 0-1 (0=speculative, 1=definite). Optional. |
+| valence | number | No | — | Emotional tone -1 to 1 (-1=negative, 1=positive). Optional. |
+
+### Store Guide
+
+| Store | Best For | Example |
+|---|---|---|
+| `semantic` | Facts, decisions, architecture, API behavior | "Convex mutations are transactional, HTTP actions are not" |
+| `episodic` | Specific events, session summaries, conversations | "Today's standup: discussed migration timeline" |
+| `procedural` | Workflows, build steps, deployment processes | "Deploy to Railway: git push, CI runs, auto-deploys to production" |
+| `prospective` | Goals, TODOs, future plans, roadmap items | "Implement vector search for semantic recall by Q3" |
+| `sensory` | Raw observations, logs, immediate context | "Deploy warning: 5 DB connections in use, approaching limit" |
+
+### Category Guide
+
+| Category | Meaning | Example |
+|---|---|---|
+| `decision` | Architectural or strategic choice made | "Chose PostgreSQL over SQLite for concurrent writes" |
+| `lesson` | What we learned from experience | "Mock tests diverged from production — always use real DB" |
+| `rule` | Constraint or principle to follow | "Never edit `.openclaw/openclaw.json` from inside a session" |
+| `person` | Information about a person | "Andy is the project lead, focuses on backend" |
+| `fact` | Neutral information or specification | "Memory Crystal has 6 dashboard pages and 21 backend modules" |
+| `goal` | Objective or aspiration | "Reduce memory recall latency to <100ms" |
+| `event` | Historical occurrence | "Launched v0.7 with vector search on 2026-03-15" |
+| `workflow` | Procedure or process | "Extract memories via GPT-4o-mini after each turn" |
+| `conversation` | Conversation snapshot or summary | "User asked about recall performance, discussed caching" |
+
+## Returns
+
+```json
+{
+  "ok": true,
+  "memoryId": "string",
+  "title": "string",
+  "store": "string",
+  "category": "string",
+  "tags": ["string"],
+  "capturedAt": 1234567890000
+}
+```
+
+**Field descriptions:**
+- `ok` — Success indicator
+- `memoryId` — Unique identifier for this memory (use with crystal_trace, crystal_forget)
+- `capturedAt` — Unix milliseconds when memory was saved
+- `title`, `store`, `category`, `tags` — Echo of input parameters
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Capture an important decision
+crystal_capture({
+  title: "Chose Convex mutations over HTTP actions for memory writes",
+  content: "Using Convex mutations (not HTTP actions) for crystal_remember because mutations are transactional and automatically retried. HTTP actions don't get the same guarantees.",
+  store: "semantic",
+  category: "decision",
+  tags: ["convex", "architecture", "reliability"]
+})
+
+// Result: { ok: true, memoryId: "mem_abc123", ... }
+```
+
+### Advanced usage
+
+```javascript
+// Capture a lesson learned with confidence and valence
+crystal_capture({
+  title: "Mock database tests hid a broken migration in prod",
+  content: "We used mocked DB in tests to speed up CI. Tests passed. But in production, FK constraints failed because we hadn't tested against real schema. Now we always use integration tests with a real DB.",
+  store: "semantic",
+  category: "lesson",
+  tags: ["testing", "database", "migration"],
+  confidence: 0.95,
+  valence: -0.8  // negative lesson
+})
+
+// Capture a workflow procedure
+crystal_capture({
+  title: "Deploy Memory Crystal to Railway",
+  content: "1. Run 'npm run build' in apps/web\n2. Commit to main\n3. Railway auto-deploys from main branch\n4. Verify at docs.memorycrystal.ai\n5. Monitor Sentry for errors",
+  store: "procedural",
+  category: "workflow",
+  tags: ["deployment", "railway", "ci-cd"]
+})
+
+// Capture a future goal
+crystal_capture({
+  title: "Implement vector search for semantic recall",
+  content: "Use OpenAI embeddings (text-embedding-3-small) to enable semantic search across memory stores. This will improve recall accuracy vs. keyword matching. Timeline: Q2 2026.",
+  store: "prospective",
+  category: "goal",
+  tags: ["roadmap", "search", "ml"]
+})
+```
+
+## When to use this vs alternatives
+
+- **`crystal_capture`** — When you explicitly want to save a memory (manual capture)
+- **`crystal_remember`** (deprecated) — Old name; use `crystal_capture` instead
+- Automatic capture — The plugin's `capture-hook.js` automatically extracts memories from conversations via GPT-4o-mini
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| "title is required" | title is missing or empty | Provide a non-empty title string |
+| "content is required" | content is missing or empty | Provide memory content describing the fact/decision/lesson |
+| "store is required" | store is missing | Provide a valid store: sensory, episodic, semantic, procedural, or prospective |
+| "category is required" | category is missing | Provide a valid category: decision, lesson, person, rule, event, fact, goal, workflow, or conversation |
+| "tags is required" | tags is missing or not an array | Provide an array of tag strings (can be empty `[]` if needed) |
+| Invalid store/category | Unrecognized store or category value | Check schema.ts for valid enum values |
+| API connection error | Convex endpoint unavailable | Retry; check `CONVEX_URL` environment variable |
+
+## Notes
+
+- Titles should be specific and descriptive (✅ "Chose PostgreSQL over SQLite for concurrent writes" vs ❌ "database decision")
+- Content should include reasoning, context, and consequences when relevant
+- Tags are lightweight and can be used for organizing memories (e.g., by feature, decision type, or project)
+- Memories are automatically embedded and deduplicated against existing LTM
+- Optional metadata (arousal, confidence, valence) weights memories for future recall
+- This captures into LTM (permanent store); short-term messages are captured separately
+- Use in post-session workflows or in response to notable outcomes

@@ -1,0 +1,127 @@
+export const metadata = {
+  title: "crystal_list_knowledge_bases",
+  description: "List available Memory Crystal knowledge bases",
+};
+
+# List Knowledge Bases
+
+List available Memory Crystal knowledge bases.
+
+## What it does
+
+Retrieves all knowledge bases accessible to the current user, optionally filtered by active status or channel. Each knowledge base can be used as a scoped context for memory operations.
+
+In mixed private/shared setups, visibility is determined by:
+
+- authenticated user
+- `agentId`
+- `channel`
+- KB `scope`
+- KB `peerScopePolicy`
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `includeInactive` | boolean | No | Include inactive/archived knowledge bases (default: false) |
+| `channel` | string | No | Channel or scope context (for example `morrow-coach:511172388` or `morrow-team:main`) |
+
+## Returns
+
+Returns a structured response containing:
+
+- **knowledgeBases**: Array of knowledge base objects with metadata
+
+Each knowledge base includes:
+- **id**: Unique identifier for the knowledge base
+- **name**: Human-readable name
+- **description**: Brief description of the KB's purpose
+- **status**: "active" or "archived"
+- **channel**: Channel type (if applicable)
+- **chunkCount**: Number of indexed chunks
+- **createdAt**: Creation timestamp
+
+Example response:
+```json
+{
+  "knowledgeBases": [
+    {
+      "id": "kb_abc123",
+      "name": "Codebase Documentation",
+      "description": "API docs, architecture guides, and README files",
+      "status": "active",
+      "channel": null,
+      "chunkCount": 157,
+      "createdAt": 1713302400000
+    },
+    {
+      "id": "kb_def456",
+      "name": "Slack #engineering",
+      "description": "Engineering channel history and discussions",
+      "status": "active",
+      "channel": "slack",
+      "chunkCount": 2340,
+      "createdAt": 1710624000000
+    }
+  ]
+}
+```
+
+## Examples
+
+### List all active knowledge bases
+
+```
+crystal_list_knowledge_bases()
+```
+
+Returns all active knowledge bases you have access to.
+
+### Include archived knowledge bases
+
+```
+crystal_list_knowledge_bases(includeInactive=true)
+```
+
+Returns both active and archived knowledge bases, useful for auditing or recovering archived content.
+
+### Filter by channel
+
+```
+crystal_list_knowledge_bases(channel="slack")
+```
+
+Returns only knowledge bases created from Slack channel imports, helpful when managing multiple Slack workspaces.
+
+### List all with archival status
+
+```
+crystal_list_knowledge_bases(includeInactive=true, channel="discord")
+```
+
+Returns all Discord knowledge bases, including archived ones.
+
+## When to use
+
+- **Discover available contexts** — See what knowledge bases are available before using other KB tools
+- **Manage knowledge bases** — Get a complete inventory of your knowledge bases
+- **Plan imports** — Check what channels/sources are already indexed
+- **Audit storage** — See chunk counts to understand what's been imported
+- **Channel-specific queries** — Know which KB ID to use for channel-filtered searches
+
+## Errors
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Failed to list knowledge bases | General server error or permission issue | Check your connection and API key; retry in a moment |
+| Invalid channel parameter | Channel type not recognized | Use valid channel types (slack, discord, email, etc.) |
+
+## Notes
+
+- Knowledge bases can be created via channel imports or manual uploads
+- Chunk count indicates the volume of indexed content
+- Inactive/archived knowledge bases are hidden by default to reduce clutter
+- Channels filter works only on knowledge bases created from those sources
+- Each knowledge base has a unique ID used by other KB tools (query, import, etc.)
+- Knowledge bases are scoped to the current user or team depending on your setup
+- Peer-capable KBs default to strict isolation; cross-chat/shared access on those agents requires `peerScopePolicy: "permissive"`

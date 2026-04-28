@@ -1,0 +1,64 @@
+---
+title: Memory Stores
+description: The five store types Memory Crystal uses and why each one exists.
+---
+
+
+Not every memory belongs in the same bucket.
+A rule, a fact, and a future plan are different kinds of things, so Memory Crystal stores them in different buckets.
+
+## What this means in practice
+
+The five stores are:
+
+- `sensory`
+- `episodic`
+- `semantic`
+- `procedural`
+- `prospective`
+
+A quick mental model:
+
+- **sensory** = observations and signals
+- **episodic** = events and experiences
+- **semantic** = facts and knowledge
+- **procedural** = how-to memory and workflows
+- **prospective** = future intentions and plans
+
+## How it actually works
+
+Store values are part of the schema and are used throughout memory capture, recall, and downstream logic.
+
+Important files:
+
+- `convex/schema.ts`
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/crystal/memories.ts`
+- `convex/crystal/mcp.ts`
+
+## Commands / examples
+
+Examples of how these stores feel in practice:
+
+- “Andy sounds frustrated about the deploy” → sensory
+- “We shipped v2 on March 15” → episodic
+- “The API uses Convex for the backend” → semantic
+- “Deploy with npm run convex:deploy” → procedural
+- “Need to add billing webhooks next sprint” → prospective
+
+## Common mistakes
+
+- using stores and categories as if they are the same concept
+- treating procedural memory like generic notes instead of how-to execution memory
+- assuming all stores should be ranked equally for all questions
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/schema.ts`
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/crystal/memories.ts`
+- `convex/crystal/mcp.ts`

@@ -1,0 +1,94 @@
+---
+title: Claude Code
+description: Connect Memory Crystal to Claude Code using the current MCP path and understand what the installer actually does.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure this target for hosted cloud or local Docker Convex and creates config backups before writing.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-code
+```
+
+For native Windows PowerShell, use:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets claude-code
+```
+
+For local data storage, add `--backend local` in Bash or `-Backend local` in PowerShell. See [Local-First Setup](/configuration/local-first).
+
+
+
+Claude Code can plug into Memory Crystal so it can ask for memories it learned before instead of starting from zero every run.
+
+## What this means in practice
+
+Claude Code uses the **current Streamable HTTP MCP path**.
+In this repo, that means you can either:
+
+- run the Claude-specific installer
+- or register the MCP endpoint yourself
+
+## How it actually works
+
+Important repo surfaces:
+
+- `apps/web/public/install-claude-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`
+
+The installer is responsible for:
+
+- detecting the Claude CLI
+- handling device/browser authorization or manual API-key entry
+- registering the Memory Crystal MCP endpoint
+- storing local Memory Crystal support files under `~/.memory-crystal`
+
+## Universal installer path
+
+The recommended first install path is the universal installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Use it when you want Memory Crystal to detect Claude Code, ask before changing config, and offer cloud or local-first backend mode. The dedicated commands below remain useful for single-client installs and compatibility.
+
+## Commands / examples
+
+Installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+```
+
+Direct registration:
+
+```bash
+claude mcp add memory-crystal --transport http http://localhost:3100/mcp
+```
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-claude-mcp.sh | bash
+```
+
+For purge behavior and safety notes, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- following the deprecated Claude Desktop path instead of the Claude Code path
+- confusing local server examples with hosted endpoint usage
+- forgetting to provide the API key/backend URL when bypassing the installer
+
+## Source of truth
+
+Primary files behind this page:
+
+- `apps/web/public/install-claude-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`

@@ -1,0 +1,85 @@
+---
+title: Factory Droid
+description: Connect Memory Crystal to Factory Droid using the repo's hosted MCP installer path.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure this target for hosted cloud or local Docker Convex and creates config backups before writing.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets factory-droid
+```
+
+For native Windows PowerShell, use:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets factory-droid
+```
+
+For local data storage, add `--backend local` in Bash or `-Backend local` in PowerShell. See [Local-First Setup](/configuration/local-first).
+
+
+
+Factory Droid can use Memory Crystal as its memory helper, just like other MCP-compatible coding assistants.
+
+## What this means in practice
+
+The repo names this integration **Factory Droid**.
+That should be the canonical public docs name, even if people casually say “Factory” or “Factory Drone.”
+
+## How it actually works
+
+Important repo surfaces:
+
+- `apps/web/public/install-droid-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`
+
+The installer handles:
+
+- CLI detection
+- auth flow
+- MCP registration
+- local Memory Crystal support file setup
+
+## Universal installer path
+
+The recommended first install path is the universal installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Use it when you want Memory Crystal to detect Factory Droid, ask before changing config, and offer cloud or local-first backend mode. The dedicated commands below remain useful for single-client installs and compatibility.
+
+## Commands / examples
+
+Installer:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash
+```
+
+For purge behavior and safety notes, see the [uninstall guide](/help/uninstall).
+
+## Common mistakes
+
+- drifting from the actual script/CLI naming in the repo
+- assuming this page should describe a different product name than the repo uses
+- treating Factory Droid like a generic MCP client without documenting its dedicated installer
+
+## Source of truth
+
+Primary files behind this page:
+
+- `apps/web/public/install-droid-mcp.sh`
+- `packages/mcp-server/README.md`
+- `.env.example`

@@ -1,0 +1,96 @@
+---
+title: Quick Start
+description: Get Memory Crystal working quickly, then choose hosted or local-first storage for your AI client.
+---
+
+Start with the universal installer. It detects supported clients, asks before configuring each one, and lets you choose cloud or local backend mode.
+
+## Universal install
+
+For macOS, Linux, WSL, or Git Bash:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+For native Windows PowerShell, use the PowerShell companion when available for your release:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -UseBasicParsing | iex
+```
+
+The installer can configure:
+
+- OpenClaw
+- Claude Code
+- Claude Desktop
+- Codex CLI
+- Factory Droid
+- generic MCP clients
+
+It prompts before changing each detected client and creates backups before config edits.
+
+## Choose a deployment mode
+
+| Mode | Best for | Details |
+| --- | --- | --- |
+| **Cloud** (recommended) | Easiest setup, shared memory across devices | Uses Memory Crystal's hosted backend |
+| **Local-first** | Single-machine data control | Uses Docker Convex on `127.0.0.1` for data while hosted auth/license remains required |
+| **External self-hosted** | Advanced operators | Uses your own Convex deployment when supported by the installer |
+
+See [Local-First Setup](/configuration/local-first) for Docker requirements, local dashboard URLs, backup behavior, and rollback notes.
+
+## Single-client installer paths
+
+Use these when you intentionally want one client path instead of the universal prompt flow.
+
+<AccordionGroup>
+  <Accordion title="Claude Code">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+    ```
+    See [Claude Code](/integrations/claude-code).
+  </Accordion>
+  <Accordion title="Codex CLI">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+    ```
+    See [Codex CLI](/integrations/codex-cli).
+  </Accordion>
+  <Accordion title="Factory Droid">
+    ```bash
+    curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+    ```
+    See [Factory Droid](/integrations/factory-droid).
+  </Accordion>
+  <Accordion title="Claude Desktop">
+    Use the config shown on the [Claude Desktop](/integrations/claude-desktop) page when your installer release does not yet mutate Claude Desktop config automatically.
+  </Accordion>
+</AccordionGroup>
+
+## Pick your platform
+
+Cloud and external self-hosted modes need a Memory Crystal API key. Local-first mode still needs hosted account/device auth so Memory Crystal can validate license entitlement before provisioning local credentials.
+
+1. Visit [memorycrystal.ai/dashboard](https://memorycrystal.ai/dashboard)
+2. Create or open your account
+3. Go to **API Keys**
+4. Create a key and save it somewhere safe
+
+<Warning>The dashboard only shows the key once. Local mode stores local client credentials separately and should never log hosted bearer/device tokens.</Warning>
+
+## Verify your setup
+
+```bash
+npm run crystal:doctor
+```
+
+For local Docker Convex, also verify the local backend health from the installed artifact or from a repo checkout:
+
+```bash
+npm run convex:local:doctor
+```
+
+<Tip>
+If local-first setup fails, run the local backend doctor from the installed artifact and verify Docker is running before reinstalling.
+</Tip>

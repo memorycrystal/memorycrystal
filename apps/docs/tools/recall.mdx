@@ -1,0 +1,221 @@
+---
+title: Recall tools
+description: The tools and backend flows that help Memory Crystal search across recent messages, durable memories, and relationships.
+---
+
+
+Recall tools help the AI look backward and bring the right memory back.
+
+## What this means in practice
+
+Recall-oriented flows include:
+
+- semantic recall — find memories by semantic similarity
+- recent-message continuity — access recent conversation context
+- topic scans — broad topic understanding across memories
+- decision archaeology — trace past decisions and reasoning
+- ownership lookups — find who owns or manages entities
+- dependency tracing — understand what depends on what
+- preflight retrieval — gather context before an action
+
+## crystal_recall — Semantic memory search
+
+The primary semantic recall tool. Retrieves memories by embedding similarity, with optional filtering by store, category, tags, and mode.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The search query. Embedded and matched against memory embeddings. |
+| `mode` | string | No | Recall mode preset: `general` (default), `decision`, `project`, `people`, `workflow`, or `conversation`. Each mode prioritizes different memory categories. |
+| `stores` | array | No | Filter by memory store: `sensory`, `episodic`, `semantic`, `procedural`, `prospective`. |
+| `categories` | array | No | Filter by category: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, `conversation`. |
+| `tags` | array | No | Filter by tags. Returns memories matching any tag. |
+| `limit` | number | No | Max results to return. Range: 1–20. |
+| `includeAssociations` | boolean | No | Include associated memories. Default: `true`. |
+| `includeArchived` | boolean | No | Include archived memories in results. Default: `false`. |
+| `channel` | string | No | Scope to a specific channel. |
+
+For OpenClaw/plugin-backed sessions, `agentId` is threaded automatically when available so the backend can resolve shared vs peer-scoped knowledge-base access correctly.
+
+### Returns
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "mem_abc123",
+      "store": "semantic",
+      "category": "decision",
+      "title": "Chose Convex over Supabase",
+      "content": "Using Convex for backend because mutations are transactional...",
+      "strength": 0.92,
+      "confidence": 0.95,
+      "tags": ["backend", "architecture"],
+      "score": 0.89
+    }
+  ],
+  "injectionBlock": "⚠️ Memory Crystal — Informational Context Only\n..."
+}
+```
+
+### Examples
+
+**Basic semantic search:**
+
+```json
+{
+  "query": "authentication strategy"
+}
+```
+
+**Search with mode (find decisions):**
+
+```json
+{
+  "query": "deployment process",
+  "mode": "decision"
+}
+```
+
+**Filter by store and category:**
+
+```json
+{
+  "query": "API design patterns",
+  "stores": ["semantic", "procedural"],
+  "categories": ["rule", "workflow"],
+  "limit": 5
+}
+```
+
+**Find memories tagged with specific topics:**
+
+```json
+{
+  "query": "user preferences",
+  "tags": ["user-model", "personalization"]
+}
+```
+
+## When to use vs alternatives
+
+### crystal_recall (semantic similarity)
+
+**Use when:** You want to find memories related to a topic by semantic meaning. Best for open-ended exploration and context building.
+
+**Example:** "What have I learned about database architecture?"
+
+### crystal_search_messages (exact transcript match)
+
+**Use when:** You need to find exact messages or phrasing from recent conversations. Better for recent continuity than long-term patterns.
+
+**Example:** "Find the exact conversation where we discussed X."
+
+**Tool:** `crystal_search_messages`
+
+### crystal_what_do_i_know (broad topic scan)
+
+**Use when:** You want a comprehensive overview of everything about a topic without specifying a query. Returns facts, decisions, lessons, workflows, and goals all at once.
+
+**Example:** "What do I know about Memory Crystal architecture?"
+
+**Tool:** `crystal_what_do_i_know`
+
+### crystal_recent (time-ordered continuity)
+
+**Use when:** You need the most recent messages in order, not by relevance. Useful for session continuity and understanding what just happened.
+
+**Example:** "What did we just discuss?"
+
+**Tool:** `crystal_recent`
+
+### Decision guide
+
+| Scenario | Tool |
+|----------|------|
+| I need context on a specific topic | **`crystal_recall`** |
+| I want a comprehensive overview of a topic | `crystal_what_do_i_know` |
+| I remember the exact phrasing but not the context | `crystal_search_messages` |
+| I need the last N messages chronologically | `crystal_recent` |
+| I want to trace why a decision was made | `crystal_why_did_we` |
+| I want to find related decisions | `crystal_recall` with `mode=decision` |
+
+## Recall modes explained
+
+| Mode | Prioritizes | Best for |
+|------|-------------|----------|
+| `general` | All memory types equally | Open-ended queries |
+| `decision` | Decisions and lessons from semantic store | Past reasoning and choices |
+| `project` | Goals, workflows, facts | Project status and procedures |
+| `people` | Person memories and relationships | User/teammate context |
+| `workflow` | Procedural rules and patterns | How-to and best practices |
+| `conversation` | Recent conversational context | Session continuity |
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Embedding service unavailable | The embedding backend is unreachable. | Retry; check service health. |
+| Memory Crystal recall degraded | Same as above. | Retry later. |
+| Invalid store value | Store is not one of the five valid types. | Use: `sensory`, `episodic`, `semantic`, `procedural`, `prospective`. |
+| Invalid category value | Category is not a valid memory category. | Use a valid category from the schema. |
+| Invalid mode | Mode is not a recognized recall mode. | Use: `general`, `decision`, `project`, `people`, `workflow`, `conversation`. |
+| Empty results | No memories matched the query/filters. | Try a broader query or remove filters. |
+
+## Confidence and scoring
+
+Recall results include two scores:
+
+- **`score`** — semantic similarity (0–1), where 1 is a perfect semantic match
+- **`confidence`** — the system's confidence in the memory itself (varies by age, access count, strength)
+
+Results marked `[HIGH CONFIDENCE]` (≥0.8) should be referenced in your response, especially for factual queries.
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/recall.ts` — main recall query logic
+- `convex/crystal/recallRanking.ts` — ranking and scoring algorithm
+- `convex/crystal/messages.ts` — message search and retrieval
+- `convex/crystal/mcp.ts` — tool registration and HTTP routing
+- `mcp-server/src/tools/recall.ts` — MCP tool definition
+
+These files define how Memory Crystal embeds queries, ranks candidates, merges memory sources, and returns recall results.
+
+### Shared vs peer-scoped recall
+
+The shipped recall path supports both:
+
+- **peer/client sessions** like `morrow-coach:511172388`
+- **shared/open sessions** like `morrow-team:main`
+
+Important rule:
+
+- private client memories stay peer-scoped
+- shared training KBs can be exposed through `scope: "...:main"` plus `peerScopePolicy: "permissive"` when you intentionally want them available to multiple agents/chats under one key
+
+## Common mistakes
+
+- Treating recall as a single feature instead of a family of related retrieval flows
+- Assuming vector search alone explains the final ranking (it's combined with strength, recency, and scope)
+- Ignoring the role of recent-message and scope-aware filtering
+- Not using modes to guide recall toward specific memory types
+- Forgetting that `crystal_recent` and `crystal_search_messages` serve different purposes than semantic recall
+
+## Source of truth
+
+Primary files behind this page:
+
+- `mcp-server/src/tools/recall.ts` — tool definition
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`
+
+## Notes
+
+### Peer-first fallback (new in 0.7.15)
+
+When `channel` is omitted on a peer-facing call, recall now fails-closed on any knowledge base with a concrete peer scope instead of silently upgrading to management-level visibility. If you're integrating recall from a peer session and expect KB results, always pass the peer channel (e.g. `morrow-coach:511172388`). Omit `channel` only when you intend a deliberately unscoped (management) read.
