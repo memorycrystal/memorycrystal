@@ -1,0 +1,74 @@
+---
+title: Hermes Agent
+description: Install Memory Crystal as a Hermes plugin with MCP tool parity.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure Hermes for hosted cloud, local Docker Convex, or an external self-hosted backend and creates config backups before writing.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets hermes
+```
+
+For local data storage, add `--backend local`. See [Local-First Setup](/configuration/local-first).
+
+## What this gives Hermes
+
+Memory Crystal uses two Hermes integration points:
+
+- a native Hermes plugin for automatic recall before model calls, transcript logging after model calls, and pre-tool guardrail checks
+- Hermes MCP configuration for the full Memory Crystal tool surface
+
+That keeps the plugin small while still exposing recall, remember, update/supersede, search messages, recent, wake, stats, preflight, trace, checkpoint, forget/edit, knowledge-base tools, reasoning tools, and ideas tools through Hermes MCP.
+
+## How it installs
+
+The installer writes:
+
+- `~/.hermes/plugins/crystal-memory/plugin.yaml`
+- `~/.hermes/plugins/crystal-memory/__init__.py`
+- `~/.hermes/.env`
+- `~/.hermes/config.yaml`
+
+It enables `crystal-memory` under `plugins.enabled` and adds a `mcp_servers.memory_crystal` entry with the selected Memory Crystal backend and bearer token.
+
+## Verify
+
+Restart Hermes after installation, or reload MCP from an active Hermes session:
+
+```text
+/reload-mcp
+/plugins
+/crystal_status
+```
+
+Hermes prefixes MCP tools by server name, so Memory Crystal tools may appear with a prefix like `mcp_memory_crystal_crystal_stats`. Hermes can still choose them during normal reasoning.
+
+## Troubleshooting
+
+If the plugin is installed but not active, check `~/.hermes/config.yaml`:
+
+```yaml
+plugins:
+  enabled:
+    - crystal-memory
+```
+
+If MCP tools are missing, check the `mcp_servers.memory_crystal` block and run `/reload-mcp`.
+
+If recall/capture does not work, check `~/.hermes/.env` for:
+
+```bash
+MEMORY_CRYSTAL_API_KEY=...
+MEMORY_CRYSTAL_API_URL=...
+```
+
+## Source of truth
+
+Primary files behind this page:
+
+- `integrations/hermes/crystal-memory/plugin.yaml`
+- `integrations/hermes/crystal-memory/__init__.py`
+- `apps/web/public/install.sh`
+- `apps/web/app/install-assets/hermes-plugin/[...file]/route.ts`
