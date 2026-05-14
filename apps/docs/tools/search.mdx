@@ -1,0 +1,250 @@
+---
+title: Search & scope
+description: How Memory Crystal searches across messages and memories while respecting channel, client, and knowledge-base boundaries.
+---
+
+
+Search tools help the AI find the right memory without looking in the wrong places. All searches respect channel, client, and knowledge-base isolation boundaries.
+
+## What this means in practice
+
+This includes:
+
+- semantic search over recent messages (STM)
+- scoped message visibility by channel
+- time-range filtering for recent continuity
+- knowledge-base-aware query behavior
+- client/channel isolation rules (enforced server-side)
+
+## crystal_search_messages — Semantic message search
+
+Search short-term memory (recent messages) by semantic similarity. Complements `crystal_recall` (which searches long-term memories).
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The search query. Embedded and matched against message content. |
+| `limit` | number | No | Maximum results to return. Default: 10. Range: 1–20. |
+| `channel` | string | No | Scope search to a specific channel. If not provided, searches all accessible channels. |
+| `sinceMs` | number | No | Only return messages after this Unix timestamp (in milliseconds). Useful for time-range queries. |
+
+### Returns
+
+```json
+{
+  “query”: “authentication strategy”,
+  “results”: [
+    {
+      “_id”: “msg_abc123”,
+      “role”: “user”,
+      “content”: “How should we implement auth in the new API?”,
+      “channel”: “engineering”,
+      “timestamp”: 1713314400000,
+      “score”: 0.89
+    },
+    {
+      “_id”: “msg_def456”,
+      “role”: “assistant”,
+      “content”: “I recommend using OAuth2 with JWT tokens for stateless auth.”,
+      “channel”: “engineering”,
+      “timestamp”: 1713314460000,
+      “score”: 0.85
+    }
+  ],
+  “limit”: 10,
+  “channel”: “engineering”,
+  “sinceMs”: null
+}
+```
+
+### Examples
+
+**Basic message search:**
+
+```json
+{
+  “query”: “what did we decide about the database?”
+}
+```
+
+**Search within a specific channel:**
+
+```json
+{
+  “query”: “deploy process”,
+  “channel”: “devops”
+}
+```
+
+**Search recent messages only (last 7 days):**
+
+```json
+{
+  “query”: “API authentication”,
+  “sinceMs”: 1712104800000,
+  “limit”: 5
+}
+```
+
+**Search engineering channel since a specific time:**
+
+```json
+{
+  “query”: “performance optimization”,
+  “channel”: “engineering”,
+  “sinceMs”: 1713000000000,
+  “limit”: 15
+}
+```
+
+## Channel filtering
+
+### What channels do
+
+- **Isolate conversations** — messages in one channel are not visible to queries scoped to another channel
+- **Enable cross-client scenarios** — the same user can have separate channels for different integrations (e.g., Slack vs Telegram)
+- **Preserve context boundaries** — memory recall respects channel scope by default
+
+### Using channels
+
+If you omit `channel`, searches return results from all channels the user has access to. To narrow results:
+
+1. **Provide the channel name** — Pass the channel identifier (e.g., `”slack”`, `”telegram”`, `”claude-code”`)
+2. **Verify visibility** — Server-side rules enforce that you only see messages within accessible channels
+3. **Combine with sinceMs** — Time range + channel gives fine-grained control
+
+### Example: Multi-channel scenario
+
+A user interacts with Memory Crystal via both Slack and Telegram. Each has its own channel. To search only Slack messages:
+
+```json
+{
+  “query”: “project timeline”,
+  “channel”: “slack”
+}
+```
+
+To search both, omit the channel parameter (or make two calls with different channels).
+
+## Time-range filtering with sinceMs
+
+Use `sinceMs` to retrieve messages after a specific Unix timestamp (milliseconds):
+
+```javascript
+// Messages from the last 7 days
+const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+// Messages from a specific date (2026-04-16)
+const specificDate = new Date(“2026-04-16”).getTime();
+```
+
+### Examples
+
+**Messages from today onwards:**
+
+```json
+{
+  “query”: “decisions made”,
+  “sinceMs”: 1713004800000
+}
+```
+
+**Messages from a specific week:**
+
+```json
+{
+  “query”: “deployment issues”,
+  “sinceMs”: 1712000000000,
+  “channel”: “devops”
+}
+```
+
+## When to use vs alternatives
+
+### crystal_search_messages (recent, exact context)
+
+**Use when:** You need to find recent messages by semantic meaning, preserving context and timestamps.
+
+**Best for:** Session continuity, recent decision tracking, finding exact phrasing from recent conversations.
+
+**Example:** “What did we just discuss about authentication?”
+
+### crystal_recall (long-term, high-confidence memories)
+
+**Use when:** You want to find durable, extracted facts and decisions. Better for understanding patterns and history.
+
+**Best for:** Getting the gist of a topic without reading full conversation history.
+
+**Example:** “What have we decided about authentication?”
+
+### Decision guide
+
+| Scenario | Tool |
+|----------|------|
+| Find an exact recent message or phrasing | **`crystal_search_messages`** |
+| Get the summary/decision from a topic | `crystal_recall` |
+| Get context on why a decision was made | `crystal_why_did_we` |
+| Get all information about a topic | `crystal_what_do_i_know` |
+| Find the most recent N messages chronologically | `crystal_recent` |
+| Query a knowledge base | `crystal_query_knowledge_base` |
+
+## Scoping and isolation
+
+Memory Crystal enforces isolation at multiple levels:
+
+1. **User-level isolation** — Users never see each other's messages or memories (enforced by `userId`)
+2. **Channel-level isolation** — Messages in one channel don't appear in queries scoped to another (enforced by channel filtering)
+3. **Knowledge-base isolation** — KB queries only return chunks from the specified knowledge base
+4. **Age-based visibility** — Archived memories and expired STM messages are hidden by default
+
+**Server-side guarantee:** All filtering is enforced server-side. Client code cannot bypass isolation rules.
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| query is required | No query parameter was provided. | Provide a non-empty search string. |
+| Embedding service unavailable | The embedding backend is unreachable. | Retry; check service health. |
+| Memory Crystal recall degraded | Same as above. | Retry later. |
+| Invalid channel | Channel identifier is malformed or inaccessible. | Verify the channel name exists. |
+| Invalid sinceMs | sinceMs is not a valid Unix timestamp. | Use `Date.now()` or a numeric millisecond timestamp. |
+| Empty results | No messages matched the query/filters. | Try a broader query or remove the channel/time filter. |
+
+## How it actually works
+
+Key repo surfaces:
+
+- `mcp-server/src/tools/search-messages.ts` — tool definition and HTTP handler
+- `convex/crystal/messages.ts` — message storage and search logic
+- `convex/crystal/mcp.ts` — API endpoint routing
+- `convex/crystal/recall.ts` — scoping and filtering rules
+
+The flow:
+
+1. Tool validates query, limit, channel, and sinceMs parameters
+2. Query is embedded using OpenAI's `text-embedding-3-small`
+3. ConvexClient POSTs to `/api/mcp/search-messages` with embedding
+4. Backend applies channel and time filters
+5. Vector search retrieves top-K matching messages
+6. Results are returned with scores and timestamps
+
+Channel and user isolation is enforced at the database level, not in the tool code.
+
+## Common mistakes
+
+- Treating search and recall as if they are identical (they're designed for different purposes)
+- Forgetting that scoped channels affect results (all searches are channel-aware)
+- Not using sinceMs for time-range queries (just relying on default recency)
+- Assuming cross-channel visibility when channels are set (isolation is enforced)
+- Using `crystal_search_messages` for long-term patterns (use `crystal_recall` instead)
+
+## Source of truth
+
+Primary files behind this page:
+
+- `mcp-server/src/tools/search-messages.ts` — tool definition
+- `convex/crystal/messages.ts` — backend logic and filtering
+- `convex/crystal/recall.ts` — scoping rules
+- `convex/crystal/knowledgeBases.ts` — KB visibility logic
+- `convex/crystal/mcp.ts` — HTTP endpoint routing

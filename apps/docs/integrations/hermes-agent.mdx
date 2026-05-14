@@ -1,0 +1,116 @@
+---
+title: Hermes Agent
+description: Install Memory Crystal as a Hermes plugin with MCP tool parity.
+---
+
+## Recommended: universal installer
+
+Use the universal installer first. It can configure Hermes for hosted cloud, local Docker Convex, or an external self-hosted backend and creates config backups before writing.
+
+### Agent Instructions
+
+Copy and paste this directly into your Hermes Agent:
+
+```text
+Install Memory Crystal for Hermes Agent. Run the official installer command below, follow the auth/backend prompts, and do not manually edit Hermes config unless the installer fails and asks for a manual fallback. After installation, reload MCP and verify with `/plugins`, `/reload-mcp`, and `/crystal_status`.
+
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets hermes
+```
+
+<Warning>Hermes Agent is not supported by the native Windows PowerShell installer yet. Use macOS, Linux, WSL, or Git Bash for the Hermes installer path.</Warning>
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets hermes
+```
+
+For local data storage, add `--backend local`. See [Local-First Setup](/configuration/local-first).
+
+## What this gives Hermes
+
+Memory Crystal uses two Hermes integration points:
+
+- a native Hermes plugin for automatic recall before model calls, transcript logging after model calls, and pre-tool guardrail checks
+- Hermes MCP configuration for the full Memory Crystal tool surface
+
+The plugin runs in `auto` mode by default. If Hermes exposes a native memory-provider registration surface, Memory Crystal registers as a provider. If that surface is unavailable, it falls back to lifecycle hooks. Either mode keeps recall and capture automatic; MCP remains configured for the broad tool surface.
+
+That keeps the integration compatible across Hermes builds while still exposing recall, remember, update/supersede, search messages, recent, wake, stats, preflight, trace, checkpoint, forget/edit, knowledge-base tools, reasoning tools, and ideas tools through Hermes MCP.
+
+## How it installs
+
+The installer writes:
+
+- `~/.hermes/plugins/crystal-memory/plugin.yaml`
+- `~/.hermes/plugins/crystal-memory/__init__.py`
+- `~/.hermes/.env`
+- `~/.hermes/config.yaml`
+
+It enables `crystal-memory` under `plugins.enabled` and adds a `mcp_servers.memory_crystal` entry with the selected Memory Crystal backend and bearer token.
+
+## Verify
+
+Restart Hermes after installation, or reload MCP from an active Hermes session:
+
+```text
+/reload-mcp
+/plugins
+/crystal_status
+```
+
+Hermes prefixes MCP tools by server name, so Memory Crystal tools may appear with a prefix like `mcp_memory_crystal_crystal_stats`. Hermes can still choose them during normal reasoning.
+
+## Troubleshooting
+
+If the plugin is installed but not active, check `~/.hermes/config.yaml`:
+
+```yaml
+plugins:
+  enabled:
+    - crystal-memory
+```
+
+If MCP tools are missing, check the `mcp_servers.memory_crystal` block and run `/reload-mcp`.
+
+If recall/capture does not work, check `~/.hermes/.env` for:
+
+```bash
+MEMORY_CRYSTAL_API_KEY=...
+MEMORY_CRYSTAL_API_URL=...
+MEMORY_CRYSTAL_HERMES_MODE=auto
+MEMORY_CRYSTAL_CAPTURE_TURNS=true
+MEMORY_CRYSTAL_INJECT_RECALL=true
+MEMORY_CRYSTAL_ALLOW_GROUP_WRITES=false
+```
+
+Hermes turn capture writes completed user/assistant turns through `/api/mcp/turn`.
+If your backend is older and does not expose that route, the plugin falls back to
+the older two-message `/api/mcp/log` capture path and reports the fallback in
+`crystal_status`.
+
+`crystal_status` also reports the active lifecycle mode (`provider`, `hooks`,
+`disabled`, or `degraded`), backend auth, recent hook/provider counts, capture
+mode, skip reasons, and circuit-breaker state. Group/public chats, cron, flush,
+and subagent contexts skip writes by default.
+
+## Uninstall
+
+Use the universal uninstall script when removing Hermes support:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets hermes
+```
+
+Add `--purge` to remove the staged `~/.hermes/plugins/crystal-memory` bundle.
+The uninstall path removes Memory Crystal keys from `~/.hermes/.env` and removes
+the `crystal-memory` plugin plus `mcp_servers.memory_crystal` config entries
+while preserving unrelated Hermes config.
+
+## Source of truth
+
+Primary files behind this page:
+
+- `integrations/hermes/crystal-memory/plugin.yaml`
+- `integrations/hermes/crystal-memory/__init__.py`
+- `integrations/hermes/crystal-memory/CONTRACT.md`
+- `apps/web/public/install.sh`
+- `apps/web/app/install-assets/hermes-plugin/[...file]/route.ts`
