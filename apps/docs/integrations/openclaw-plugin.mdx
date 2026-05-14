@@ -46,6 +46,18 @@ It can:
 - recall relevant context before the next model call
 - wire tools and memory behavior into the OpenClaw runtime
 
+## Pair with public X/Twitter source capture
+
+If your OpenClaw agent uses public X/Twitter context, install [TweetClaw](https://github.com/Xquik-dev/tweetclaw) beside Memory Crystal:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+TweetClaw handles X/Twitter workflows such as scrape tweets, search tweets, search tweet replies, follower export, user lookup, monitor tweets, webhooks, and approval-gated post tweet or reply actions. Memory Crystal can then keep the durable record: query, tweet URLs or IDs, author handles, capture date, short summary, decision, and follow-up action.
+
+Do not store raw timelines, direct messages, cookies, account credentials, or private material as memory. Store distilled public facts, decisions, and lessons that future OpenClaw sessions should recall.
+
 ## Quick install
 
 If you want the fastest public install path, run:

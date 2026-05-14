@@ -140,6 +140,18 @@ First-class immutable reference collections for docs, policies, runbooks, and im
 - **Bulk import** — standard import or high-volume bulk-insert without blocking on embedding
 - **Background enrichment** — embedding and graph backfill run asynchronously
 
+## Source-capture example for OpenClaw
+
+Memory Crystal works well as the durable memory layer for data-source plugins. If an OpenClaw agent also uses [TweetClaw](https://github.com/Xquik-dev/tweetclaw), install it separately:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+Use TweetClaw to scrape tweets, search tweets, search tweet replies, export followers, look up users, monitor tweets, receive webhooks, and run approval-gated post tweet or reply workflows. Then ask Memory Crystal to store concise source memories: query, tweet URLs or IDs, author handles, capture date, short summary, decision, and follow-up action.
+
+Keep raw timelines, direct messages, cookies, account credentials, and private material out of long-term memory. Store distilled public facts, decisions, and lessons that will help a future session.
+
 ---
 
 ## 24 memory tools
