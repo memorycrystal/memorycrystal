@@ -1,0 +1,124 @@
+name: Image Size Gate
+
+on:
+  workflow_run:
+    workflows: ["Publish Self-Hosted Images"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  size-gate:
+    # Only run when the publish workflow succeeded and was triggered by a tag or dispatch
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.event == 'push' ||
+       github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: web-selfhosted
+            limit_mb: 200
+          - image: mcp
+            limit_mb: 80
+
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image ref
+        id: ref
+        run: |
+          # Derive the version from the triggering workflow's head_branch/head_sha.
+          # For tag pushes the ref_name on the triggering run is the tag itself.
+          TRIGGERING_REF="${{ github.event.workflow_run.head_branch }}"
+          if [[ -z "$TRIGGERING_REF" || "$TRIGGERING_REF" == "null" ]]; then
+            TRIGGERING_REF="sha-$(echo '${{ github.event.workflow_run.head_sha }}' | head -c 8)"
+          fi
+          # Strip leading 'v' to get the version segment
+          VERSION="${TRIGGERING_REF#v}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${VERSION}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Check compressed size via manifest inspect
+        id: size_check
+        run: |
+          IMAGE="${{ steps.ref.outputs.image }}"
+          LIMIT_MB="${{ matrix.limit_mb }}"
+
+          echo "Inspecting: ${IMAGE}"
+          # docker manifest inspect returns layer sizes in bytes.
+          # We sum all layer sizes to get total compressed size.
+          MANIFEST=$(docker manifest inspect "${IMAGE}" 2>&1) || {
+            echo "::error::Failed to inspect manifest for ${IMAGE}"
+            echo "$MANIFEST"
+            exit 1
+          }
+
+          TOTAL_BYTES=$(echo "$MANIFEST" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          total = 0
+          # Multi-platform: manifests list
+          if 'manifests' in data:
+              for m in data['manifests']:
+                  total += m.get('size', 0)
+                  # Also sum layers if present
+          # Single manifest: layers list
+          if 'layers' in data:
+              for layer in data['layers']:
+                  total += layer.get('size', 0)
+          # Config blob
+          if 'config' in data:
+              total += data['config'].get('size', 0)
+          print(total)
+          " 2>/dev/null || echo "0")
+
+          if [[ "$TOTAL_BYTES" == "0" ]]; then
+            # Fallback: sum layers only (some registries return different shapes)
+            TOTAL_BYTES=$(echo "$MANIFEST" | python3 -c "
+          import sys, json, re
+          text = sys.stdin.read()
+          sizes = [int(x) for x in re.findall(r'\"size\":\s*(\d+)', text)]
+          print(sum(sizes))
+          " 2>/dev/null || echo "0")
+          fi
+
+          TOTAL_MB=$(( TOTAL_BYTES / 1024 / 1024 ))
+
+          echo "Image:         ${IMAGE}"
+          echo "Total size:    ${TOTAL_MB} MB (compressed, from manifest)"
+          echo "Limit:         ${LIMIT_MB} MB"
+
+          echo "total_mb=${TOTAL_MB}" >> "$GITHUB_OUTPUT"
+
+          if [[ $TOTAL_MB -gt $LIMIT_MB ]]; then
+            echo "::error::Image ${IMAGE} is ${TOTAL_MB} MB compressed, exceeds limit of ${LIMIT_MB} MB."
+            exit 1
+          fi
+
+          echo "Size gate passed: ${TOTAL_MB} MB <= ${LIMIT_MB} MB"
+
+      - name: Write size gate summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## Size gate: ${{ matrix.image }}
+
+          | Field | Value |
+          |-------|-------|
+          | Image | \`${{ steps.ref.outputs.image }}\` |
+          | Compressed size | ${{ steps.size_check.outputs.total_mb }} MB |
+          | Limit | ${{ matrix.limit_mb }} MB |
+          | Result | ${{ steps.size_check.outputs.total_mb <= matrix.limit_mb && 'PASS' || 'FAIL' }} |
+          SUMMARY

@@ -1,0 +1,29 @@
+name: crystal-memory
+version: "0.8.7"
+description: Persistent Memory Crystal recall, capture, guardrails, and MCP tool parity for Hermes Agent
+author: Memory Crystal
+provides_memory_provider: true
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+  - pre_tool_call
+  - on_session_start
+  - on_session_end
+  - on_session_finalize
+  - on_session_reset
+provides_commands:
+  - crystal_status
+requires_env:
+  - name: MEMORY_CRYSTAL_API_KEY
+    description: Memory Crystal API key
+    url: https://memorycrystal.ai/dashboard/settings
+    secret: true
+  - name: MEMORY_CRYSTAL_HERMES_MODE
+    description: "Hermes lifecycle mode: auto, provider, hooks, or disabled"
+    default: auto
+  - name: MEMORY_CRYSTAL_CAPTURE_TURNS
+    description: Capture completed Hermes turns
+    default: "true"
+  - name: MEMORY_CRYSTAL_INJECT_RECALL
+    description: Inject bounded recall context before model calls
+    default: "true"

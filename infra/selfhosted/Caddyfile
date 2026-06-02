@@ -1,0 +1,37 @@
+# Memory Crystal — Tier-1 Caddy fallback responder
+#
+# Listens on :8089. Serves structured JSON 503 (§10 envelope) when web/mcp
+# are down but the Mac is online and cloudflared is connected (Tier 1).
+#
+# The final cloudflared ingress rule points to http://fallback:8089 so this
+# Caddy instance is the last stop before cloudflared would otherwise return
+# a bare error page.
+#
+# MC_TENANT_SLUG is injected from the container environment.
+
+{
+	# Disable Caddy's admin API endpoint (no management needed in this container)
+	admin off
+
+	# Structured JSON logging to stdout (picked up by docker logs / cloudwatch)
+	log {
+		output stdout
+		format json
+	}
+}
+
+:8089 {
+	# Health probe — returns 200 OK with no body.
+	# Used by the Docker healthcheck: wget -q --spider http://localhost:8089/_health
+	handle /_health {
+		respond 200
+	}
+
+	# Catch-all: return the §10 structured-503 JSON envelope.
+	# status "tunnel-fallback-ingress" = Tier 1 (Mac on, cloudflared up, web/mcp down).
+	handle {
+		header Content-Type application/json
+		header Retry-After 30
+		respond `{"status":"tunnel-fallback-ingress","retry_after":30,"last_seen_at":null,"tenant_slug":"{$MC_TENANT_SLUG}","support_link":"https://memorycrystal.ai/docs/troubleshooting","error":"upstream_unavailable","message":"Your Memory Crystal stack is unreachable. The Mac is online but web/mcp services are not responding."}` 503
+	}
+}

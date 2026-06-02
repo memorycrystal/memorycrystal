@@ -1,0 +1,51 @@
+---
+title: Knowledge Bases
+description: The reference-data side of Memory Crystal's public tool surface.
+---
+
+
+Knowledge Bases are the shelf of books your AI can read when it needs stable reference material.
+
+## What this means in practice
+
+Use them for:
+
+- documentation
+- policies
+- runbooks
+- reference notes
+- scoped project or workspace knowledge
+
+They are different from conversational memory because they are meant to stay stable and be queried deliberately.
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+
+## Common mistakes
+
+- treating Knowledge Bases as just another name for memory stores
+- forgetting the difference between stable reference data and conversational memory
+- documenting import/query behavior without checking the actual HTTP/tool surfaces
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`
