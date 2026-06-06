@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "system": "Pinecone Assistant",
+  "status": "not_available",
+  "boundary": "persistent_memory",
+  "run_id": "pinecone-unavailable-20260525T132127Z",
+  "run_at": "2026-05-25T13:21:27.937Z",
+  "stage": "competitor_reproduction",
+  "reason_code": "adjacent_category_no_comparable_public_memory_score",
+  "reason": "Pinecone Assistant exposes assistant/RAG evaluation APIs, but no comparable public persistent-memory benchmark score is available for this V1 matrix.",
+  "retryable": false,
+  "score": null,
+  "source_artifact": "benchmarks/results/competitors/public-claims.json",
+  "redacted_environment": {
+    "external_network": false,
+    "credential_env": "PINECONE_API_KEY",
+    "credential_present": false,
+    "spend_policy": "no_paid_competitor_runs_in_v1"
+  },
+  "caveats": [
+    "This is an explicit unavailable/not-reproduced artifact, not a benchmark score.",
+    "Public claims for this system remain visible only as sourced public claims."
+  ]
+}
