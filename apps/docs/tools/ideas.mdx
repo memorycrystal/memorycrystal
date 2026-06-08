@@ -1,0 +1,176 @@
+---
+title: "Ideas & discoveries"
+description: "View and manage memory discoveries — cross-memory connections, patterns, and insights found between sessions."
+---
+
+Discover patterns and insights that Memory Crystal has found across your memories, including connections between ideas, pattern recognitions, and resolved contradictions.
+
+## What this means in practice
+
+Use `crystal_ideas` and `crystal_idea_action` to:
+
+- Discover cross-memory connections your system has made automatically
+- Identify patterns in your memories over time
+- Find insights that resolve contradictions between earlier memories
+- Star valuable discoveries to save them
+- Dismiss unhelpful or incorrect ideas
+- Track idea status (pending, starred, dismissed, read)
+
+## crystal_ideas
+
+Retrieve memory discoveries by status.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `status` | string | No | Filter by status: `pending` (unread), `starred` (saved), or `all`. Default: `pending`. |
+| `limit` | number | No | Maximum ideas to return. Range: 1–20. Default: 5. |
+
+### Returns
+
+```json
+{
+  "ideas": [
+    {
+      "_id": "idea_abc123",
+      "title": "Deploy process spans two systems",
+      "summary": "Memories show deployment involves both Railway and GitHub Actions, requiring coordination.",
+      "ideaType": "connection",
+      "confidence": 0.87,
+      "status": "pending",
+      "sourceMemoryIds": ["mem_xyz1", "mem_xyz2", "mem_xyz3"],
+      "createdAt": 1713314400000
+    },
+    {
+      "_id": "idea_def456",
+      "title": "Convex mutations preferred over HTTP actions",
+      "summary": "Pattern: multiple memories document transactional guarantees from mutations.",
+      "ideaType": "pattern",
+      "confidence": 0.92,
+      "status": "pending",
+      "sourceMemoryIds": ["mem_abc1", "mem_abc2"],
+      "createdAt": 1713228000000,
+      "starredAt": 1713314400000
+    }
+  ]
+}
+```
+
+### Idea types
+
+| Type | Meaning |
+|------|---------|
+| `connection` | Two or more memories are semantically related. |
+| `pattern` | Similar facts or lessons appear across multiple memories. |
+| `contradiction_resolved` | Earlier contradictory memories have been reconciled. |
+| `insight` | A new understanding emerges from combinations of memories. |
+| `action_suggested` | The system suggests a decision or action based on patterns. |
+
+### Examples
+
+**Get pending discoveries (default):**
+
+```json
+{}
+```
+
+**Get all ideas, limited to 10:**
+
+```json
+{
+  "status": "all",
+  "limit": 10
+}
+```
+
+**Get starred ideas only:**
+
+```json
+{
+  "status": "starred"
+}
+```
+
+## crystal_idea_action
+
+Take action on an idea (star, dismiss, or mark as read).
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `ideaId` | string | Yes | The ID of the idea to act on. |
+| `action` | string | Yes | Action to take: `star` (save as valuable), `dismiss` (hide), or `read` (acknowledge). |
+
+### Returns
+
+```json
+{
+  "message": "⭐ Idea starred as valuable."
+}
+```
+
+### Examples
+
+**Star a valuable idea:**
+
+```json
+{
+  "ideaId": "idea_abc123",
+  "action": "star"
+}
+```
+
+**Dismiss an incorrect idea:**
+
+```json
+{
+  "ideaId": "idea_def456",
+  "action": "dismiss"
+}
+```
+
+**Mark an idea as read:**
+
+```json
+{
+  "ideaId": "idea_ghi789",
+  "action": "read"
+}
+```
+
+## When to use vs alternatives
+
+| Use case | Tool |
+|----------|------|
+| Discover patterns and connections automatically | **`crystal_ideas`** |
+| React to and manage discovered ideas | **`crystal_idea_action`** |
+| Find memories related to a topic | `crystal_recall` or `crystal_what_do_i_know` |
+| Get recent messages | `crystal_recent` |
+| Search for exact transcript matches | `crystal_search_messages` |
+
+## Understanding confidence
+
+Each idea includes a confidence score (0–1):
+
+- **0.9+**: High confidence. The pattern is clear and well-supported.
+- **0.7–0.9**: Good confidence. Multiple supporting memories.
+- **0.5–0.7**: Moderate confidence. Some supporting evidence; may need human judgment.
+- **<0.5**: Low confidence. Consider dismissing or requesting more evidence.
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Organic Ideas not available | The endpoint doesn't exist on this server. | The feature may not be deployed yet. |
+| Memory Crystal not configured | Environment variables not set. | Ensure `MEMORY_CRYSTAL_API_URL` and `MEMORY_CRYSTAL_API_KEY` are defined. |
+| Idea not found | The specified `ideaId` doesn't exist. | Verify the ID from a prior `crystal_ideas` call. |
+| Invalid action | The action is not one of `star`, `dismiss`, or `read`. | Use a valid action string. |
+
+## Source of truth
+
+- `mcp-server/src/tools/ideas.ts` — `crystal_ideas` tool definition
+- `mcp-server/src/tools/idea-action.ts` — `crystal_idea_action` tool definition
+- `convex/crystal/organic/` — backend idea generation and ranking logic
+- `apps/web/app/(dashboard)/discoveries/` — ideas UI in the dashboard

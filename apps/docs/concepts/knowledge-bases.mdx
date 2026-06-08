@@ -1,0 +1,59 @@
+---
+title: Knowledge Bases
+description: Understand how Knowledge Bases differ from conversational memory and when to use them.
+---
+
+
+If memory is what your AI learns from talking to you, a Knowledge Base is the shelf of books you hand it on purpose.
+
+## What this means in practice
+
+Knowledge Bases are best for stable reference material such as:
+
+- docs
+- policies
+- runbooks
+- imported project notes
+- scoped reference data for a team, agent, or workspace
+
+They are meant to sit **beside** conversational memory, not replace it.
+
+## How it actually works
+
+The main implementation and HTTP surfaces live in:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`
+
+Knowledge Base operations include listing, creating, importing, querying, and background enrichment/backfill flows.
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+
+Representative endpoints:
+
+- `GET /api/knowledge-bases`
+- `POST /api/knowledge-bases/:knowledgeBaseId/import`
+- `POST /api/knowledge-bases/:knowledgeBaseId/query`
+
+## Common mistakes
+
+- treating Knowledge Bases as just another name for memory stores
+- mixing mutable conversational memories and stable reference imports together conceptually
+- documenting import/query flows without tying them to the actual HTTP/tool surface
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`
