@@ -1,0 +1,164 @@
+---
+title: crystal_checkpoint
+description: Create a manual Memory Checkpoint backup of durable memory.
+---
+
+## What it does
+
+Creates a manual Memory Checkpoint: a bounded backup of durable memory for later review and recovery planning. Use this only when the user explicitly asks to create a checkpoint or backup. Automatic conversation provenance is stored separately as Conversation Snapshots and does not consume checkpoint allowance.
+
+Checkpoint creation is intentionally cheap: it uses bounded indexed reads and document writes only. It does not run LLM summarization, embeddings, vector search, graph enrichment, or raw file backup.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| mode | string | No | "create" | Checkpoint mode: `create` (save snapshot) or `list` (retrieve checkpoints). |
+| label | string | Conditional | — | Checkpoint name/title. Required when `mode="create"`. Should be descriptive: "Implemented vector search", "Before auth refactor", etc. |
+| description | string | No | — | Longer description of what this checkpoint captures or why it's significant. |
+| memoryIds | array | No | — | Deprecated compatibility field. When supported by the backend, limits the checkpoint to specific memory IDs; otherwise checkpoint selection is bounded by scope and plan. |
+| sessionId | string | No | — | Scope checkpoint to a specific session. Used in list mode to filter checkpoints. |
+| semanticSummary | string | No | — | Deprecated compatibility field. Checkpoint summaries are generated cheaply from captured memory text, not by LLM. |
+| tags | array | No | — | Array of tag strings for organizing checkpoints (e.g., `["release", "v0.8", "production"]`). |
+| limit | number | No | 20 | In list mode: maximum number of checkpoints to return. Range: 1-100. |
+| createdBy | string | No | — | Deprecated compatibility field. The authenticated user owns the checkpoint. |
+| channel | string | No | — | Scope checkpoint to a specific channel. Used in both create and list modes. |
+
+## Returns (Create mode)
+
+```json
+{
+  "checkpointId": "string",
+  "mode": "create",
+  "label": "string",
+  "memoryCount": 12,
+  "allowance": 5,
+  "retainedCount": 2,
+  "snapshotCap": 200,
+  "tier": "starter"
+}
+```
+
+## Returns (List mode)
+
+```json
+{
+  "checkpoints": [
+    {
+      "checkpointId": "string",
+      "label": "string",
+      "description": "string",
+      "createdAt": 1234567890000,
+      "channel": "string",
+      "memoryCount": 12,
+      "tags": ["string"]
+    }
+  ],
+  "allowance": 5,
+  "retainedCount": 2,
+  "snapshotCap": 200,
+  "tier": "starter"
+}
+```
+
+**Field descriptions:**
+- `checkpointId` — Unique identifier for the checkpoint
+- `label` — Human-readable name
+- `createdAt` — Unix milliseconds when checkpoint was created
+- `memoryCount` — Number of memories included in the checkpoint
+- `allowance` — Number of retained Memory Checkpoints allowed by the current plan
+- `retainedCount` — Current number of retained Memory Checkpoints
+- `snapshotCap` — Maximum memory entries considered for each checkpoint on the current plan
+- `tags` — Optional tags for filtering and organization
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Create a checkpoint after the user explicitly asks to preserve this memory state
+crystal_checkpoint({
+  mode: "create",
+  label: "Implemented semantic search via embeddings"
+})
+
+// Result: { 
+//   checkpointId: "cp_abc123def456",
+//   mode: "create",
+//   label: "Implemented semantic search via embeddings",
+//   createdAt: 1713283200000,
+//   memoryCount: 42
+// }
+```
+
+### Advanced usage
+
+```javascript
+// Create a detailed checkpoint with description and tags
+crystal_checkpoint({
+  mode: "create",
+  label: "Release v0.8.0 — Vector search ready",
+  description: "All vector search infrastructure implemented and tested. Dashboard updated. Docs written. Ready for production deploy.",
+  tags: ["release", "v0.8", "stable"],
+  channel: "main"
+})
+
+// List all checkpoints
+crystal_checkpoint({
+  mode: "list",
+  limit: 50
+})
+
+// List checkpoints from a specific session
+crystal_checkpoint({
+  mode: "list",
+  sessionId: "session_xyz789",
+  limit: 20
+})
+
+// List checkpoints with a specific tag
+crystal_checkpoint({
+  mode: "list",
+  limit: 30,
+  channel: "claude-code"
+})
+
+// Create checkpoint with specific memories
+crystal_checkpoint({
+  mode: "create",
+  label: "Before auth system refactor",
+  description: "Saved auth decisions before rearchitecting from JWT to session-based",
+  memoryIds: ["mem_auth1", "mem_auth2", "mem_auth3"],
+  tags: ["auth", "refactor"]
+})
+```
+
+## When to use this vs alternatives
+
+- **`crystal_checkpoint`** — When the user explicitly asks to save a manual Memory Checkpoint
+- **`crystal_capture`** — When you want to save a single memory immediately
+- **`crystal_recent`** — When you need to see recent conversation messages, not checkpoint history
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| "Invalid arguments" | args is not an object | Pass a valid object |
+| "mode must be create or list" | Invalid mode value | Use either `"create"` or `"list"` |
+| "label is required for create mode" | label missing when mode="create" | Provide a non-empty label string |
+| "limit must be a number" | limit is provided but not numeric | Omit or provide a number in range 1-100 |
+| "memoryIds must be array of ids" | memoryIds is not an array | Provide an array of strings (can be empty) |
+| "channel must be a string" | channel is not a string | Provide a string or omit |
+| API connection error | Convex endpoint unavailable | Retry; check `CONVEX_URL` environment variable |
+
+## Notes
+
+- Checkpoints are retained according to plan allowance: Free 1, Starter/Pro 5, Ultra 10, Unlimited 20
+- Delete an older checkpoint before creating another at the allowance limit
+- Labels should be descriptive and action-oriented (✅ "Implemented vector search" vs ❌ "checkpoint 42")
+- Tags are lightweight and support filtering checkpoints by theme or project
+- Scoping by session, channel, or explicit memoryIds lets you create focused checkpoints when supported by the caller
+- List mode supports pagination via `limit` parameter
+- Checkpoints are useful before risky changes only when the user explicitly asks to create one
+- Use descriptions to explain WHY a checkpoint was created or what state it represents
+- Conversation Snapshots are separate automatic provenance records and are not listed as Memory Checkpoints

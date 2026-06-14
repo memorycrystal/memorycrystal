@@ -1,0 +1,40 @@
+name: Validate Caddyfile
+
+# Prevents the "broken Caddyfile blocks tunnel" failure mode (§11 risk table).
+# Runs caddy validate on every PR or push that touches the self-hosted Caddyfile.
+# A bad Caddyfile causes the fallback container to crash, which prevents cloudflared
+# from starting (depends_on: fallback), breaking the entire tunnel.
+
+on:
+  push:
+    paths:
+      - "infra/selfhosted/Caddyfile"
+  pull_request:
+    paths:
+      - "infra/selfhosted/Caddyfile"
+
+jobs:
+  validate-caddyfile:
+    name: Caddy config validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Caddyfile via caddy:2-alpine
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/infra/selfhosted/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Confirm fallback health route present
+        run: |
+          grep -q '/_health' infra/selfhosted/Caddyfile \
+            || (echo "ERROR: Caddyfile is missing /_health route — fallback healthcheck will fail" && exit 1)
+
+      - name: Confirm structured-503 envelope uses correct status field
+        run: |
+          grep -q '"status":"tunnel-fallback-ingress"' infra/selfhosted/Caddyfile \
+            || (echo "ERROR: Caddyfile 503 body missing status:tunnel-fallback-ingress (§10 contract)" && exit 1)

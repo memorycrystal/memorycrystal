@@ -1,0 +1,69 @@
+# Memory Crystal — mcp build context exclusions
+# Build context root is the monorepo root.
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (reinstalled inside the image)
+**/node_modules
+
+# Build outputs
+**/dist
+apps/web/.next
+apps/web/out
+
+# Test artifacts
+**/__tests__
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+**/vitest.config.*
+**/jest.config.*
+fixtures/
+
+# Local dev / env files
+**/.env
+**/.env.*
+!**/.env.example
+
+# OMC / Claude tooling
+.omc/
+.claude/
+**/.claude/
+
+# Documentation (keep LICENSE)
+*.md
+!LICENSE
+
+# OS artifacts
+**/.DS_Store
+**/Thumbs.db
+
+# Editor artifacts
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+
+# CI / infra
+.github/
+infra/cloudflare/
+infra/convex/
+infra/selfhosted/
+
+# Scripts
+scripts/
+
+# Source trees not needed for mcp build
+apps/
+convex/
+plugin/
+plugins/
+shared/
+assets/
+
+# Logs
+**/*.log
