@@ -1,0 +1,342 @@
+---
+title: Error Reference
+description: HTTP status codes, error responses, and debugging memory blocking and rate limiting.
+---
+
+Memory Crystal returns structured error responses for all failure modes. This page maps HTTP status codes to specific error conditions and shows how to diagnose them.
+
+## HTTP Status Codes
+
+### 400 Bad Request
+
+The request was malformed or missing required parameters.
+
+**Common causes:**
+- Missing required JSON fields
+- Invalid JSON syntax
+- Empty query string
+- Invalid UUID format for memory/KB IDs
+
+**Example response:**
+```json
+{
+  "error": "Bad request",
+  "details": "Missing required field: query"
+}
+```
+
+**How to debug:**
+- Check request body matches endpoint schema
+- Validate JSON with `jq` before sending
+- Verify all required parameters are present
+
+### 401 Unauthorized
+
+Authentication failed. The API key is missing, invalid, or expired.
+
+**Common causes:**
+- Missing `Authorization` header
+- Malformed header (not `Bearer <token>`)
+- Bearer token doesn't match any key hash in the database
+- Key is inactive (user disabled it)
+- Key has expired
+
+**Example response:**
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+**How to debug:**
+```bash
+# Check if key is in the header
+curl -v https://your-deployment/api/mcp/recall \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY"
+
+# Verify the key is not truncated or typo'd
+echo $MEMORY_CRYSTAL_API_KEY | wc -c  # Should be 65 chars (64 hex + newline)
+
+# Test with a new key if you suspect expiration
+```
+
+### 403 Forbidden
+
+Authentication succeeded but the user is not allowed to access this resource.
+
+**Common causes:**
+- Memory belongs to a different user
+- Knowledge base belongs to a different user
+- User's tier doesn't support this operation
+- Channel scope mismatch (memory in channel A, user in channel B)
+
+**Example response:**
+```json
+{
+  "error": "Forbidden"
+}
+```
+
+**How to debug:**
+- Verify the resource ID belongs to the authenticated user
+- Check user tier restrictions (Free vs Pro vs Ultra)
+- Confirm channel scope if applicable
+
+### 429 Too Many Requests
+
+Rate limit exceeded for the user's tier.
+
+**Common causes:**
+- Burst of requests exceeding per-minute limit
+- Multiple API keys hitting the same tier bucket
+- Bot or automation hitting limits
+- Shared API key across team members
+
+**Response headers:**
+```http
+Retry-After: 45
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1681234567
+```
+
+**Example response:**
+```json
+{
+  "error": "Rate limit exceeded",
+  "retryAfterMs": 45000
+}
+```
+
+**How to debug:**
+```bash
+# Check remaining quota
+curl -I https://your-deployment/api/mcp/stats \
+  -H "Authorization: Bearer $API_KEY" | grep X-RateLimit
+
+# Back off and retry with exponential backoff
+sleep 45
+curl https://your-deployment/api/mcp/recall \
+  -H "Authorization: Bearer $API_KEY"
+```
+
+See [Rate Limits](rate-limits.mdx) for tier-specific limits and recovery strategies.
+
+### 500 Internal Server Error
+
+An unexpected error occurred on the server.
+
+**Common causes:**
+- Database connection failure
+- Embedding service timeout
+- Uncaught exception in endpoint handler
+- Convex backend unavailability
+
+**Example response:**
+```json
+{
+  "error": "Internal server error",
+  "requestId": "req_12345"
+}
+```
+
+**How to debug:**
+- Note the `requestId` and report it to support
+- Check server logs (if you have access)
+- Verify Convex deployment is healthy
+- Retry after a short delay (transient failures)
+
+---
+
+## Memory Blocking Errors
+
+Some memories may be blocked from being written or recalled due to content policy violations.
+
+### Memory Blocked on Write
+
+When `crystal_remember` fails to save a memory:
+
+```json
+{
+  "error": "Memory blocked: [reason] [[threatId]]"
+}
+```
+
+**Possible reasons:**
+- `violent_content` — memory contains instructions for harm
+- `illegal_activity` — memory documents illegal actions
+- `personal_info_exposure` — memory exposes PII without consent
+- `copyright_violation` — memory reproduces copyrighted text
+
+**How to debug:**
+1. Review the memory content
+2. Remove the flagged content
+3. Rewrite with more general language
+4. Contact support if you believe it's a false positive (include `threatId`)
+
+### Memory Blocked on Recall
+
+Blocked memories are silently filtered from search results. You won't see an error, but some expected memories won't appear.
+
+**How to debug:**
+```bash
+# Query stats to see total count
+curl https://your-deployment/api/mcp/stats \
+  -H "Authorization: Bearer $API_KEY" | jq .memoryCount
+
+# If count is higher than recall results, some are filtered
+# Check recent memories to see if they're blocked:
+curl -X POST https://your-deployment/api/mcp/recent-messages \
+  -H "Authorization: Bearer $API_KEY" \
+  -d '{"limit": 100}'
+```
+
+---
+
+## Embedding and Deduplication Errors
+
+### Embedding Service Timeout
+
+The embedding service (Google Gemini or OpenAI) didn't respond within timeout.
+
+```json
+{
+  "error": "Embedding service timeout",
+  "details": "Please retry after a few seconds"
+}
+```
+
+**How to debug:**
+- Retry after 5–10 seconds
+- Check if embedding provider status page shows outages
+- Check that `OPENAI_API_KEY` or Gemini credentials are valid
+- If persistent, contact support
+
+### Deduplication Conflict
+
+A memory with identical content already exists.
+
+```json
+{
+  "error": "Duplicate memory",
+  "existingMemoryId": "mem_456",
+  "details": "A memory with the same content already exists"
+}
+```
+
+**How to debug:**
+- Decide: use the existing memory or update it with `crystal_edit`
+- Or create a new memory with slightly different wording
+- The `existingMemoryId` can be used with `crystal_trace` to see context
+
+---
+
+## Knowledge Base Errors
+
+### Knowledge Base Not Found
+
+Referenced KB ID doesn't exist or belongs to a different user.
+
+```json
+{
+  "error": "Knowledge base not found"
+}
+```
+
+### Import Batch Too Large
+
+Chunk import batch exceeds size limits.
+
+```json
+{
+  "error": "Import batch too large",
+  "details": "Maximum 10,000 chunks per import, got 15,000"
+}
+```
+
+**How to fix:**
+- Split into multiple import requests
+- Combine related chunks before importing
+
+### Invalid Chunk Metadata
+
+Chunk structure doesn't match expected schema.
+
+```json
+{
+  "error": "Invalid chunk",
+  "index": 5,
+  "details": "Missing required field: metadata.title"
+}
+```
+
+**How to fix:**
+```json
+{
+  "chunks": [
+    {
+      "content": "...",
+      "metadata": {
+        "title": "Document Title",        // Required
+        "sourceUrl": "https://...",       // Recommended
+        "chunkIndex": 0,                  // Optional but helps with ordering
+        "totalChunks": 1                  // Optional
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Debugging Checklist
+
+When something fails:
+
+1. **Check authentication:**
+   ```bash
+   curl -X GET https://your-deployment/api/knowledge-bases \
+     -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY"
+   ```
+
+2. **Verify endpoint is correct:**
+   - Recall: `POST /api/mcp/recall`
+   - Remember: `POST /api/mcp/capture`
+   - Stats: `GET /api/mcp/stats`
+
+3. **Validate request body:**
+   ```bash
+   cat request.json | jq . > /dev/null  # Check JSON syntax
+   ```
+
+4. **Test with minimal request:**
+   ```bash
+   curl -X POST https://your-deployment/api/mcp/stats \
+     -H "Authorization: Bearer $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{}'
+   ```
+
+5. **Check rate limits:**
+   ```bash
+   curl -I https://your-deployment/api/mcp/stats \
+     -H "Authorization: Bearer $API_KEY" | grep X-RateLimit
+   ```
+
+6. **Enable verbose logging:**
+   ```bash
+   curl -v https://your-deployment/api/mcp/recall \
+     -H "Authorization: Bearer $API_KEY" \
+     -d '{"query": "test", "limit": 1}'
+   ```
+
+---
+
+## Getting Help
+
+If you've gone through the checklist:
+
+1. Save the full error response (redact API keys)
+2. Note your `requestId` from the response header
+3. Include your tier/plan
+4. Report to support with a minimal reproduction case
