@@ -1,0 +1,49 @@
+{
+  "name": "@memorycrystal/crystal-memory",
+  "version": "0.8.16",
+  "description": "Memory Crystal OpenClaw plugin",
+  "license": "MIT",
+  "main": "index.js",
+  "homepage": "https://memorycrystal.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/memorycrystal/memorycrystal"
+  },
+  "bugs": {
+    "url": "https://github.com/memorycrystal/memorycrystal/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "memory",
+    "ai",
+    "plugin",
+    "crystal"
+  ],
+  "files": [
+    "*.js",
+    "*.mjs",
+    "*.cjs",
+    "*.json",
+    "README.md",
+    "LICENSE",
+    "compaction/*.js",
+    "compaction/package.json",
+    "store/*.js",
+    "store/package.json",
+    "tools/*.js",
+    "tools/package.json",
+    "utils/*.js",
+    "!*.test.js",
+    "!**/*.test.js",
+    "!__tests__/**",
+    "!node_modules"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.8.0"
+  }
+}
