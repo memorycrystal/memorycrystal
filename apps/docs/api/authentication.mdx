@@ -1,0 +1,190 @@
+---
+title: Authentication
+description: How Memory Crystal authenticates MCP and HTTP access, and which variables or headers matter in practice.
+---
+
+
+If Memory Crystal is a vault, the API key is the key that opens the vault.
+No key means no memory access.
+
+## What this means in practice
+
+Most HTTP-facing access uses:
+
+```http
+Authorization: Bearer <api-key>
+```
+
+You may also see environment variables like:
+
+- `MEMORY_CRYSTAL_API_KEY`
+- `MEMORY_CRYSTAL_API_URL`
+
+Those are especially important for MCP client and server setup.
+
+## How it actually works
+
+Authentication happens at two layers:
+
+### 1. API Key Creation Flow
+
+When a user wants to use Memory Crystal via HTTP or MCP, they first generate an API key:
+
+```
+User action: Request new API key (via dashboard or API)
+  ↓
+Backend: `issueApiKeyForUser({ userId, label })`
+  ↓
+Generate: 32 random bytes → hex string (raw key returned once)
+  ↓
+Store: SHA256 hash of key in `crystalApiKeys` table
+  ↓
+Return: Raw key to user (never stored plaintext)
+```
+
+**Why hash the key?** If the database is compromised, attackers can't immediately use the key. The user only sees the raw key once during creation.
+
+### 2. HTTP Request Authentication
+
+Every HTTP request must include the key as a Bearer token:
+
+```http
+Authorization: Bearer <api-key>
+```
+
+The backend validates this by:
+1. Extract Bearer token from header
+2. SHA256 hash it
+3. Query `crystalApiKeys` for a matching hash
+4. Check if key is active and not expired
+5. Check if key belongs to the authenticated user
+6. Fire-and-forget: update `lastUsedAt` timestamp
+
+If any check fails: **401 Unauthorized**
+
+### 3. MCP Server Configuration
+
+For MCP transport, set environment variables:
+
+```bash
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site
+MEMORY_CRYSTAL_API_KEY=your_raw_api_key
+```
+
+The MCP server forwards these to HTTP endpoints as Bearer tokens.
+
+### 4. Rate Limiting Integration
+
+After auth succeeds, rate limits are checked immediately:
+
+```
+Auth success → checkAndIncrementRateLimit(userId, tier)
+  ↓
+Check: requests this minute < tier limit?
+  ↓
+If yes: increment counter, return 200 + results
+If no:  return 429 + Retry-After header
+```
+
+Rate limits are per-endpoint and per-tier (Free/Pro/Ultra).
+
+## HTTP Status Codes
+
+### 200 OK
+Request authenticated and processed successfully.
+
+### 401 Unauthorized
+- Missing `Authorization` header
+- Malformed header (not `Bearer <token>`)
+- Bearer token doesn't match any known key hash
+- Key is inactive (disabled by user)
+- Key has expired (`expiresAt < now`)
+- Key belongs to a different user
+
+**Response:**
+```json
+{ "error": "Unauthorized" }
+```
+
+### 403 Forbidden
+The authenticated user is not allowed to access this resource.
+
+Examples:
+- Memory belongs to a different user
+- Knowledge base is scoped to a channel the user is not in
+- User's tier doesn't support this operation
+
+**Response:**
+```json
+{ "error": "Forbidden" }
+```
+
+### 429 Too Many Requests
+Rate limit exceeded for the user's tier.
+
+**Response headers:**
+```http
+Retry-After: <seconds>
+X-RateLimit-Limit: <requests-per-minute>
+X-RateLimit-Remaining: <requests-left>
+X-RateLimit-Reset: <unix-timestamp>
+```
+
+**Response body:**
+```json
+{ "error": "Rate limit exceeded", "retryAfterMs": 12000 }
+```
+
+## Commands / examples
+
+Example process-level configuration (MCP):
+
+```bash
+MEMORY_CRYSTAL_API_URL=https://your-deployment.convex.site \
+MEMORY_CRYSTAL_API_KEY=your_api_key_here \
+npm run start --workspace mcp-server
+```
+
+Example HTTP request (with curl):
+
+```bash
+curl -X POST https://your-deployment.convex.site/api/mcp/recall \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "authentication flow",
+    "limit": 5
+  }'
+```
+
+Example creating an API key (via Convex):
+
+```typescript
+// From dashboard or internal API
+const rawKey = await ctx.runMutation(internal.crystal.mcp.issueApiKeyForUser, {
+  userId: user.id,
+  label: "claude-session-key"
+});
+// rawKey is returned ONCE — user must save it immediately
+```
+
+## 0.7.15 — API-key recall path improvements
+
+As of 0.7.15, the API-key (HTTP) path of `crystal_why_did_we`, `crystal_who_owns`, `crystal_dependency_chain`, and `crystal_explain_connection` now forwards the `channel` parameter to the backend recall endpoint. Previously these four tools silently dropped `channel` on the API-key branch, returning unscoped cross-channel results. JWT clients were already correct; hosted/API-key consumers should now pass `channel` when peer scoping is desired.
+
+## Common mistakes
+
+- mixing `CRYSTAL_API_KEY` and `MEMORY_CRYSTAL_API_KEY` without understanding which layer is consuming them
+- forgetting the backend URL for MCP server setups
+- assuming local install success means auth is valid
+
+## Source of truth
+
+Primary files behind this page:
+
+- `.env.example`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+- `convex/crystal/mcp.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `scripts/crystal-doctor.sh`

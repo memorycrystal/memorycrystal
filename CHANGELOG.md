@@ -1,0 +1,891 @@
+# Changelog
+
+All notable changes to Memory Crystal are documented here.
+
+## [0.8.18] — 2026-07-02
+
+### Improved — Higher-quality recall defaults for every new install
+
+- Recall now surfaces **12 memories by default** (up from 10; hard cap stays 20) with **800-character previews** (up from 750) and a **12,500-character injection budget** (up from 11,000), so 12 full-length previews fit alongside the wake briefing without being trimmed. These are the operator-validated settings, now shipped as built-in defaults across the OpenClaw plugin, Hermes plugin, backend, both MCP servers, and the Claude/Codex/Factory hooks — no per-install tuning required.
+- Because compact `recallText` is injected by default, the richer 12×800 window costs fewer tokens than the previous 10×750 baseline: higher quality **and** lower cost.
+- The backend default limit is now configurable via `MEMORY_CRYSTAL_MAX_MEMORIES` (clamped to 1–20, with a safe fallback), matching the plugin-side knobs.
+- Hard caps are unchanged (20 memories / 2,000 preview characters) and the 8-second auto-recall timeout is preserved.
+
+### Fixed — Installer no longer pins the stale recall timeout
+
+- The universal installer previously wrote `MEMORY_CRYSTAL_AUTO_RECALL_TIMEOUT=2.5` into every fresh Hermes install, overriding the shipped 8-second default and re-introducing the circuit-breaker stall that silently suppressed memory injection on memory-rich accounts. The installer no longer writes that pin, and **re-running the installer auto-migrates existing installs off the stale value** so the 8-second default applies. No recall-quality values are pinned by the installer anymore — the code defaults are the single source of truth.
+- `/api/mcp/recall` now honors the fleet-wide default limit for callers that omit `limit`, so hook and API clients get the same recall depth (12) as every other surface instead of a hardcoded 10.
+
+### Fixed — Self-hosted mirror and supply chain
+
+- The public mirror now strips the six hosted-only cron registrations (telemetry/stats rollups and email lifecycle) whose target modules are excluded from the mirror, so self-hosted deployments no longer fail on missing modules; a permanent boundary assertion guards against future drift.
+- Closed all outstanding dependency security advisories: `form-data`, `ws`, `vite`, `postcss`, and `js-yaml` were patched directly, and upgrading the Cloudflare worker to Wrangler 4 cleared the remaining dev-only `undici`/`esbuild` alerts. `npm audit` is now clean across the repository.
+
+### Internal
+
+- End-to-end tests run on a dedicated port so a stray dev server can no longer masquerade as the app under test, and the self-hosted image workflow's repository guard now skips cleanly on the private repo instead of painting a failed run on every release tag.
+
+## [0.8.17] — 2026-07-02
+
+### Improved — Recall depth, latency budgets, and cross-client defaults
+
+- Recall now returns up to **10 memories by default** (hard cap stays 20) across the OpenClaw plugin, Hermes plugin, MCP servers, and backend, with richer per-memory previews (750 characters, configurable via `MEMORY_CRYSTAL_PREVIEW_CHARS`) and a larger injection window (~11k characters) so memory-rich accounts get materially more usable context per turn.
+- The Hermes plugin's automatic recall budget rose from 2.5s to **8s**, and its circuit breaker now counts timeouts separately from hard errors (thresholds 5 hard / 10 timeout), so a slow first-turn recall no longer silently disables memory injection for a minute at a time.
+- Surfaced-memory count and preview length are now environment-configurable everywhere (`MEMORY_CRYSTAL_MAX_MEMORIES`, `MEMORY_CRYSTAL_PREVIEW_CHARS`), and OpenClaw plugin config values bridge into the recall child process with env-wins precedence.
+
+### Fixed — Agent-scoped knowledge bases and peer isolation
+
+- **Peer-scoped agents no longer get zero knowledge-base results.** Every client now resolves and sends an explicit `agentId` on recall, wake, preflight, and KB queries (from env, profile, or the calling agent context), and the backend prefers an explicit `agentId` while falling back to broad user-scoped KB visibility when a channel-derived agent matches no KB — instead of returning nothing.
+- `channel` never filters knowledge-base content; it scopes only peer memories. Group channels (`discord:group:*`, `slack:group:*`) now fail closed to exact-match visibility with case-insensitive detection, so a group conversation cannot surface another agent's private memories.
+- Wake accepts an optional `agentId` on all paths (previously the SDK path rejected it), giving wake briefings correct scoped-KB visibility.
+- Knowledge-base chunks can carry a `chunkKind` (`content` vs `config`); config-header/source-mirror chunks are tagged at import and dropped from recall so operators can retire client-side low-value-chunk filtering.
+- Knowledge-base queries return an additive `retrieval` diagnostics field showing when lexical/indexed fallback fired, so a vector outage is observable instead of silently blanking grounding.
+
+### Added — Reliable turn capture
+
+- New idempotent turn-capture contract: `POST /api/mcp/turn` deduplicates by `(userId, turnId)` — re-delivering a completed turn (even with different content) is a safe no-op, and long-term memory extraction is scheduled exactly once per unique turn.
+- The OpenClaw plugin now natively captures completed assistant turns on **all** channels (including Telegram/Discord peer sessions where host lifecycle events don't fire), posting them with a deterministic FNV-1a turn id that is byte-compatible with operator-side capture patches, so both paths dedupe server-side during migration. Toggle: `MEMORY_CRYSTAL_TURN_CAPTURE` (default on).
+
+### Added — Token-efficient compact recall
+
+- Extraction now writes a compact telegraphic `recallText` alongside every memory's full content (deterministic, negation-safe, idempotent — full content is never modified). Recall injects the compact form when `MEMORY_CRYSTAL_COMPACT_RECALL` is enabled (default), cutting recall token cost roughly 30–50% per memory.
+- Legacy memories are compressed lazily by an hourly, cost-bounded background pulse that pages through users with a persistent cursor — no mass migration, no full-table scans.
+- Deduplication keys use the untouched full content at both ranking and presentation layers, so two distinct memories with colliding compact forms are never collapsed.
+
+### Added — Memory export API
+
+- `GET /api/memories`: API-key-scoped, cursor-paginated export with store/category/date filters (max page 200) for account migration, backup, and data-portability flows.
+
+### Added — Codex Desktop auto-configuration
+
+- The universal installer now detects and configures **Codex Desktop** via the shared `~/.codex/config.toml` (the Codex app, CLI, and IDE extension share MCP settings), with a new `docs/clients` setup guide.
+- `crystal-doctor` gained an advisory host-compatibility section that warns — never blocks — when a detected host version is outside the tested range; advisory `testedWith` metadata ships in each plugin/package manifest.
+
+### Improved — Background job cost
+
+- All recurring background jobs moved off full-table user scans: elapsed-time/idempotent jobs (archive purge, stats caches, graph enrichment backfill, associations, decay) rotate through a bounded page of users per tick with persistent cursors, while frequency-dependent jobs (cleanup, consolidation, reflection, extraction catch-up) page in-tick with identical coverage and bounded memory.
+
+### Docs and agent guidance
+
+- `MEMORY_CRYSTAL_INSTRUCTIONS.md` rewritten as the canonical agent guide (preflight → KB query → recall → remember/import) including the isolation model: `agentId` gates knowledge bases, `channel` gates peer memories, `peerScopePolicy` controls strictness, and hard cross-agent privacy requires separate accounts.
+- Client docs refreshed for current HTTP MCP setup (Claude Code, Claude Desktop, Codex CLI, Codex Desktop) with notes on tool-search discoverability and the always-visible core tool set (`crystal_recall`, `crystal_remember`, `crystal_preflight`).
+
+### Dashboard
+
+- Branded confirm/alert dialogs replace native browser popups across the dashboard, and archived knowledge bases can now be unarchived (restores chunks, counters, and dashboard totals).
+
+## [0.8.16] — 2026-06-30
+
+### Improved — Recall ranking, source roles, and project scope
+
+- Recall now treats knowledge-base `sourceRole` as a first-class ranking signal, so direct reference material such as canonical voice guides, persona guardrails, and reference manuals can outrank unrelated social/course artifacts when the query clearly asks for that role.
+- Recall-style tools now preserve and document `agentId`, `projectId`, and `repoSlug` scope inputs across Codex, Claude, Hermes, OpenClaw, and MCP clients so repo-specific work can stay attached to the right project store instead of mixing memories from unrelated repos.
+- Knowledge-base lookup remains a separate tool path from broad recall; KB list/query calls keep agent/channel visibility rules explicit while recall can still append scoped KB evidence when relevant.
+
+### Fixed — Graph enrichment and stale sensory residue
+
+- Graph telemetry now reports actionable enrichment separately from deterministic skips, so KB chunk fanout rows no longer make a fully processed account look partially unenriched.
+- Added an admin-gated stale OpenClaw sensory cleanup action with dry-run support, exact skip-reason/tag filters, dashboard-total deltas, and audit logging for old `sensory_skip` auto-capture residue.
+- Production cleanup audits now show zero active stale OpenClaw `sensory_skip` residue across all active profiles; remaining skipped rows are legitimate KB chunks or terminal provider failures.
+
+### Docs and agent guidance
+
+- Updated recall, message search, preflight, what-do-I-know, and knowledge-base docs to describe graph-backed ranking, role-aware KB behavior, exact message-search usage, stale sensory maintenance, and repo/project scoping.
+- Updated OpenClaw, Hermes, Claude, Codex, and shared plugin guidance so agents use recall, KB lookup, message search, and preflight as distinct tools instead of broadening every query.
+- Release/version surfaces now target `0.8.16`.
+
+## [0.8.15] — 2026-06-25
+
+### Fixed — Recall payload quality and knowledge-base reliability
+
+- `/api/mcp/recall` now de-duplicates byte-identical memories before applying the result limit, so migration-cloned copies no longer crowd out distinct results.
+- Recall now also collapses near-duplicate source chunks — memories that share a specific title and an identical long content prefix (e.g. overlapping sliding-window chunks of one post) — keeping only the highest-scored representative so the model is not handed the same opening repeated many times. The strict title + prefix match leaves genuinely distinct memories and sequential non-overlapping chunks untouched.
+- Knowledge-base hits appended to recall now honor the request's category filter and are de-duplicated against already-returned content, fixing category-scoped calls (e.g. pre-flight `rule`/`lesson`/`decision`) that previously surfaced unrelated knowledge-base facts.
+- Direct knowledge-base queries on an owned, agent-scoped *permissive* KB now resolve to the KB's own agent id when the caller omits `agentId`, instead of silently returning no results. Strict peer-scoped KBs still require an explicit peer scope, preserving per-peer isolation.
+- The `crystal_recall` and `crystal_preflight` MCP tools now emit a compact structured index alongside the narrative block instead of a second verbatim copy of every memory and its internal ranking signals.
+
+### Fixed — Memory consolidation crash on sensory bloat
+
+- `getSensoryMemories` looped over a paginated query inside a single Convex function, which crashed with "ran multiple paginated queries" whenever the first page did not yield enough non-protected rows. This silently broke sensory consolidation on accounts with bloat. It now reads a single bounded page and filters protected captures in-memory.
+
+### Maintenance
+
+- Release/version surfaces now target `0.8.15`.
+
+## [0.8.14] — 2026-06-14
+
+### Fixed — Knowledge-base retrieval for peer-scoped agents
+
+- Knowledge-base queries now authorize content by the caller's agent id instead of treating peer channels as hard content filters, restoring shared training KB results for peer-scoped coach sessions.
+- `/api/mcp/recall` now honors both singular `knowledgeBaseId` and plural `knowledgeBaseIds` as an exclusive KB scope, preventing unrelated general memories from leaking into requested KB-only recall.
+- OpenClaw plugin KB list/query tools now pass the runtime agent id by default, so channel-scoped sessions can retrieve KBs whose `agentIds` list names the real agent such as `coach` or `main`.
+
+### Changed — Recall, embeddings, and graph repair resilience
+
+- KB and recall paths now preserve paid recall quality through managed-embedding fallback, tiered KB vector depth, and cost-breaker degradation behavior when upstream embedding routes are capped.
+- Graph audit and repair tooling now scans and backfills in bounded batches, keeps memory-content sampling optional, and continues through empty pages and benign no-op writes.
+- Provider/admin setting resolvers and tests were tightened around shared OpenRouter overrides, BYOK embedding attribution, and cloud-only model controls.
+
+### Security and release hygiene
+
+- Recent-context and recall-hook prompt injection hardening now treats local search wildcards literally and sanitizes prompt echoes across additional plugin paths.
+- Dependency audit hardening updates Next, Hono, `fast-uri`, `qs`, `brace-expansion`, `express-rate-limit`, `ip-address`, Vitest, and Convex lockfile resolution while leaving risky Wrangler/Miniflare/esbuild major upgrades for a dedicated lane.
+- Release/version surfaces, Hermes metadata, installer defaults, and local-backend installer artifacts now target `0.8.14`.
+
+## [0.8.13] — 2026-06-08
+
+### Fixed — Prompt echo injection hardening
+
+- Compact recall evidence now sanitizes echoed user prompt text before injecting the `Question:` label into model context.
+- Workflow skill injection and rendered recent-message match headers now reuse the same prompt-echo sanitizer, so instruction-like prompt lines are stripped consistently before model/tool exposure.
+- Regression coverage now verifies both compact recall evidence and workflow skill injection remove lines such as `Ignore previous instructions` from rendered memory context while preserving the original query for backend recall quality.
+
+### Release notes — 0.8 series since the 0.8.0 major release
+
+- `0.8.1` hardened recalled-context capture hygiene across plugin, hooks, web-served assets, and backend MCP logging.
+- `0.8.2` shipped the retention/reflection/local-backend lane with sensory tombstoning, reflection surfaces, universal installer support, and backend-owned recall.
+- `0.8.3` added admin overview, cost analytics, BYOK accounting, peer-scoped knowledge-base tooling, and local context-engine hardening.
+- `0.8.4` launched cloud/self-hosted separation, tenant/bootstrap controls, Hermes installer support, embedding cost controls, and self-hosted packaging hygiene.
+- `0.8.5` made Hermes production-ready with native provider registration, automatic lifecycle memory, canonical completed-turn capture, scoped provider tools, and Hermes diagnostics.
+- `0.8.6` added multimodal asset memory, asset-aware recall, storage/admin surfaces, public benchmark evidence, and stricter public/private release boundaries.
+- `0.8.7` added Convex cost breakers, message-search efficiency work, production cost smoke tooling, and reduced cleanup/auth write pressure.
+- `0.8.8` shipped Hermes diagnostics, native provider behavior improvements, scoped automatic capture defaults, profile-aware installs, and fallback-only provider bridge tools.
+- `0.8.9` restored OpenClaw latest compatibility by declaring every registered plugin tool in `contracts.tools` and adding manifest/tool registration regression coverage.
+- `0.8.10` restored OpenClaw capture when message-output hooks do not fire by writing completed turns through the `agent_end` fallback and `/api/mcp/turn`.
+- `0.8.11` hardened OpenClaw provider-peer channel capture, fail-closed scoping, installer verification, and Hermes group/public capture defaults.
+- `0.8.12` exposed hook dispatch gaps in `crystal_doctor` and `crystal_status` so loaded-but-idle capture paths are visible.
+- `0.8.13` closes the remaining prompt-echo injection surfaces found during release review.
+
+## [0.8.12] — 2026-06-06
+
+### Fixed — OpenClaw provider capture diagnostics
+
+- `crystal_doctor` now reports hook registration API, registered hook names, registration time, last hook event, last resolved session/channel, and last hook skip reason so loaded-but-idle capture paths are visible.
+- `crystal_doctor` now warns when Memory Crystal hooks are registered but no callbacks have fired since plugin load, making provider dispatch gaps distinguishable from backend auth or `/v1` gateway health.
+- `crystal_status` now includes a compact hook summary alongside callback counters for quick runtime triage.
+- Updated release/version surfaces and local-backend installer artifacts to `0.8.12`.
+
+## [0.8.11] — 2026-06-06
+
+### Fixed — OpenClaw channel capture hardening
+
+- OpenClaw peer-scoped policies now accept live provider-peer direct session keys such as `telegram:<peerId>` when the hook context identifies the matching agent/account, while unidentified direct sessions fail closed instead of writing to a shared bucket.
+- Exact scoped channel ids such as `peer-coach:<peerId>` are now honored on automatic capture and recall paths, covering runtimes that provide the safe channel key but not the long `agent:...:direct:<peerId>` session descriptor.
+- Plugin install assets now serve the legacy `openclaw-hook.json` file again so OpenClaw target installers do not see a partial asset-download failure.
+
+### Changed — Automatic capture defaults
+
+- Hermes group/public writes now default to enabled under Automatic Capture Coverage, while remaining scoped to the concrete group/channel/thread boundary and opt-out via `MEMORY_CRYSTAL_ALLOW_GROUP_WRITES=false`.
+- OpenClaw installer verification now checks the registered Memory Crystal memory tools instead of obsolete legacy startup-hook output.
+
+## [0.8.10] — 2026-06-06
+
+### Fixed — OpenClaw capture recovery
+
+- Added an `agent_end` capture fallback for current OpenClaw plugin runtimes so direct coach turns can be persisted through `/api/mcp/turn` when older message-output hooks do not fire.
+- Completed-turn fallback writes STM atomically and schedules on-demand LTM extraction through the backend turn endpoint instead of creating duplicate sensory captures.
+- `crystal_doctor` now reports `agent_end` callback counts to make hook dispatch gaps visible during live smoke tests.
+
+## [0.8.9] — 2026-06-06
+
+### Fixed — OpenClaw latest plugin contracts
+
+- OpenClaw plugin metadata now declares every registered Memory Crystal tool in `contracts.tools`, matching current OpenClaw plugin diagnostics and avoiding rejected agent tool registrations.
+- Plugin tests now compare runtime tool registration against the manifest contract and read status-version expectations from the manifest so installer metadata drift is caught.
+- OpenClaw plugin metadata and installer defaults moved to `0.8.9` so updater installs pick up the manifest contract fix.
+
+## [0.8.8] — 2026-06-06
+
+### Added — Hermes diagnostics and live smoke coverage
+
+- Added `crystal_doctor` for Hermes installs so operators get human-readable backend, mode, queue, tool-surface, and scoping diagnostics without parsing raw status JSON.
+- Added gated Hermes live smoke coverage for auth, stats, wake, recall, recent-message, search, and optional write paths.
+- Added ADRs and context documentation that name the native provider, explicit tool surface, group memory scope, peer memory scope, and agent scope boundaries.
+
+### Changed — Native Hermes memory behavior
+
+- Hermes lifecycle events now write automatic snapshots through `/api/mcp/snapshot`; explicit `crystal_checkpoint` remains the only Memory Checkpoint path.
+- Automatic recall now uses a shorter timeout with stale cached-context fallback, while explicit tool recalls keep the longer interactive timeout.
+- Hermes capture now runs through a bounded background queue with shutdown flushing and visible drop/degraded status.
+
+### Fixed — Hermes scoping, installer, and fallback tools
+
+- Discord-style group scope derivation now uses strict group/thread/channel ids, keeps group writes opt-in, and accepts more sender/user alias fields for private peer scopes.
+- Hermes profile installs now update the default plugin bundle, existing profile plugin bundles, and the active `HERMES_PROFILE` plugin copy while writing `MEMORY_CRYSTAL_AGENT_SCOPE` when available.
+- Provider bridge tools now default to fallback-only and hide when MCP is configured, preserving native provider behavior as the primary automatic memory path.
+
+## [0.8.7] — 2026-06-02
+
+### Added — Convex cost containment and production smoke evidence
+
+- Added a runtime Convex cost-breaker ledger with per-user and global emergency thresholds for recall, message search, and knowledge-base search surfaces.
+- Added `scripts/convex-cost-smoke.mjs` so production Convex JSONL logs can be checked for vector query bytes, text query bytes, DB read bytes, OCC retries, and errors before calling a deployment healthy.
+- Added regression coverage that keeps cost-breaker bypass flags internal-only and verifies emergency message-search responses skip expensive search work.
+
+### Changed — Recall/search efficiency without normal recall degradation
+
+- Message vector search now batch-hydrates vector hits instead of issuing one `getMessageInternal` query per result.
+- MCP recall, direct recall, message search, knowledge-base search, and prospective trace matching now keep normal recall sources enabled until an explicit emergency budget state is recorded.
+- API-key `lastUsedAt` writes now use a one-hour freshness SLA, and recall access bookkeeping is scheduled off the response path where safe to reduce hot-row contention.
+
+### Fixed — Cleanup, Organic access, and release hygiene
+
+- Cleanup candidate selectors and auth/write hot paths were tightened to reduce Convex read pressure and OCC noise.
+- Organic access and hosted pricing documentation were clarified, and admin sort affordances now use conventional indicators.
+- Updated release/version surfaces to `0.8.7`, including plugin metadata, docs introduction, installer defaults, web release data, changelog, Hermes plugin metadata, and local-backend release assets.
+
+## [0.8.6] — 2026-05-29
+
+### Added — Multimodal memory and benchmark evidence
+
+- Added Convex Storage-backed multimodal asset handling for upload metadata, ownership checks, quota accounting, checksums, authenticated access descriptors, processing status, derived memory links, and cleanup state.
+- Added asset recall context support so compact file-derived summaries can participate in recall without injecting raw files, raw storage ids, or permanent public URLs into model context.
+- Added dashboard asset and admin storage surfaces for inspecting multimodal memory state, storage usage, and processing outcomes.
+- Added the public benchmark page, benchmark harness scripts, fixture/result artifacts, and provenance-labeled competitor claim data for transparent memory-score comparisons.
+
+### Changed — Recall, provider controls, and diagnostics
+
+- OpenRouter provider configuration now prompts users toward personal billing, exposes safer model/embedding controls, and keeps graph enrichment on valid provider settings.
+- Hermes and MCP recall paths now preserve tighter channel/session scope, tolerate non-tty installs, use longer hosted-bridge timeouts, and keep message/status metadata readable.
+- STM, LTM extraction, wake, recent-message, and recall payload paths gained additional projection, redaction, pagination, and payload-size coverage for long-running agent sessions.
+- Admin and operations tooling gained provider diagnostics, graph settings, dashboard-total reconciliation, account-email repair, and private knowledge-base copy support.
+
+### Fixed — Storage safety and release boundaries
+
+- Asset uploads now reject malformed checksums, keep cleanup/enrichment failures observable, preserve `assetContexts` through hosted recall, record uploaded byte counts, and ignore zero-byte metadata when calculating storage usage.
+- Secret redaction now avoids treating ordinary hostnames as secrets while still covering bearer tokens, provider keys, and key-bearing URLs in logs and tool output.
+- Public-mirror filtering now excludes private release prompts, browser trace artifacts, account-repair tooling, and private KB-copy helpers before syncing the open-source mirror.
+- Updated release/version surfaces to `0.8.6`, including plugin metadata, docs introduction, installer defaults, web release data, changelog, Hermes plugin metadata, and local-backend release assets.
+
+## [0.8.5] — 2026-05-14
+
+### Added — Hermes production readiness
+
+- Added a dual-mode Hermes Agent integration that registers as a native memory provider when Hermes exposes `register_memory_provider`, with lifecycle-hook fallback for older or narrower Hermes runtimes.
+- Added `integrations/hermes/crystal-memory/CONTRACT.md` and a contract smoke test so provider/hook behavior, fallback mode, and the current fixture-backed Hermes contract are explicit before release.
+- Added provider-side lifecycle support for bounded wake/recall context, turn capture, memory-write mirroring, session checkpoints, delegation capture, provider tool schemas, and JSON-normalized tool-call handling.
+- Added `/api/mcp/turn` as the canonical completed-turn capture endpoint, backed by atomic/idempotent `logTurnInternal` message storage and on-demand LTM extraction scheduling.
+
+### Changed — Installers, diagnostics, and scoping
+
+- Hermes installs now write explicit mode/capture/recall/group-write env flags while preserving unrelated `~/.hermes/.env` keys.
+- The universal uninstall script now supports `--targets hermes`, removes Hermes plugin/MCP/env wiring safely, and preserves unrelated Hermes config unless `--purge` is requested.
+- `crystal_status` for Hermes now reports active lifecycle mode, configured mode, backend auth, capture/recall toggles, session hook counts, capture mode, skip reasons, and circuit-breaker state without exposing secrets.
+- Provider tool fallback now injects a computed `sessionKey` and exact `channel` by default, while preserving explicit tool-supplied scope to prevent broad cross-channel recall/recent reads.
+
+### Fixed — Release hardening
+
+- Fixed Hermes provider bridge calls to match real backend HTTP contracts for capture, checkpoint, recent messages, and recall-mode reasoning tools.
+- Expanded Hermes, backend turn-capture, installer, uninstall, and contract-smoke tests for provider/hook selection, privacy-safe scoping, turn idempotency, checkpoint/capture payload shape, and install rollback behavior.
+- Updated release/version surfaces to `0.8.5`, including plugin metadata, docs introduction, installer defaults, web release data, changelog, Hermes plugin metadata, and local-backend release assets.
+
+## [0.8.4] — 2026-05-05
+
+### Added — Cloud, self-hosted, and Hermes launch paths
+
+- Added signed-in onboarding, tenant launch pages, bootstrap recovery, API-key management, deploy-target gating, and cloud-only route protection so hosted SaaS flows stay separate from self-hosted builds.
+- Added self-hosted Docker/web assets, Cloudflare tunnel control-plane code, tenant bootstrap/recovery APIs, local bearer-token tables, and telemetry queueing for the self-hosted launch flow.
+- Added Hermes Agent support to the universal installer, web install tabs, public docs, install asset routes, and the `integrations/hermes/` plugin package.
+- Added workflow checks for self-hosted Docker/image publication, Cloudflare Caddyfile validation, E2E runs, image-size gates, and tag-triggered GHCR publishing.
+
+### Changed — Cost controls, embeddings, and evaluation
+
+- Embedding calls now enforce an operator-tunable per-user daily cap before provider calls, using admin settings/env configuration and explicit cap-exceeded errors.
+- Graph enrichment now records function-call metrics, queues backlog work from recall, and reduces runaway enrichment spend with stronger tests around OpenRouter/Gemini evaluation fixtures.
+- Eval stats now read dashboard aggregate rows for the daily cache path and use a weekly drift check to force source-of-truth rebuilds when aggregates diverge.
+- Embedding dual-write and reconcile paths keep extracted memory embeddings aligned while recall, dashboard, and eval reads move away from pulling large inline vectors unnecessarily.
+
+### Fixed — Recall, memory, and operations hardening
+
+- Added recall debounce, projection, truncation, strength-delta, decay skip-clear, private-memory import, and enrichment-failure persistence coverage.
+- Expanded MCP HTTP, knowledge-base, bearer middleware, local telemetry, cloud tenant, tunnel pool, Turnstile, signup-rate-limit, idle-cull, and bootstrap tests.
+- Added admin settings and grant-tier surfaces for provider/model/embedding controls while preserving secret staging and role-gate protections.
+- Refreshed `docs/release-prompt.md` for the new cloud/self-hosted boundary and updated public-mirror/local-backend packaging rewrites to strip hosted cloud, admin, billing, pricing, and private schema internals.
+- Updated release/version surfaces to `0.8.4`, including plugin metadata, docs introduction, installer defaults, web release data, changelog, and local-backend release assets.
+
+## [0.8.3] — 2026-04-30
+
+### Added — Admin, cost, BYOK, and knowledge-base operations
+
+- Added a dedicated admin overview page with selectable day/week/month/quarter/half-year/year ranges, total users, new signups, subscriber counts, MRR, period revenue projection, and plan-level revenue breakdown.
+- Admin navigation now includes a first-class Overview tab and routes the dashboard sidebar Admin entry to the overview instead of dropping directly into the user list.
+- Admin user search now resolves auth profile names and emails alongside user IDs and billing IDs, making support lookup usable from the directory view.
+- Cost analytics are now available to admins with category-level spend, revenue, gross margin, unknown-cost flags, plan revenue rows, and dashboard tests for public-mirror privacy.
+- Provider/BYOK settings now support OpenRouter-backed embedding usage, per-user/provider cost attribution, shared vs user-paid key accounting, and plugin/settings UI flows for managed provider configuration.
+- Hosted MCP and package MCP surfaces now expose `crystal_create_knowledge_base`, with plugin wiring and docs for creating scoped knowledge bases from client tools.
+
+### Changed — Recall, reflection, telemetry, and context engine
+
+- Added a shared plan-pricing helper so admin overview and cost analytics use the same normalized plan labels and monthly price mapping.
+- Cost analytics now reports revenue by plan with subscriber counts, monthly price, and MRR instead of only raw plan counts.
+- Grandfathered Pro product IDs are now priced at $20 MRR in admin overview and cost analytics, with regression coverage for the legacy product ID.
+- Recall telemetry now records surfaced memory/message retrieval more accurately, aligns enrichment status cards with backend state, and expands telemetry tests for the dashboard.
+- Reflection runs and retention cleanup now share clearer log/status handling, reflection dashboard output, and regression tests for cleanup/reflection interactions.
+- Peer-scoped recall and knowledge-base tooling were restored across MCP, plugin, and backend flows, including stricter channel handling, knowledge-base creation, and recall/search regression coverage.
+- Local context-engine support now has safer SQLite queue/debt/health tracking, summary receipt wrappers, replay diagnostics, and plugin regression coverage.
+
+### Changed — Public docs and release hygiene
+
+- Updated release/version surfaces to `0.8.3`, including plugin manifest/package metadata, docs introduction, web release data, installer defaults, and local-backend release assets.
+- Replaced prior client-specific names in public docs, examples, archived docs, plugin docs, and changelog entries with generic peer-scope examples.
+- Renamed the organic-memory engineering brief to a generic filename and removed client/person-specific labels from the associated docs references.
+- Public mirror filtering now excludes private pricing helpers, product IDs, local environment files, legacy client migration scripts, and internal test/script surfaces that are not safe public release content.
+
+## [0.8.2] — 2026-04-28
+
+### Major — Retention, reflection, and local backend release lane
+
+- Sensory memories now separate durable recall text from raw captured content. Raw sensory payloads can be summarized, tombstoned, or protected according to tier retention policy while preserving the memory record, dashboard totals, and searchable summary context.
+- Manual retention cleanup now supports user-owned dry runs and apply runs with retention windows, estimated summarization cost, summary generation, Gemini re-embedding, protected-row detection, and batch continuation for larger accounts.
+- Reflection now has first-class backend and dashboard surfaces: reflection logs, retention-aware reflection data, and a new dashboard route for reviewing distilled memory/reflection state.
+- LTM extraction and memory text handling now share structured formatting helpers, safer effective-text selection, additional tests, and cleanup policies for recalled-context wrappers, content tombstones, and sensory retention edge cases.
+
+### Changed — Installers, local backend, and environment model
+
+- The universal installer now supports cloud, local, and self-hosted flows across OpenClaw, Claude Code/Desktop, Codex CLI, Factory Droid, generic MCP, and local backend targets. Codex installs include hook support assets and a `codex_hooks` feature enablement path.
+- Local backend packaging now ships release-versioned `0.8.2` artifacts for Bash and PowerShell installers, prints the local Convex dashboard URL and admin key, provisions `SITE_URL`, and adds local/remote web backend switch commands.
+- Backend provider keys are now provider-specific: `GEMINI_API_KEY` powers Gemini embeddings, optional `OPENROUTER_API_KEY` powers organic model features, and `MEMORY_CRYSTAL_API_KEY` remains the client-facing bearer key. The old `CRYSTAL_API_KEY` backend/key conflation is removed from public setup docs.
+- Self-hosted installer flows now prompt for backend provider keys when useful, warn when semantic recall cannot work without Gemini, and keep client auth separate from backend model-provider credentials.
+- Universal uninstall now removes supported client integrations, generic MCP snippets, and local backend wiring while preserving local backend data by default; `--purge` and `--wipe-local-backend` explicitly widen cleanup.
+
+### Changed — Web dashboard and docs
+
+- Dashboard styling now uses the updated flat sharp visual hierarchy: darkest page void, brighter panels, brighter nested controls, stronger readable borders, no gradients, and `border-radius: 0`.
+- Dashboard memory/message cards share richer formatted-content rendering and raw text disclosure, while brain, organic, telemetry, usage, admin, memories, messages, and checkpoint pages align with the updated hierarchy and date formatting.
+- Organic dashboard pages now expose richer ensemble/settings/skills/traces surfaces, backed by updated Convex organic tick/admin/eval stats logic and expanded tests.
+- Public docs now cover current environment variables, local-first setup, uninstall behavior, pricing retention concepts, self-hosting provider keys, and the current release state.
+
+### Fixed — MCP, hooks, and diagnostics
+
+- Legacy OpenClaw recall hooks now send query text to `/api/mcp/recall` so the Memory Crystal backend owns embedding/search for hosted and current self-host installs.
+- Legacy capture/recall hooks prefer `MEMORY_CRYSTAL_API_KEY` for bearer auth, keep Gemini/OpenRouter keys out of client auth, and log embedding failures with status plus truncated response bodies without leaking key-bearing URLs.
+- MCP tools now tighten endpoint/env handling, add legacy-env tests, expose updated `what-do-i-know` behavior, and preserve current checkpoint/idea-action coverage.
+- Public hook assets now include shared helpers, sweep support, Codex hook configuration, and recalled-context stripping logic aligned with backend capture hygiene.
+
+## [0.8.1] — 2026-04-27
+
+### Fixed — Recalled-context capture hygiene
+
+- User-turn capture now strips leading `<recalled_context>` envelopes before writing STM messages, while preserving literal mid-message tags. The OpenClaw plugin, shared hook bundle, web-served public hook assets, and Convex backend all apply the same sanitizer guard.
+- MCP `/api/mcp/log` now skips wrapper-only or malformed synthetic user payloads before storage quota checks, so users at their STM limit do not get blocked by messages that would not be stored.
+- Recalled-context STM cleanup now supports dry-run/apply summaries, deletes wrapper-only or malformed rows, patches polluted rows to the trailing prompt, resets stale indexing/extraction state, and merge-deletes when the cleaned prompt already exists in the same exact scope.
+- Admin cleanup wrappers now run as mutations instead of actions, so actor/profile lookup has valid Convex DB access. Cleanup scope rejects ambiguous `channel + sessionKey` input instead of silently widening to the whole channel.
+
+### Changed — Dashboard readability
+
+- Dashboard memory and message cards now share structured rendering helpers that summarize known `<user>`, `<assistant>`, `<system>`, and `<recalled_context>` envelopes without interpreting unknown angle-bracket content.
+- Message cards expose a raw/full text disclosure for inspection while keeping compact dashboard and list previews readable.
+
+### Removed — Obsolete legacy peer purge tooling
+
+- Removed the unused `legacyPeerPurge` Convex module, its admin/public wrappers, generated API references, and stale public-mirror exclusion entry. The legacy integration no longer depends on this purge path.
+
+## [0.8.0] — 2026-04-25
+
+### Major — Local Convex developer backend
+
+- Local-first installer docs now document the universal Bash command, native PowerShell path, Docker Convex local data plane, hosted auth/license boundary, config backups, and rollback flow.
+- Docker-primary local Convex is now a first-class developer workflow. `infra/convex/docker-compose.yml` starts a pinned self-hosted Convex backend, HTTP-actions endpoint, and dashboard on ports `3210`, `3211`, and `6791`, with version pins recorded in `infra/convex/VERSIONS.md`.
+- Root `npm run convex:local:*` commands now cover `up`, `down`, `reset`, `doctor`, `seed`, auth-key provisioning, deployment-env provisioning, and per-consumer env overlay writing.
+- Managed local overlays retarget the web app, MCP server, scripts, and OpenClaw plugin together while preserving production/cloud defaults. `scripts/crystal-enable.sh` now detects `CRYSTAL_BACKEND=local` and propagates the local HTTP-actions URL and bearer token to plugin config.
+- Local seed fixtures and canaries provide deterministic Memory Crystal data for local vector-search validation without touching production. The seed path supports dry-run validation, explicit local-backend checks, fixture embeddings, and a gated vector divergence test.
+- Local side-effect guards now include deployment-env stubs and dry-run email logging so local crons/actions can be exercised without sending real email or relying on live production credentials.
+- The public [Local-First Setup](https://docs.memorycrystal.ai/configuration/local-first) guide documents end-user Docker requirements, local endpoints, hosted auth/license boundaries, backup behavior, troubleshooting, and rollback. Internal contributor setup remains private.
+
+### Included from the 0.7.17 capture-observability lane
+
+#### Added — Capture observability
+
+- `crystal_capture_stalled` telemetry. Plugin tracks per-session pending user messages and emits to the new `POST /api/mcp/metric` endpoint when a session accumulates more than the calibrated `N_pending` unpaired messages for longer than `T_age` minutes. Signal lands in the new `crystalTelemetry` Convex table for dashboard querying. Groundwork for a follow-up structural fix to LTM extraction on listener/router gateways.
+- `crystal-doctor --smoke` full callback dump. Lists every registered callback name + count, distinguishing "hook registered but never fires" from "hook not registered."
+
+#### Fixed — Pre-existing dual-fire duplicates
+
+- Assistant-side `logMessage` now dedupes within the plugin via an in-memory LRU keyed by `(sessionKey, sha1(assistText))`. Gateways that fire both `llm_output` and `message_sent` for the same assistant turn no longer write duplicate `crystalMessages` rows. No schema change.
+
+#### Compatibility
+
+No breaking changes. 0.7.17 plugin against a 0.7.16-era backend swallows the `/api/mcp/metric` 404 silently; STM capture and LTM extraction paths are unchanged. Mixed fleet note: tenants with both 0.7.16 and 0.7.17 installs active will still have historical duplicates from the pre-LRU era in `crystalMessages`; a follow-up backfill will dedupe via content hash.
+
+### Included hardening since 0.7.18
+
+- JSONL first-turn recovery now has documented operator tooling: `crystal-doctor` flags recent transcripts with `SessionStart` but no `UserPromptSubmit`, and the dry-run `crystal-backfill-from-jsonl.mjs` utility can recover reviewed Claude Code first turns through backend-deduped MCP writes.
+- Release automation now requires guarded annotated release tags for approved versions, so `v0.8.0` and future tags are part of the release contract.
+
+### Compatibility
+
+Production and the managed Convex cloud workflow remain the default. The local backend path is opt-in and additive; no existing installed plugin needs to switch unless the operator chooses local/self-hosted development.
+
+## [0.7.18] — 2026-04-25
+
+### Fixed — Capture telemetry retention and validation
+
+- `crystalTelemetry` now carries an expiry timestamp, the daily cleanup job removes expired telemetry rows, and `/api/mcp/metric` validates metric kind, payload size, and scope length before insert. Audit metadata records payload bytes without storing the payload itself.
+- Assistant-message dedupe refreshes LRU recency before pruning, so active sessions keep their duplicate guard entry while older entries age out first.
+
+### Fixed — Organic contradiction flow
+
+- Organic tick processing now waits for ensemble writes before contradiction scanning while keeping resonance and procedural extraction independent. Recently resolved conflict pairs act as a 30-day cooldown gate, and the daily contradiction alert budget is checked before expensive LLM work.
+
+### Fixed — MCP contradiction passthrough
+
+- `crystal_remember`, `crystal_update`, `crystal_edit`, and `crystal_supersede` now preserve backend `contradiction` and `contradictionCheck` metadata in runtime MCP responses. The hosted streamable HTTP MCP server shares the same structured/text result helper so contradiction metadata reaches clients consistently.
+
+### Changed — Release and dashboard hygiene
+
+- Brain dashboard loading now uses the full page skeleton instead of a small centered placeholder.
+- Public mirror sync now treats the private `packages/` workspace as excluded content; the public mirror contract remains `apps/docs/`, `convex/`, `plugin/`, `mcp-server/`, and `shared/`.
+
+### Scoped deferral — LTM extraction/backfill
+
+This release is a hardening patch; the structural LTM extraction/content-hash backfill remains deferred to a follow-up release so the release notes do not silently overclaim this patch.
+
+## [0.7.16] — 2026-04-21
+
+### Infrastructure (amended 2026-04-21)
+
+- **Default Convex HTTP host updated to `https://convex.memorycrystal.ai`.** OAuth consent, MCP endpoints, and the plugin's default `convexUrl` now use the Memory Crystal custom domain instead of the Convex-generated `rightful-mockingbird-389.convex.site` subdomain. **Existing installs require no action** — Convex keeps the old subdomain active indefinitely, so plugins already in the field continue to work; they organically upgrade on next installer run. OAuth provider callback URIs accept both hosts during a 2-week transition, after which the old URI is removed from Google/GitHub consoles.
+
+### Security (amended 2026-04-21)
+
+Patches 10 Dependabot advisories (2 HIGH, 8 MEDIUM) via transitive dependency pins in the root `package.json` `overrides` block. **Supply-chain hygiene — no runtime exposure confirmed.** Call-graph trace of `@modelcontextprotocol/sdk@1.29.0` found no `getCookie`/`setCookie`/`hono/cookie` imports in production paths. The MCP SDK's `streamableHttp` transport imports `getRequestListener` from `@hono/node-server`, but Memory Crystal does not invoke `serveStatic` (CVE-2026-39406), `toSSG` (CVE-2026-39408), `ipRestriction` (CVE-2026-39409), the `hono` cookie helpers (CVE-2026-39410), or the `vite` dev server (CVE-2026-39363/39364/39365). Released for clean advisory baseline.
+
+- **vite 7.3.1 → 7.3.2** — GHSA-p9ff-h696-f583 (CVE-2026-39363 dev server WebSocket file read), GHSA-v2wj-q39q-566r (CVE-2026-39364 `server.fs.deny` bypass), CVE-2026-39365 (path traversal in optimized deps `.map`)
+- **hono 4.12.9 → 4.12.14** — CVE-2026-39407 (repeated-slash middleware bypass in `serveStatic`), CVE-2026-39408 (path traversal in `toSSG`), CVE-2026-39409 (IPv4-mapped-IPv6 matching in `ipRestriction`), CVE-2026-39410 (non-breaking-space prefix bypass in `getCookie`), missing cookie-name validation in `setCookie`, GHSA-458j-xx4x-4375 (JSX SSR HTML injection)
+- **@hono/node-server 1.19.11 → 1.19.13** — CVE-2026-39406 (repeated-slash middleware bypass in `serveStatic`)
+
+Pulled via `@modelcontextprotocol/sdk` (hono family) and `vitest` (vite). Applied via root `package.json` `overrides` because npm workspaces + existing lockfile refuse to bump a satisfied transitive without an override hint. No version bump — lockfile-only change against the existing 0.7.16 release.
+
+### Cost controls and memory mutation tools
+
+- **Convex bandwidth mitigation.** Trigger lookup now uses indexed trigger rows instead of broad memory scans, and production trigger backfill is resumable across users and memory pages.
+- **Organic Pulse Engine guardrails.** Organic scheduled pulse intervals now clamp to one hour or longer, with supported tiers of 1h, 2h, 4h, 8h, 12h, and 24h. Faster legacy tiers are shown disabled in the dashboard.
+- **Per-user Pulse Engine toggle.** Each user can pause or resume their own Organic Pulse Engine without affecting other tenants; scheduled and conversation pulses respect the per-user enabled flag.
+- **Maintenance read reductions.** Duplicate checks, salience promotion, consolidation, and decay now use targeted indexes/read budgets to reduce Convex database bandwidth.
+- **Native memory update and supersede tools.** Added first-class `crystal_update` and `crystal_supersede` / `crystal_supercede` tool surfaces, with atomic successor creation, old-memory archival, and queryable lineage fields.
+
+## [0.7.15] — 2026-04-19
+
+### Peer isolation hardening
+
+- **Peer-first `guardChannel` fallback.** Recall, session KB listing, MCP filter-visible-memories, and both knowledge-base query paths (`runKnowledgeBaseQuery`, `getKBMemoriesInternal`) no longer fall back to `MANAGEMENT_CHANNEL_SENTINEL` when a peer caller omits `channel`. Missing channel now fails-closed on KBs with a concrete peer scope instead of silently upgrading to management-level visibility. This closes the `?? MANAGEMENT_CHANNEL_SENTINEL` bypass pattern the existing guard comment warned against.
+- **`getKBMemoriesInternal` chunk-level peer scope filter.** The internal KB-chunk reader now mirrors `runKnowledgeBaseQuery`'s admission rules — trailing-colon channels fail closed, candidates are over-fetched and post-filtered by peer so permissive shared KBs no longer leak cross-peer chunks on `by_knowledge_base` index reads.
+- **Shared-mode agent writes distinguish agents under the same scope.** When `agentScopePolicies` marks `mode: "shared"`, `crystal_remember` now resolves the write channel to `scope:main-<agentId>` so two shared agents under the same scope stop bleeding captures into one bucket. Read path uses the same resolution for symmetry. Single-shared-agent installs stay on `scope:main` (backward compatible).
+- **KB-scoped BM25 candidate pool.** `runKnowledgeBaseQuery` now forwards `knowledgeBaseId` into `searchMemoriesByText`; lexical candidates are filtered to the target KB instead of competing with the user's entire corpus.
+
+### MCP server hardening
+
+- **API-key paths forward `channel` filter.** `crystal_why_did_we`, `crystal_who_owns`, `crystal_dependency_chain`, and `crystal_explain_connection` now forward `channel` on the API-key / HTTP recall branch. Hosted MCP consumers previously saw unscoped, cross-channel results from these four tools.
+- **Server-side error logs sanitized.** `crystal_recall`, `crystal_trace`, and the HTTP listener run error messages through an inline redactor that scrubs Bearer tokens, `sk-*` keys, and `?api_key=/?token=/?secret=` query-string values before writing to stderr.
+- **`stdio` is the default MCP mode.** `CRYSTAL_MCP_MODE` defaults to `stdio` to match common client expectations (Claude Code, Codex CLI). Operators who want the HTTP listener must set `CRYSTAL_MCP_MODE=http` explicitly.
+- **Obsidian writer hardened.** Category is now validated against the Convex enum, and filenames include the memory `id` suffix to prevent same-millisecond slug collisions from silently overwriting prior notes.
+- **No-context Convex client cached.** In stdio mode the HTTP client is cached at module scope instead of being reconstructed on every tool call.
+
+### Plugin hardening
+
+- **Pressure-log Maps bounded.** `pressureEventState` and `hostCompactState` now evict via a stale-first / oldest-first policy when they exceed `MAX_SESSION_MAP_SIZE=500`, with `PRESSURE_STATE_MAX_AGE_MS=2h` staleness. Closes a slow heap-growth path on long-lived gateway processes.
+- **Normalized agent-scope policies cached.** `normalizeAgentScopePolicies` memoizes its Map via a WeakMap keyed by the plugin config object, so repeated per-turn channel resolution reuses the cached map instead of rebuilding.
+- **`crystal_search_messages` forwards `agentId`.** Parity with `memory_search` for agent-scoped routing.
+- **Memory-formatter regex footgun removed.** `SENTENCE_BOUNDARY_RE` lives inside `truncateMemoryContent` (fresh regex per call), eliminating the stateful `/g` module-scope regex.
+
+### Web hardening
+
+- **`/api/mcp-auth` proxy no longer forwards `cookie` / `set-cookie`.** The proxy uses `Authorization: Bearer` only; blanket cookie forwarding created a confused-deputy credential-relay risk that the updated allowlist rules out. Future cookie needs must be explicitly allowlisted by name.
+- **Polar checkout `plan` param validated against an allowlist** (`free`, `pro`, `ultra`, `starter`) before `PRODUCT_IDS` lookup. Invalid plans redirect to `/pricing?checkoutError=config` without reflecting the attacker-supplied plan value.
+- **Login `redirectTo` guard.** The login page now rejects any `redirectTo` that does not start with a single `/` (blocks `//`, `/\\`, and non-relative paths) and falls back to `/dashboard`.
+- **Install-assets allowlist pruned.** Removed `openclaw-hook.json` dead entry.
+
+### DevEx / operational hardening
+
+- **`legacyPeerPurge.scanCandidates` bounded.** Previously unbounded `.collect()` calls on `crystalWakeState`, `crystalNodes`, `crystalRelations`, `organicEnsembles`, `organicEnsembleMemberships`, `organicProspectiveTraces`, `organicTickState` (plus cutoff-bounded `organicIdeas`, `organicSkillSuggestions`, `organicRecallLog`) now `.take(SCAN_ROW_CAP)` with a `warn()` when the cap is hit, matching the existing pattern for `crystalMemories`/`crystalMessages` scans.
+- **`kbCounterReconcile` uses the full composite-index predicate.** `countKnowledgeBaseChunksPage` now scopes by `(knowledgeBaseId, userId, archived)` instead of scan-and-filter. TOCTOU window between read and patch is documented in the module header.
+
+## [0.7.14] — 2026-04-16
+
+### Memory / peer isolation hardening
+
+- **Stricter per-user knowledge-base isolation.** Knowledge bases attached to peer-capable agents (e.g. Telegram coach bots) now enforce strict per-peer scoping by default. Tenants relying on cross-peer shared KBs on peer-capable agents must opt-in via the new `peerScopePolicy: "permissive"` flag. See migration notes.
+- **New `kbPeerScopeBackfill` migration** — run `npx convex run crystal/migrations/kbPeerScopeBackfill '{}'` to inspect peer-capable KBs lacking scope and flag them for review. Backfill completed in staging.
+- **Observability metrics added** — `mc.metric.kb-peer-block` and `mc.metric.kb-chunk-drop` emit at guard/filter boundaries; metrics route through minimal `metric()` helper at `convex/crystal/metrics.ts` with structured `[mc.metric]` log prefix for Convex log drain.
+- **Kill-switch available** — setting env `MC_KB_PEER_STRICT=false` on the Convex deployment reverts to legacy (agentIds-only) visibility behavior without redeploy. Default (unset) is strict — this is the posture operators need.
+
+### Knowledge base correctness fixes
+
+- **KB counter drift fixed.** `archiveKnowledgeBaseMemoryInternal` now decrements the parent KB's `memoryCount` and `totalChars` on archive. Previously every per-memory archive (including `deleteKnowledgeBase`) leaked counter state, leading to inflated metadata over time.
+- **KB vector recall scoped at the index.** `runKnowledgeBaseQuery` now filters the `crystalMemories.by_embedding` vector search by `knowledgeBaseId` and `archived=false`. Previously the top-N nearest-neighbor search ran across the whole user corpus and small KB chunks were crowded out before the post-filter ran, collapsing `vectorScore` to 0 for legitimate KB hits on accounts with thousands of memories.
+- **One-shot reconciliation tool.** New `crystal/kbCounterReconcile:reconcileAllKnowledgeBases` action with `applyMode: "dry-run" | "apply"`. Paginated and safe to re-run; reports drift and worst offenders before patching. Used to repair historical drift in prod.
+- **`crystal_trace` reason wording.** Memories written via direct API (e.g. `crystal_remember`) used to be reported as "predates conversation tracking"; the handler now distinguishes direct-API writes (`source=external|cron|observation|inference`) from genuinely pre-tracking memories.
+
+## [0.7.13] — 2026-04-15
+
+### Plugin / per-turn recall unblocked
+
+- **Per-turn Convex recall now fires in `reduced` mode** — `assemble()` previously gated the Convex-backed recall on `mode === "full"`, which meant every default install (`localStoreEnabled: false`) silently dropped per-turn memory injection and answered from training-data inference instead. Only `"hook-only"` should skip recall; `"reduced"` and `"full"` now both fetch. Extracted the decision into `shouldFetchConvexContext(mode)` with a regression test (`plugin/recall-mode.test.js`) so this can't return silently.
+
+### Plugin / context-engine stability
+
+- **Hard assemble-path injection ceiling** — `assemble()` enforces `ASSEMBLE_MAX_INJECTION_CHARS = 12_000` across the injected system context + local messages combined. Oldest local messages drop first, then `convexContext` is truncated. Prevents runaway per-turn growth on hot long-lived sessions regardless of host compaction behavior.
+- **Tier-aware per-memory cap with sentence-boundary slicing** — recall content caps at 1200 chars for knowledge-base chunks (book/course/podcast excerpts) and 600 chars for auto-extracted notes, replacing the previous flat 350-char trim. Truncation prefers paragraph breaks and sentence terminators (`.`, `!`, `?`) inside the cap window so KB definitions no longer end mid-sentence.
+- **Transient-channel metadata** — `assemble()` returns additive `contextUsage: { crystalInjectedChars, crystalInjectedMessageCount, ephemeral: true }` alongside the existing `{messages, used}` contract. Hosts that honor it can exclude Crystal injection from session persistence; no-op if the host ignores.
+- **Rate-limited pressure telemetry** — new `plugin/pressure-log.js` emits one `crystal_pressure` log line per session per minute when injection is trimmed or exceeds 60% of the ceiling. Schema includes `hostCompactInvoked` + `hostCompactTokensReclaimed` so we can attribute whether the host compaction trigger fired at all.
+
+### Plugin / safer defaults for hot lanes
+
+- **`localSummaryInjection` defaults to `false`** — local-store summary injection compounds on long-lived agent sessions; opt in per-agent when you actually want it. Existing installs that explicitly set the key keep their behavior.
+- **`defaultRecallLimit` defaults to `4`** (down from 8). Lower fan-in keeps per-turn injection volume bounded under the new ceiling without degrading recall quality on focused queries.
+
+### Installer + updater
+
+- **Installer and all three update scripts include `pressure-log.js` and `memory-formatter.js`.** Without this, 0.7.13 installs copied `index.js` but not its new dependencies and crashed with `Cannot find module './pressure-log'` at load.
+- **Web-served `/install-assets/plugin/` route allows the two new modules.** The route maintains an explicit allowlist; 0.7.13 installs 404'd on the new files until the allowlist caught up.
+- **Post-install verification now checks the `context-engine` capability binding and the `before_agent_start` hook** instead of grepping for specific tool names. OpenClaw's context-aware tool factory (shipped in 0.7.12) produces anonymous closures, so the old name-based grep always failed on 0.7.12+ installs even when the plugin was healthy.
+- **Updater parity maintained** across `plugin/update.sh`, `scripts/update.sh`, and `apps/web/public/update.sh` (byte-identical).
+
+### Convex / recall ranking
+
+- **KB ranking weight restored** — `knowledgeBaseWeight` at `0.25` (default) and `0.26` / `0.18` across mode presets, restoring full margin for the "half rap"-class fix from 0.7.12. The new tier-aware per-memory cap means the higher weight no longer compounds the per-turn byte budget.
+- **Convex client bumped to `^1.35.1`** across root, `apps/web`, and `mcp-server` workspaces.
+
+## [0.7.12] — 2026-04-14
+
+### Plugin / OpenClaw compatibility
+
+- **Tool-context session fallback restored** — Memory Crystal now registers its cloud-backed tools through OpenClaw’s context-aware tool factory so `sessionKey`, delivery context, and other runtime fields survive into tool execution even when the tool runner passes a sparse execute-time ctx. This fixes shared main-agent recall for stock OpenClaw main sessions like `agent:main:main`.
+- **Shared-lane recall unblocked** — `crystal_recall`, `crystal_search_messages`, `crystal_what_do_i_know`, `crystal_why_did_we`, `crystal_debug_recall`, `crystal_preflight`, `crystal_recent`, `crystal_wake`, and `memory_search` now work in sessions whose channel uses a `main`, `default`, or `unknown` peer suffix. Previously these tools hard-errored with `Cannot resolve a safe channel scope for this session`. Captures remain strict so multi-peer content still cannot cross-pollinate a named scope.
+- **Shared agent recall fallback** — read-path recall now reuses scoped `:main` / `:default` / `:unknown` channels for trusted `agent:*` sessions, so shared agent lanes like `agent:main:main` can recall their own scoped memory without weakening write-path isolation.
+- **Optional `channel` parameter** on the read-path tools lets callers pin a session-specific channel explicitly when the automatic resolver can't infer one.
+- **Regression coverage for OpenClaw default main scope** — plugin tests now prove that context-aware registration preserves shared-lane recall even when execute-time ctx is empty.
+
+### Plugin / install hardening
+
+- **Backend persistence hardened** — `scripts/crystal-enable.sh` now treats explicit memory-backend overrides as the deliberate top-priority migration lever, keeps persisted plugin `convexUrl` authoritative over generic `CONVEX_URL` drift, validates `/api/mcp/stats` before persisting a backend, rejects HTTP 404 targets by default, and wires the selected backend into both plugin config and hook command env. This prevents generic `CONVEX_URL` drift from silently repointing Memory Crystal at a non-MCP Convex deployment.
+- **Doctor backend provenance** — `crystal_doctor` now reports backend source and classifies route validation failures more clearly.
+- **Updater parity restored** — `plugin/update.sh`, `scripts/update.sh`, and `apps/web/public/update.sh` are aligned again so every published updater pulls from the same public mirror source.
+
+### Dashboard
+
+- **Knowledge base detail guard** — the KB detail panel now surfaces a clear `no longer available on the server` notice when the list row refers to a KB the backend detail query returns as `null`, instead of spinning on a permanent `Loading…` state.
+
+## [0.7.9] — 2026-04-13
+
+### Plugin recall and prompt shaping
+
+- **Compact recall evidence by default** — standard prompt injection now uses a small `Relevant Memory Evidence` block instead of stacking large recall/message-history sections on every turn.
+- **Tool guidance reduced to once per session** — the long Memory Crystal tool-discipline block now appears on first injection only, instead of being repeated on every prompt.
+- **Wake briefing trimmed** — first-turn wake context is still injected for continuity, but the plugin now inserts a shorter version to reduce prompt overhead.
+- **Message-history lookup narrowed** — `search-messages` is now reserved for explicit history / factual-recall prompts like “what did we work on” or names / birthdays, while generic questions stay on the cheaper semantic-recall path.
+- **Full debug surface added** — new `crystal_debug_recall` returns the raw wake / recall / search / recent bundle plus the rendered hook sections for debugging and retrieval inspection.
+
+### MCP transport and runtime
+
+- **Legacy SSE transport removed** — the old SSE/session MCP surface is gone. Hosted Memory Crystal now standardizes on Streamable HTTP `/mcp`, while command-launched local MCP uses explicit `stdio` wiring.
+- **Local transport contract clarified** — deprecated local MCP docs and examples now distinguish `stdio` for command-launched clients from explicit `http` mode for the local network listener.
+- **Runtime tooling aligned** — generated hook configs, doctor checks, and environment examples now emit `stdio`/`http` intentionally instead of legacy `sse`.
+
+### Knowledge bases
+
+- **Dashboard crash fix** — the Knowledge Bases page now tolerates legacy or malformed knowledge-base rows with missing counters or timestamps instead of crashing on `toLocaleString`.
+- **Server-side normalization** — knowledge-base list/detail queries now backfill missing `memoryCount`, `totalChars`, `createdAt`, and `updatedAt` values before returning data to clients.
+
+### Auth and backend hardening
+
+- **API-key hosted parity fixes** — API-key recall semantics now preserve intended filters and hosted graph-style tools no longer degrade API-key clients into hard errors.
+- **Device auth and impersonation hardening** — device authorization now rate-limits brute-force attempts, and impersonation targets are revalidated when effective user resolution runs.
+- **Cleanup and purge convergence** — association cleanup and legacy peer purge execution now iterate to completion instead of stopping after one pass.
+- **Email path fixes** — missing email template variables no longer leak raw `{{placeholder}}` text, and admin email log listing no longer full-table scans.
+
+### Installers
+
+- **Codex TOML repair** — the Codex installer now merges `codex_hooks = true` into an existing `[features]` table instead of appending a duplicate table that breaks `config.toml`.
+- **Dry-run safety improvement** — hook-config dry runs now redact secret values instead of dumping credentials to stdout.
+- **Full install/uninstall verification sweep** — OpenClaw, Claude Code, Codex CLI, and Factory Droid install/uninstall flows were rechecked in temp-home simulations, including safe `--purge` cleanup behavior.
+
+## [0.7.8] — 2026-04-11
+
+### Integrations and installers
+
+- **Hook-based MCP installs for Claude Code, Codex CLI, and Factory Droid** — shared Memory Crystal hooks now install with browser-based device auth, scoped channel/session propagation, and safer host config merging.
+- **Installer hardening** — Codex / Claude / Droid hook installers preserve unrelated hooks and repair invalid Codex hook layouts instead of clobbering existing config.
+- **Safe uninstall coverage** — public uninstall scripts now exist for OpenClaw, Claude Code, Codex CLI, and Factory Droid, with safe defaults and explicit purge paths.
+
+### Recall and memory reliability
+
+- **Peer-scoped coach recall fixes** — malformed scoped writes are normalized, same-peer raw message fallback is restored at session start, and cross-client leakage protections remain intact.
+- **SessionStart noise reduction** — startup hooks now emit a compact memory-active summary instead of dumping the full wake briefing and long-form instruction block.
+- **Gateway-safe local store mitigation** — local SQLite compaction is now explicit via `localStoreEnabled`, defaults off for non-opted-in runtimes, and uses WAL/file-cache guardrails when enabled.
+
+### Knowledge bases and release workflow
+
+- **Knowledge base imports auto-chunk raw text** — pasted or uploaded raw text now splits automatically while preserving explicit JSON chunk arrays and delimiter-based chunk boundaries.
+- **Release workflow improvements** — docs, public assets, and branch alignment are now part of the release lane instead of an afterthought.
+- **HTTP auth / MCP test refresh** — stale API-key mock paths were updated to match the current auth contract so release audit runs are green again.
+
+## [0.7.6] — 2026-04-04
+
+### Backend — Gemini cost guardrails
+
+- **Cron throttling** — graph enrichment backfill reduced from 200 memories/5 min to 25 memories/hr (~96% cut). STM embedder interval widened from 5 min to 15 min. Asset embedder interval widened from 5 min to 30 min.
+- **Circuit breaker** — graph enrichment aborts after 3 consecutive Gemini failures instead of burning quota against a failing API.
+- **Daily Gemini call cap** — new `GEMINI_DAILY_CALL_CAP` env var (off by default). When set, an atomic counter in `crystalGeminiDailyUsage` blocks further Gemini calls once the cap is reached for the UTC day. Checked in graph enrichment, `embedText`, and `embedMemory`.
+- **Embedding error logging** — `embedText` now logs status code, model name, and truncated error payload. `batchEmbedTexts` returns all-null on 429/5xx to prevent amplification; falls back to individual calls on other errors.
+
+### Backend — Unified CRYSTAL_API_KEY
+
+- **Single API key env var** — `CRYSTAL_API_KEY` is now the primary env var for Gemini access. `GEMINI_API_KEY` remains as a backward-compatible fallback. All 12+ consumers (Convex actions, MCP server, plugin, scripts) updated to resolve `CRYSTAL_API_KEY ?? GEMINI_API_KEY`.
+- **Updated .env.example** — documents `CRYSTAL_API_KEY` as the preferred key alongside `GEMINI_EMBEDDING_MODEL`.
+
+### Backend — Tier-aware Gemini controls
+
+- **Per-tier Gemini policy** — `GeminiTierConfig` added to `shared/tierLimits.ts`. Free=no managed Gemini (cap 0), Pro/Starter=managed with 500 calls/day cap, Ultra/Unlimited=managed unlimited with BYOK support.
+- **Per-user guardrail** — `geminiGuardrail.incrementAndCheck` now accepts `userId`, resolves the user's tier, and enforces the tier-specific daily cap. Global `GEMINI_DAILY_CALL_CAP` env var still works as an override (lowest cap wins).
+- **BYOK for Ultra** — new `geminiApiKey` and `geminiDailyCap` fields in `organicTickState` schema. Ultra users can supply their own key and set a custom daily cap.
+
+### Plugin — Peer-scoped recall fixes
+
+- **Replaced ad-hoc channel filter** with `isNonKnowledgeBaseMemoryVisibleInChannel` for consistent peer-scoped recall isolation.
+- **Blocked bare-prefix memory leakage** — memories stored under a bare channel prefix (e.g. `agent:`) no longer leak into peer-specific channels (`agent:user-1`).
+- **Surface agent-prefix memories** — memories stored with the agent's own prefix are now correctly returned in peer channel recalls.
+- **Exclude global memories from scoped channels** — unscoped memories no longer appear in peer-scoped recall results.
+
+### Installer — update.sh sync
+
+- **PLUGIN_FILES list reconciled** — removed stale `openclaw-hook.json` entry from `scripts/update.sh` to match `plugin/update.sh`.
+
+## [0.7.5] — 2026-04-03
+
+### Backend — Gemini-native embeddings and isolation hardening
+
+- **Unified embeddings on Gemini** — all embedding paths now use Gemini exclusively; OpenAI embedding codepath hard-disabled.
+- **Stale-vector remediation** — new CLI-callable actions re-embed memories still using 1536-dim OpenAI vectors to 3072-dim Gemini vectors.
+- **Per-client memory isolation** — hard channel filter and KB scope field enforce strict per-client boundaries in multi-tenant peer-scoped sessions.
+- **Write-tool 404 fix** — `crystal_remember`, `crystal_checkpoint`, and `crystal_forget` now route through HTTP endpoints correctly.
+- **Retrieval quality fixes** — embedding dimension mismatches, hybrid search scoring, and channel visibility bugs resolved.
+
+## [0.7.4] — 2026-04-03
+
+### Plugin — Memory leak fixes
+
+- **intentCache TTL enforcement** — `intentCache` now enforces a 30-minute TTL at read time. Stale intents are deleted and treated as absent rather than persisting indefinitely across long sessions.
+- **sessionRecallCache stale eviction** — When the 4-hour recall cache TTL expires, stale entries are now actively deleted from both `sessionRecallCache` and `sessionRecallCacheTimestamps` instead of just skipping injection.
+- **conversationPulse fetch body disposal** — Fire-and-forget fetch now explicitly cancels the response body (`r.body?.cancel?.()`) to avoid socket lingering in Node.js.
+
+### Installer — migrate.sh content field fix
+
+- **Fixed `migrate.sh` sending wrong field name** — The import payload was sending `text` but `mcpCapture` expects `content`. Every memory import attempt since launch was silently 400ing. Fixed — re-run `migrate.sh` to actually import your memories.
+
+## [0.7.3] — 2026-04-03
+
+### Plugin — Memory leak fix
+
+- **`clearSessionState()` helper added** — consolidates all per-session Map cleanup into a single function. Previously, `session_end` and `dispose()` each had incomplete, hand-rolled lists of deletes that missed several Maps (`pendingUserMessages`, `sessionConfigs`, `wakeInjectedSessions`, `seenCaptureSessions`, `intentCache`). With each session leaving behind stale entries, long-running gateways accumulated unbounded Map growth.
+- **`session_end` hook updated** — now calls `clearSessionState(sessionKey)` which clears all 13 per-session caches atomically.
+- **`dispose()` updated** — now explicitly clears all Maps including `pendingUserMessages`, `sessionConfigs`, `wakeInjectedSessions`, `seenCaptureSessions`, `intentCache`, and `reinforcementTurnCounters`.
+
+## [0.7.2] — 2026-04-03
+
+### Plugin — OpenClaw 2026.3.31 compatibility fix
+
+- **Fixed `command:new` / `command:reset` hook names** — OpenClaw 2026.3.31 removed these as valid typed-hook names for plugins. Replaced with `session_start` (fires on new session) and `before_reset` (fires before `/reset`). Reflection still triggers correctly on both events.
+- **Auto-updater: public mirror fallback** — `update.sh` now pulls from `memorycrystal/memorycrystal` (`stable` branch) when no GitHub auth token is present. Users without access to the private repo can now auto-update without setting up a token.
+
+---
+
+## [0.5.4] — 2026-03-24
+
+### Consolidated release (0.5.1–0.5.4)
+
+### New Features
+- **Dashboard docs rewrite** — full tool reference, install guide, and MCP config docs
+- **One-command MCP installers** — for Codex, Claude Code, and Factory
+- **Codex API key persistence** — persisted to shell profile
+- **Releases dashboard tab** — moved to `/dashboard/releases`
+
+### Bug Fixes
+- **`before_tool` hook renamed to `before_tool_call`** — matches OpenClaw's actual API
+- **Polar billing portal** — uses customer session API instead of broken static URL
+- **API key regeneration** — patches in-place instead of creating new row
+- **Telemetry queries** — capped to 500 docs to stay under Convex 8MB read limit
+- **Admin delete** — now removes all authAccounts per user (email + OAuth)
+- **Trial button** — updated from 14-day to 7-day
+- **Route conflict** — dashboard releases moved to `/dashboard/releases`
+
+---
+
+## [0.5.2] — 2026-03-23
+
+### New Features
+- **Token-budgeted recent message window** — after compaction, the agent now gets a chronological window of recent messages (up to 7k chars / ~5k tokens) injected alongside semantic recall. Fetches the last 30 messages from `/api/mcp/recent-messages`, keeps the most recent that fit the budget. Solves the "forgot what we discussed 30 minutes ago" problem. Complements semantic recall — long-term memory + short-term continuity, both active.
+
+### Bug Fixes
+- **`/crystal` install route** — `request.url` on Railway returns `localhost:8080` (internal host), causing redirects to send curl clients to `https://localhost:8080/install.sh`. Fixed to use the `Host` header instead, which Cloudflare forwards correctly as the public domain.
+- **`/crystal/update` route** — same fix as `/crystal`.
+- **TypeScript: `accessCount` union type** — `ctx.db.get(id as any)` returns the full table union type which doesn't include `accessCount`. Cast result to `{ accessCount?: number } | null` so Railway's type-checked build passes.
+- **Hero section dots** — traffic-light buttons in `TabbedInstallCommand` were rendering square due to `span` sizing. Moved dots to `TerminalAnimation` only (removed from install card entirely), bumped to `w-3 h-3` + `flex-shrink-0`.
+
+### Layout
+- **Hero section redesign** — H1 + subtitle now span full width above the two-column grid. Install command card (left) and terminal animation (right) sit below. Terminal uses fixed height instead of `max-h` for visual stability.
+
+---
+
+## [0.5.0] — 2026-03-20
+
+### New Features
+- **Action triggers** — `actionTriggers` field on memories enables the new `/api/mcp/triggers` endpoint and `before_tool` hook. Memories tagged with triggers are surfaced automatically before matching tool calls, keeping guardrails and lessons in scope during execution.
+- **Circuit breaker** — plugin warns when an agent saves 3+ lessons on the same topic in a single session, preventing runaway self-correction loops.
+- **Guardrails in wake briefing** — high-strength `lesson` and `rule` memories are automatically injected into the session wake briefing so guardrails are active from turn one.
+- **Install script: 3 backend modes** — `install.sh` now prompts for Cloud, Self-hosted Convex, or Local-only SQLite. No Convex account required for local-only installs.
+
+### Bug Fixes
+- **Local-only mode (`apiKey: "local"`)** — `request()` now returns `null` immediately for local-only mode instead of attempting Convex calls with a fake bearer token. `crystalRequest()` throws a clear "not available in local-only mode" error. `buildBeforeAgentContext` skips all remote calls. Previously, local-only mode would attempt Convex requests with `Authorization: Bearer local` and get 401s on every turn.
+- **Guardrails channel-agnostic** — `getGuardrailMemories` now queries across all channels by strength, not just the current channel. Guardrails were silently missing for new channels/sessions.
+- **Guardrails in HTTP wake handler** — guardrail injection was dead code for plugin users (only fired in the direct HTTP path); now correctly wired for all wake briefing paths.
+- **Session key fallback** — circuit breaker uses a stable session key fallback, preventing false positives when session ID is unavailable early in a turn.
+
+---
+
+## [0.4.2] — 2026-03-18
+
+### Bug Fixes
+- **`ingestBatch` rename** — context engine `ingest` method renamed to `ingestBatch` to match OpenClaw's actual API contract. The ingest hook was silently never firing because OpenClaw calls `ingestBatch()`. This is the root cause fix for context not being accumulated in the local store.
+- **`tokenBudget` field name** — `assemble` and `afterTurn` now read `payload.tokenBudget` instead of `payload.budget` to match what OpenClaw actually sends.
+- **Leaf compaction threshold** — lowered from 20,000 tokens to 4,000. Sessions were overflowing the context window before ever hitting the compaction trigger. At 4k, compaction fires after ~15-20 exchanges.
+- **`assemble` tail-replacement** — when local summaries exist, `assemble` now replaces the older portion of the raw message history with summaries and keeps only the last 6 messages raw. Previously summaries were prepended but all raw messages still passed through, so context usage never actually dropped.
+- **JSON schema fix** — removed invalid `"required": false` from `channelScope` property in `openclaw.plugin.json` (must be omitted for optional fields; was crashing gateway config validator on update).
+
+---
+
+## [0.4.1] — 2026-03-18
+
+### Bug Fixes
+- **Install script** — updated to download all 13 v0.4.0 files including subdirectory structure (`store/`, `compaction/`, `tools/`, `utils/`); was broken since v0.4.0 only fetched 7 flat files from v0.2.x
+- **Update script** — same fix; added `compaction/package.json` to file list
+- **Install-assets route** — renamed `[file]` to `[...file]` catch-all to serve subdirectory paths; fixed path resolution from `process.cwd()` to `import.meta.url` anchor; added `compaction/package.json` to allowlist
+- **Non-ASCII characters** — stripped box-drawing chars from install.sh success banner
+
+### New Features
+- **`channelScope` config** — set `"channelScope": "myapp"` (or any string) to automatically namespace all captures and recalls as `{channelScope}:{peerId}`. Peer ID is derived from Telegram sender, Discord user, or session key. Enables multi-tenant and per-client memory isolation without any additional code.
+- **`migrate.sh --ingest-dir`** — new flags for bulk ingesting arbitrary directories into Memory Crystal: `--ingest-dir DIR` (repeatable), `--store`, `--category`, `--tags`, `--channel`. When `--ingest-dir` is set, skips OpenClaw memory scan and processes the specified paths only.
+
+### Dependencies
+- `better-sqlite3` npm install step added to both `install.sh` and `update.sh` (graceful fallback if unavailable)
+
+---
+
+## [0.4.0] — 2026-03-17
+
+### Highlights
+- **Phase 2 context engine** — Memory Crystal now owns compaction (`ownsCompaction: true`). Local SQLite layer (L1) + Convex cloud (L2) two-tier architecture live
+- **Local compaction DAG** — hierarchical leaf → condensed summarization with 3-level LLM escalation (normal → aggressive → deterministic truncation fallback)
+- **Budget-aware context assembly** — fresh tail always protected; summaries XML-wrapped as `<crystal_summary>` blocks injected before Convex recall
+- **Three new local tools** — `crystal_grep`, `crystal_describe`, `crystal_expand` registered lazily once SQLite store initializes
+- **Cross-platform SQLite** — `better-sqlite3` with `createRequire` + dynamic import fallback; graceful no-op stub if unavailable (Windows, Linux ARM, all platforms)
+- **Interface bug fixes** — 5 runtime bugs patched: wrong assembleContext arg, createSummarizer wrong import, missing messageId/summaryId fields, missing getMessageById/getSummary methods, wrong API key for summarizer
+
+### Plugin
+- **`plugin/index.js`** — Phase 2 hooks: `ingest` writes to local store, `assemble` prepends local summaries + Convex recall, `compact` runs DAG sweep before Convex checkpoint, `afterTurn` runs incremental leaf compaction
+- **`plugin/utils/crystal-utils.js`** — extracted helpers (extractUserText, extractAssistantText, shouldCapture, isCronOrIsolated, normalizeContextEngineMessage, etc.)
+- **`plugin/store/crystal-local-store.js`** — SQLite-backed session store; tables: conversations, messages, summaries, summary_parents, summary_messages, context_items; `checkSqliteAvailability()` export; `getMessageById()` + `getSummary()` methods
+- **`plugin/compaction/crystal-summarizer.js`** — LLM summarization factory, 3-level escalation, LEAF_PROMPT / CONDENSED_PROMPT builders, `estimateTokens`, `formatTimestamp`
+- **`plugin/compaction/crystal-assembler.js`** — budget-constrained context assembly, fresh tail protection, XML-wrapped summary injection
+- **`plugin/compaction/crystal-compaction.js`** — `CrystalCompactionEngine`: `evaluate`, `compactLeaf`, `compact` (full sweep)
+- **`plugin/tools/crystal-local-tools.js`** — `crystal_grep`, `crystal_describe`, `crystal_expand` via `createLocalTools(store)`
+- **`openaiApiKey`** config field added — separate from Convex API key, falls back to `OPENAI_API_KEY` env var
+- **All files under 500 lines** — 41/41 tests passing
+
+---
+
+## [0.3.0] — 2026-03-16
+
+### Highlights
+- **Agent tool guidance** — every session now receives a compact behavioral guide explaining when and how to use each Memory Crystal tool, so agents use memory proactively without being prompted
+- **Crystal Grep** — BM25 full-text search activated on `crystal_search_messages`; find verbatim past wording across all retained messages
+- **Structured message capture** — turns now stored with role, session ID, and turn metadata for conversation threading
+- **Recall ranking** — context-aware reranking with recency decay, graph boost, and session continuity scoring
+- **Message embeddings** — immediate enqueue on capture + starvation fix ensures all messages are semantically searchable
+- **Auto-update infrastructure** — `release` branch + `scripts/update.sh` for streamlined client rollouts
+
+### Plugin (`plugin/index.js`)
+- **Agent tool guidance injected**: `before_agent_start` now injects a `## Memory Crystal — How to Use Your Tools` section with per-tool behavioral guidance (when to call each tool, what it's for). Excluded from cron/isolated sessions.
+- **Structured turn capture**: messages now stored with `role`, `turnIndex`, `sessionId`, and `channelKey` metadata
+- **Noise filter**: heartbeat ACKs, greetings, HEARTBEAT_OK, short confirmations excluded from capture
+- **Reflection hooks**: `command:new` and `command:reset` trigger `triggerReflection()` at session boundaries
+
+### Convex — Messages (`convex/crystal/messages.ts`)
+- **Crystal Grep**: `searchMessagesByTextForUser` uses the existing `search_content` BM25 index — exact phrase hits boosted, quoted queries stripped, all retained messages searchable (not just recent 50-200)
+- **Hybrid message search**: `searchMessageMatches` now merges indexed lexical + semantic + recency fallback
+
+### Convex — Recall (`convex/crystal/recall.ts`)
+- **Context-aware reranking**: 5-component weighted score `vectorScore×0.35 + strength×0.30 + recency×0.20 + accessScore×0.10 + bm25Boost×0.05`
+- **Graph node boost**: memories with high-confidence graph links get `+0.05` post-processing boost
+- **Session continuity**: memories from the same project/context ranked higher
+
+### Convex — Reflection (`convex/crystal/reflection.ts`)
+- **Distillation pipeline**: nightly job extracts decisions, lessons, summaries, open loops from sensory/episodic memories and writes distilled semantic/procedural memories
+
+### Security
+- Hardcoded API key removed from `plugin/index.js`; always sourced from plugin config
+
+### Security
+- **Removed hardcoded API key** from plugin/index.js; API key is now always sourced from plugin config (`ctx.config.apiKey`), never from a fallback literal.
+
+### Plugin (`plugin/index.js`)
+- **Noise filter**: Added `shouldCapture()` guard in `llm_output` hook — heartbeat ACKs, short greetings, simple confirmations, and HEARTBEAT_OK are not written to memory.
+- **Reflection hooks**: Plugin now registers `command:new` and `command:reset` hooks that fire `triggerReflection()` on session boundaries, calling `/api/mcp/reflect` with a 4-hour window (fire-and-forget).
+
+### Plugin (`plugin/recall-hook.js`)
+- **Adaptive recall skip**: Added `shouldRecall()` guard — empty queries, slash commands, greetings, short acks, pure emoji, and heartbeat patterns skip the embedding+recall round-trip entirely.
+- **BM25 hybrid search wiring**: `searchMemories()` now passes `query` string to Convex `recallMemories` action alongside the embedding vector, enabling hybrid vector+BM25 scoring.
+- **Session dedup**: Added `sessionMemoryCache` with 4-hour TTL. Memory IDs returned per session are tracked; subsequent recalls for the same session exclude already-seen memories via `recentMemoryIds` arg.
+
+### Convex — Schema (`convex/schema.ts`)
+- **BM25 search indexes**: Added `searchIndex("search_content", ...)` and `searchIndex("search_title", ...)` to `crystalMemories` table, enabling full-text search over memory content and title fields with `userId` and `archived` filter fields.
+
+### Convex — Recall (`convex/crystal/recall.ts`)
+- **Hybrid scoring formula**: `recallMemories` action now uses a 5-component weighted score:
+  `vectorScore × 0.35 + strength × 0.30 + recency × 0.20 + accessScore × 0.10 + bm25Boost × 0.05`
+- **Knowledge graph node boost**: After initial ranking, memories with at least one `crystalMemoryNodeLinks` entry with `linkConfidence > 0.7` receive a `+0.05` post-processing score boost.
+- **Parallel association lookup**: `buildAssociationCandidates` calls are now batched via `Promise.all()` across all top results (was sequential).
+- **Associations on by default**: `includeAssociations` now defaults to `true` if not supplied.
+- **BM25 search internal query**: Added `searchMemoriesByText` internalQuery that runs parallel `search_content` + `search_title` Convex search indexes and returns deduplicated results with boost metadata.
+- **Schema fields added to requestSchema**: Added `query` (optional string) and `recentMemoryIds` (optional string array) to the `recallMemories` args schema — previously `query` was accessed via `(args as any).query` and `recentMemoryIds` was silently undefined.
+- **Graph node lookup query**: Added `getNodesForMemories` internalQuery used to identify graph-linked memories for the node boost post-processing step.
+
+### Convex — Reflection (`convex/crystal/reflection.ts`) — NEW FILE
+- **Reflection/distillation pipeline**: New module implementing memory distillation via OpenAI `gpt-4o-mini`.
+  - `getRecentMemoriesForReflection` (internalQuery): fetches recent `sensory`/`episodic` memories within a configurable time window.
+  - `runReflectionForUser` (internalAction): calls OpenAI to extract decisions, lessons, session summary, and open loops from recent memories; writes each as a new distilled memory (`episodic/decision`, `semantic/lesson`, `episodic/event`, `prospective/goal`).
+  - `runReflection` (public action): iterates all users and calls `runReflectionForUser`; used by cron and `/api/mcp/reflect`.
+
+### Convex — HTTP (`convex/http.ts`)
+- **`/api/mcp/reflect` route**: New POST route registered, backed by `mcpReflect` handler in `mcp.ts`.
+
+### Convex — Crons (`convex/crons.ts`)
+- **Daily reflection cron**: Added `crons.daily("crystal-reflect", { hourUTC: 4, minuteUTC: 30 }, ...)` to run memory distillation for all users daily after the STM expiry job.
+
+### Convex — MCP (`convex/crystal/mcp.ts`)
+- **`mcpReflect` HTTP handler**: New handler that authenticates, rate-limits, and calls `runReflectionForUser` for the authenticated user with configurable `windowHours` and optional `sessionId`.
+
+### MCP Server (`mcp-server/src/tools/recall.ts`)
+- **Pass `query` to Convex**: `handleRecallTool` now includes `query: parsed.query` in the `recallMemories` action args, enabling BM25 hybrid search from the MCP path (was embedding-only).
+
+---
+
+## Deployment Notes
+
+To deploy to production:
+
+```bash
+# Deploy Convex backend (schema + functions)
+npx convex deploy
+
+# Or for local dev:
+npx convex dev
+
+# MCP server (if running standalone):
+cd mcp-server && npm run build && npm start
+```
+
+**Environment variables required:**
+- `GEMINI_API_KEY` — required for embeddings and graph enrichment (Gemini-native since v0.7.5)
+- `CONVEX_URL` — Convex deployment URL (set in mcp-server `.env`)
+- `GEMINI_DAILY_CALL_CAP` — optional daily Gemini API call limit (off by default, added in v0.7.6)

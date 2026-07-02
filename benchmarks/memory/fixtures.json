@@ -1,0 +1,398 @@
+{
+  "schemaVersion": 1,
+  "name": "memory-crystal-seeded-retrieval-v0",
+  "boundary": "retrieval_seeded",
+  "description": "Synthetic Memory Crystal seeded retrieval fixtures for fact, preference, contradiction, scoped privacy, LoCoMo-style recall, and latency/cost smoke tracks.",
+  "cases": [
+    {
+      "id": "fact-001",
+      "track": "fact_recall",
+      "channel": "bench:profile",
+      "query": "What is Maya's birthday?",
+      "expected": ["Maya's birthday is March 14"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Maya birthday", "content": "Maya's birthday is March 14.", "channel": "bench:profile", "store": "semantic", "category": "fact", "tags": ["fact", "family"] },
+        { "id": "distractor", "title": "Maya project", "content": "Maya reviewed the Q2 roadmap draft.", "channel": "bench:profile", "store": "episodic", "category": "event", "tags": ["project"] }
+      ]
+    },
+    {
+      "id": "fact-002",
+      "track": "fact_recall",
+      "channel": "bench:profile",
+      "query": "Which airport does Rowan prefer?",
+      "expected": ["Rowan prefers YEG airport"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Rowan airport preference", "content": "Rowan prefers YEG airport for morning flights.", "channel": "bench:profile", "store": "semantic", "category": "fact", "tags": ["travel"] },
+        { "id": "distractor", "title": "Airport parking", "content": "The parking receipt was saved under travel expenses.", "channel": "bench:profile", "store": "sensory", "category": "conversation", "tags": ["travel"] }
+      ]
+    },
+    {
+      "id": "fact-003",
+      "track": "fact_recall",
+      "channel": "bench:projects",
+      "query": "What is the Atlas launch code?",
+      "expected": ["Atlas launch code is cobalt-river-27"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Atlas launch code", "content": "Atlas launch code is cobalt-river-27.", "channel": "bench:projects", "store": "semantic", "category": "fact", "tags": ["atlas"] },
+        { "id": "distractor", "title": "Atlas notes", "content": "Atlas needs final copy review before launch.", "channel": "bench:projects", "store": "episodic", "category": "goal", "tags": ["atlas"] }
+      ]
+    },
+    {
+      "id": "fact-004",
+      "track": "fact_recall",
+      "channel": "bench:team",
+      "query": "Who owns the billing webhook?",
+      "expected": ["Nadia owns the billing webhook"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Billing webhook owner", "content": "Nadia owns the billing webhook and reviews Polar events.", "channel": "bench:team", "store": "semantic", "category": "person", "tags": ["billing"] },
+        { "id": "distractor", "title": "Webhook retry", "content": "Webhook retry tests run during release verification.", "channel": "bench:team", "store": "procedural", "category": "workflow", "tags": ["billing"] }
+      ]
+    },
+    {
+      "id": "fact-005",
+      "track": "fact_recall",
+      "channel": "bench:health",
+      "query": "What is the allergy note?",
+      "expected": ["No shellfish allergy"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Allergy note", "content": "No shellfish allergy is recorded for this profile.", "channel": "bench:health", "store": "semantic", "category": "fact", "tags": ["health"] },
+        { "id": "distractor", "title": "Restaurant note", "content": "Avoid late dinners before early flights.", "channel": "bench:health", "store": "episodic", "category": "conversation", "tags": ["travel"] }
+      ]
+    },
+    {
+      "id": "preference-001",
+      "track": "preference_recall",
+      "channel": "bench:style",
+      "query": "How should reports be formatted?",
+      "expected": ["reports should use concise bullets"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Report format preference", "content": "The user prefers reports should use concise bullets and exact file references.", "channel": "bench:style", "store": "procedural", "category": "rule", "tags": ["preference", "writing"] },
+        { "id": "distractor", "title": "Report archive", "content": "Old reports live in the archive folder.", "channel": "bench:style", "store": "semantic", "category": "fact", "tags": ["writing"] }
+      ]
+    },
+    {
+      "id": "preference-002",
+      "track": "preference_recall",
+      "channel": "bench:tools",
+      "query": "Which command style is preferred?",
+      "expected": ["prefers concrete shell commands"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Command preference", "content": "The user prefers concrete shell commands with exact working directories.", "channel": "bench:tools", "store": "procedural", "category": "rule", "tags": ["preference", "workflow"] },
+        { "id": "distractor", "title": "Tool inventory", "content": "The workspace includes Node, npm, and Convex tooling.", "channel": "bench:tools", "store": "semantic", "category": "fact", "tags": ["workflow"] }
+      ]
+    },
+    {
+      "id": "preference-003",
+      "track": "preference_recall",
+      "channel": "bench:design",
+      "query": "What UI radius should dashboard controls use?",
+      "expected": ["dashboard controls use border radius zero"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Dashboard radius rule", "content": "Memory Crystal dashboard controls use border radius zero everywhere.", "channel": "bench:design", "store": "procedural", "category": "rule", "tags": ["design"] },
+        { "id": "distractor", "title": "Dashboard accent", "content": "Dashboard accent color is Memory Crystal blue.", "channel": "bench:design", "store": "semantic", "category": "fact", "tags": ["design"] }
+      ]
+    },
+    {
+      "id": "preference-004",
+      "track": "preference_recall",
+      "channel": "bench:planning",
+      "query": "What planning style is preferred?",
+      "expected": ["prefers implementation plans with verification commands"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Planning preference", "content": "The user prefers implementation plans with verification commands and clear risks.", "channel": "bench:planning", "store": "procedural", "category": "workflow", "tags": ["preference"] },
+        { "id": "distractor", "title": "Planning folder", "content": "Plans are stored under the .omx plans directory.", "channel": "bench:planning", "store": "semantic", "category": "fact", "tags": ["workflow"] }
+      ]
+    },
+    {
+      "id": "contradiction-001",
+      "track": "contradiction",
+      "channel": "bench:profile",
+      "query": "What is the current office location?",
+      "expected": ["current office location is Denver"],
+      "forbidden": ["Boulder"],
+      "expectedMemoryIds": ["new"],
+      "forbiddenMemoryIds": ["old"],
+      "memories": [
+        { "id": "old", "title": "Old office location", "content": "Old office location was Boulder.", "channel": "bench:profile", "store": "semantic", "category": "fact", "tags": ["profile"], "archived": true, "createdAtOffsetDays": 30 },
+        { "id": "new", "title": "Current office location", "content": "The current office location is Denver.", "channel": "bench:profile", "store": "semantic", "category": "fact", "tags": ["profile"], "createdAtOffsetDays": 1 }
+      ]
+    },
+    {
+      "id": "contradiction-002",
+      "track": "contradiction",
+      "channel": "bench:travel",
+      "query": "What is the current hotel preference?",
+      "expected": ["current hotel preference is airport hotels"],
+      "forbidden": ["downtown hotels"],
+      "expectedMemoryIds": ["new"],
+      "forbiddenMemoryIds": ["old"],
+      "memories": [
+        { "id": "old", "title": "Old hotel preference", "content": "The user previously preferred downtown hotels.", "channel": "bench:travel", "store": "procedural", "category": "rule", "tags": ["travel"], "archived": true, "createdAtOffsetDays": 60 },
+        { "id": "new", "title": "Current hotel preference", "content": "The current hotel preference is airport hotels for early flights.", "channel": "bench:travel", "store": "procedural", "category": "rule", "tags": ["travel"], "createdAtOffsetDays": 1 }
+      ]
+    },
+    {
+      "id": "contradiction-003",
+      "track": "contradiction",
+      "channel": "bench:team",
+      "query": "Who is the current analytics owner?",
+      "expected": ["current analytics owner is Priya"],
+      "forbidden": ["Marco"],
+      "expectedMemoryIds": ["new"],
+      "forbiddenMemoryIds": ["old"],
+      "memories": [
+        { "id": "old", "title": "Old analytics owner", "content": "Marco was the analytics owner last quarter.", "channel": "bench:team", "store": "semantic", "category": "person", "tags": ["team"], "archived": true, "createdAtOffsetDays": 45 },
+        { "id": "new", "title": "Current analytics owner", "content": "The current analytics owner is Priya.", "channel": "bench:team", "store": "semantic", "category": "person", "tags": ["team"], "createdAtOffsetDays": 1 }
+      ]
+    },
+    {
+      "id": "contradiction-004",
+      "track": "contradiction",
+      "channel": "bench:release",
+      "query": "What is the current release branch?",
+      "expected": ["current release branch is stable"],
+      "forbidden": ["beta"],
+      "expectedMemoryIds": ["new"],
+      "forbiddenMemoryIds": ["old"],
+      "memories": [
+        { "id": "old", "title": "Old release branch", "content": "The old release branch was beta.", "channel": "bench:release", "store": "semantic", "category": "fact", "tags": ["release"], "archived": true, "createdAtOffsetDays": 14 },
+        { "id": "new", "title": "Current release branch", "content": "The current release branch is stable.", "channel": "bench:release", "store": "semantic", "category": "fact", "tags": ["release"], "createdAtOffsetDays": 1 }
+      ]
+    },
+    {
+      "id": "contradiction-005",
+      "track": "contradiction",
+      "channel": "bench:calendar",
+      "query": "What is the current demo day?",
+      "expected": ["current demo day is Thursday"],
+      "forbidden": ["Tuesday"],
+      "expectedMemoryIds": ["new"],
+      "forbiddenMemoryIds": ["old"],
+      "memories": [
+        { "id": "old", "title": "Old demo day", "content": "The demo day used to be Tuesday.", "channel": "bench:calendar", "store": "semantic", "category": "event", "tags": ["calendar"], "archived": true, "createdAtOffsetDays": 9 },
+        { "id": "new", "title": "Current demo day", "content": "The current demo day is Thursday.", "channel": "bench:calendar", "store": "semantic", "category": "event", "tags": ["calendar"], "createdAtOffsetDays": 1 }
+      ]
+    },
+    {
+      "id": "locomo-001",
+      "track": "locomo_style",
+      "channel": "bench:conversation-a",
+      "query": "What did Elena ask us to align with?",
+      "expected": ["Elena asked us to align launch with the Q3 roadmap"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Launch alignment conversation", "content": "Elena asked us to align launch with the Q3 roadmap during the planning conversation.", "channel": "bench:conversation-a", "store": "episodic", "category": "conversation", "tags": ["locomo", "launch"] },
+        { "id": "distractor", "title": "Deployment conversation", "content": "DevOps asked for deployment pipeline follow-up before Friday.", "channel": "bench:conversation-a", "store": "episodic", "category": "conversation", "tags": ["locomo"] }
+      ]
+    },
+    {
+      "id": "locomo-002",
+      "track": "locomo_style",
+      "channel": "bench:conversation-b",
+      "query": "Which restaurant did Sam reject and why?",
+      "expected": ["Sam rejected North Pier because it was too loud"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Dinner planning conversation", "content": "Sam rejected North Pier because it was too loud for the client dinner.", "channel": "bench:conversation-b", "store": "episodic", "category": "conversation", "tags": ["locomo", "dinner"] },
+        { "id": "distractor", "title": "Dinner budget", "content": "The client dinner budget was capped at ninety dollars per person.", "channel": "bench:conversation-b", "store": "semantic", "category": "fact", "tags": ["dinner"] }
+      ]
+    },
+    {
+      "id": "locomo-003",
+      "track": "locomo_style",
+      "channel": "bench:conversation-c",
+      "query": "What did we promise after the security review?",
+      "expected": ["send the key rotation checklist"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Security review follow-up", "content": "After the security review we promised to send the key rotation checklist.", "channel": "bench:conversation-c", "store": "episodic", "category": "decision", "tags": ["locomo", "security"] },
+        { "id": "distractor", "title": "Security schedule", "content": "Security review meetings happen on Wednesdays.", "channel": "bench:conversation-c", "store": "semantic", "category": "event", "tags": ["security"] }
+      ]
+    },
+    {
+      "id": "locomo-004",
+      "track": "locomo_style",
+      "channel": "bench:conversation-d",
+      "query": "What color did Mira choose for the prototype?",
+      "expected": ["Mira chose graphite green"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Prototype color choice", "content": "Mira chose graphite green for the prototype shell.", "channel": "bench:conversation-d", "store": "episodic", "category": "decision", "tags": ["locomo", "prototype"] },
+        { "id": "distractor", "title": "Prototype material", "content": "The prototype shell uses recycled aluminum.", "channel": "bench:conversation-d", "store": "semantic", "category": "fact", "tags": ["prototype"] }
+      ]
+    },
+    {
+      "id": "scope-001",
+      "track": "scope_privacy",
+      "channel": "coach:andy",
+      "query": "What is Andy's goal?",
+      "expected": ["Andy's goal is inbox zero"],
+      "forbidden": ["Kristen's goal is payroll cleanup"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Andy goal", "content": "Andy's goal is inbox zero by Friday.", "channel": "coach:andy", "store": "semantic", "category": "goal", "tags": ["scope"] },
+        { "id": "forbidden", "title": "Kristen goal", "content": "Kristen's goal is payroll cleanup by Monday.", "channel": "coach:kristen", "store": "semantic", "category": "goal", "tags": ["scope"] }
+      ]
+    },
+    {
+      "id": "scope-002",
+      "track": "scope_privacy",
+      "channel": "coach:kristen",
+      "query": "What is Kristen's goal?",
+      "expected": ["Kristen's goal is payroll cleanup"],
+      "forbidden": ["Andy's goal is inbox zero"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Kristen goal", "content": "Kristen's goal is payroll cleanup by Monday.", "channel": "coach:kristen", "store": "semantic", "category": "goal", "tags": ["scope"] },
+        { "id": "forbidden", "title": "Andy goal", "content": "Andy's goal is inbox zero by Friday.", "channel": "coach:andy", "store": "semantic", "category": "goal", "tags": ["scope"] }
+      ]
+    },
+    {
+      "id": "scope-003",
+      "track": "scope_privacy",
+      "channel": "client:apollo",
+      "query": "What is Apollo's renewal risk?",
+      "expected": ["Apollo renewal risk is support backlog"],
+      "forbidden": ["Zephyr renewal risk is budget freeze"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Apollo renewal risk", "content": "Apollo renewal risk is support backlog.", "channel": "client:apollo", "store": "semantic", "category": "fact", "tags": ["scope", "client"] },
+        { "id": "forbidden", "title": "Zephyr renewal risk", "content": "Zephyr renewal risk is budget freeze.", "channel": "client:zephyr", "store": "semantic", "category": "fact", "tags": ["scope", "client"] }
+      ]
+    },
+    {
+      "id": "scope-004",
+      "track": "scope_privacy",
+      "channel": "client:zephyr",
+      "query": "What is Zephyr's renewal risk?",
+      "expected": ["Zephyr renewal risk is budget freeze"],
+      "forbidden": ["Apollo renewal risk is support backlog"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Zephyr renewal risk", "content": "Zephyr renewal risk is budget freeze.", "channel": "client:zephyr", "store": "semantic", "category": "fact", "tags": ["scope", "client"] },
+        { "id": "forbidden", "title": "Apollo renewal risk", "content": "Apollo renewal risk is support backlog.", "channel": "client:apollo", "store": "semantic", "category": "fact", "tags": ["scope", "client"] }
+      ]
+    },
+    {
+      "id": "scope-005",
+      "track": "scope_privacy",
+      "channel": "legal:matter-a",
+      "query": "What is matter A's filing deadline?",
+      "expected": ["Matter A filing deadline is June 3"],
+      "forbidden": ["Matter B filing deadline is July 9"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Matter A filing", "content": "Matter A filing deadline is June 3.", "channel": "legal:matter-a", "store": "semantic", "category": "event", "tags": ["scope", "legal"] },
+        { "id": "forbidden", "title": "Matter B filing", "content": "Matter B filing deadline is July 9.", "channel": "legal:matter-b", "store": "semantic", "category": "event", "tags": ["scope", "legal"] }
+      ]
+    },
+    {
+      "id": "scope-006",
+      "track": "scope_privacy",
+      "channel": "legal:matter-b",
+      "query": "What is matter B's filing deadline?",
+      "expected": ["Matter B filing deadline is July 9"],
+      "forbidden": ["Matter A filing deadline is June 3"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Matter B filing", "content": "Matter B filing deadline is July 9.", "channel": "legal:matter-b", "store": "semantic", "category": "event", "tags": ["scope", "legal"] },
+        { "id": "forbidden", "title": "Matter A filing", "content": "Matter A filing deadline is June 3.", "channel": "legal:matter-a", "store": "semantic", "category": "event", "tags": ["scope", "legal"] }
+      ]
+    },
+    {
+      "id": "scope-007",
+      "track": "scope_privacy",
+      "channel": "agent:writer",
+      "query": "What is the writer agent instruction?",
+      "expected": ["Writer agent instruction is draft release notes"],
+      "forbidden": ["Finance agent instruction is reconcile invoices"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Writer instruction", "content": "Writer agent instruction is draft release notes.", "channel": "agent:writer", "store": "procedural", "category": "workflow", "tags": ["scope", "agent"] },
+        { "id": "forbidden", "title": "Finance instruction", "content": "Finance agent instruction is reconcile invoices.", "channel": "agent:finance", "store": "procedural", "category": "workflow", "tags": ["scope", "agent"] }
+      ]
+    },
+    {
+      "id": "scope-008",
+      "track": "scope_privacy",
+      "channel": "agent:finance",
+      "query": "What is the finance agent instruction?",
+      "expected": ["Finance agent instruction is reconcile invoices"],
+      "forbidden": ["Writer agent instruction is draft release notes"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "Finance instruction", "content": "Finance agent instruction is reconcile invoices.", "channel": "agent:finance", "store": "procedural", "category": "workflow", "tags": ["scope", "agent"] },
+        { "id": "forbidden", "title": "Writer instruction", "content": "Writer agent instruction is draft release notes.", "channel": "agent:writer", "store": "procedural", "category": "workflow", "tags": ["scope", "agent"] }
+      ]
+    },
+    {
+      "id": "scope-009",
+      "track": "scope_privacy",
+      "channel": "tenant:north",
+      "query": "What is North tenant's secret?",
+      "expected": ["North tenant secret is blue lantern"],
+      "forbidden": ["South tenant secret is red compass"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "North tenant secret", "content": "North tenant secret is blue lantern.", "channel": "tenant:north", "store": "semantic", "category": "fact", "tags": ["scope", "tenant"] },
+        { "id": "forbidden", "title": "South tenant secret", "content": "South tenant secret is red compass.", "channel": "tenant:south", "store": "semantic", "category": "fact", "tags": ["scope", "tenant"] }
+      ]
+    },
+    {
+      "id": "scope-010",
+      "track": "scope_privacy",
+      "channel": "tenant:south",
+      "query": "What is South tenant's secret?",
+      "expected": ["South tenant secret is red compass"],
+      "forbidden": ["North tenant secret is blue lantern"],
+      "expectedMemoryIds": ["target"],
+      "forbiddenMemoryIds": ["forbidden"],
+      "memories": [
+        { "id": "target", "title": "South tenant secret", "content": "South tenant secret is red compass.", "channel": "tenant:south", "store": "semantic", "category": "fact", "tags": ["scope", "tenant"] },
+        { "id": "forbidden", "title": "North tenant secret", "content": "North tenant secret is blue lantern.", "channel": "tenant:north", "store": "semantic", "category": "fact", "tags": ["scope", "tenant"] }
+      ]
+    },
+    {
+      "id": "latency-001",
+      "track": "latency_cost",
+      "channel": "bench:scale",
+      "query": "What is the scale marker alpha?",
+      "expected": ["scale marker alpha is prism-101"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Scale marker alpha", "content": "The scale marker alpha is prism-101.", "channel": "bench:scale", "store": "semantic", "category": "fact", "tags": ["scale"] },
+        { "id": "distractor", "title": "Scale marker beta", "content": "The scale marker beta is prism-202.", "channel": "bench:scale", "store": "semantic", "category": "fact", "tags": ["scale"] }
+      ]
+    },
+    {
+      "id": "latency-002",
+      "track": "latency_cost",
+      "channel": "bench:scale",
+      "query": "What is the scale marker gamma?",
+      "expected": ["scale marker gamma is prism-303"],
+      "expectedMemoryIds": ["target"],
+      "memories": [
+        { "id": "target", "title": "Scale marker gamma", "content": "The scale marker gamma is prism-303.", "channel": "bench:scale", "store": "semantic", "category": "fact", "tags": ["scale"] },
+        { "id": "distractor", "title": "Scale marker delta", "content": "The scale marker delta is prism-404.", "channel": "bench:scale", "store": "semantic", "category": "fact", "tags": ["scale"] }
+      ]
+    }
+  ]
+}
