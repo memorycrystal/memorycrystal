@@ -1,0 +1,58 @@
+---
+title: Context Engine
+description: How Memory Crystal chooses which context to surface before a response or through the tool/API layer.
+---
+
+
+The Context Engine is the picker.
+It looks at everything Memory Crystal knows and decides which pieces are most useful right now.
+
+## What this means in practice
+
+Memory Crystal does not just dump all memory back into context.
+It uses ranking, filtering, and scope rules so the assistant sees the most relevant information first.
+
+That means the Context Engine cares about things like:
+
+- recency
+- similarity to the current question
+- memory strength
+- access history
+- graph connections
+- visibility or channel scope
+
+## How it actually works
+
+The strongest public-facing grounding for this concept is in:
+
+- `README.md`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`
+
+These files together show how Memory Crystal blends recall logic, ranking, message search, and tool/API surfaces.
+
+## Commands / examples
+
+Useful adjacent docs:
+
+- [Memory Layers](/concepts/memory-layers)
+- [Search & Scope](/tools/search)
+- [Recall tools](/tools/recall)
+
+## Common mistakes
+
+- assuming vector search alone is the whole context system
+- assuming every relevant memory should always be injected
+- overlooking channel or scope isolation rules
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`

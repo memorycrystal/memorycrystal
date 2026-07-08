@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "system": "Memory Crystal",
+  "status": "blocked_credentials",
+  "boundary": "http_recall",
+  "run_id": "mc-http_recall-20260525T132135Z",
+  "run_at": "2026-05-25T13:21:35.704Z",
+  "stage": "hosted_setup",
+  "reason_code": "missing_api_url",
+  "reason": "Boundary http_recall requires --api-url and MEMORY_CRYSTAL_API_KEY in the environment.",
+  "retryable": true,
+  "source_artifact": "benchmarks/memory/fixtures.json",
+  "redacted_environment": {
+    "api_url": null,
+    "api_key_env": "MEMORY_CRYSTAL_API_KEY",
+    "api_key_present": true,
+    "external_network": false,
+    "spend_policy": "cheap_v1_no_paid_large_runs"
+  },
+  "caveats": [
+    "This artifact records why the hosted benchmark was not run.",
+    "It is not a benchmark score."
+  ]
+}

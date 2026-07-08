@@ -1,0 +1,43 @@
+name: Update Docs on Release
+
+on:
+  push:
+    branches:
+      - stable
+    paths:
+      - 'CHANGELOG.md'
+      - 'apps/docs/**'
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if CHANGELOG.md changed
+        id: changelog_changed
+        run: |
+          if git diff HEAD~1 HEAD --name-only | grep -q "^CHANGELOG.md$"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync changelog.mdx from CHANGELOG.md
+        if: steps.changelog_changed.outputs.changed == 'true'
+        run: node scripts/sync-changelog-docs.mjs
+
+      - name: Commit updated docs
+        if: steps.changelog_changed.outputs.changed == 'true'
+        run: |
+          git config user.name "gerald-bot"
+          git config user.email "gerald@illumin8.ca"
+          git add apps/docs/changelog.mdx
+          git diff --cached --quiet || git commit -m "docs: sync changelog.mdx from CHANGELOG.md [skip ci]"
+          git push origin stable

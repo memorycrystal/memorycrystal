@@ -1,0 +1,57 @@
+---
+title: Stale sensory cleanup
+description: Safely audit and remove stale OpenClaw sensory residue that should not participate in recall.
+---
+
+Stale sensory cleanup is an admin maintenance path for old OpenClaw auto-capture rows that were intentionally skipped by graph enrichment and are no longer useful recall input.
+
+## What it targets
+
+The cleanup action is deliberately narrow. A memory must be:
+
+- active, not archived
+- `store: "sensory"`
+- `source: "external"`
+- `enrichmentSkippedReason: "sensory_skip"`
+- tagged with both `openclaw` and `auto-capture`
+- not linked to a knowledge base
+- not protected by sensory retention policy
+- older than the configured age threshold
+- at or below the configured access-count threshold
+
+That filter keeps curated memories, KB chunks, protected sensory captures, and non-OpenClaw data out of the cleanup path.
+
+## How to run it
+
+Use dry-run first:
+
+```bash
+npx convex run --prod --identity '<admin-identity-json>' \
+  crystal/sensoryPurge:purgeStaleOpenClawSensoryResidue \
+  '{"userId":"<target-user-id>","dryRun":true,"minAgeDays":30,"maxAccessCount":100,"maxMemories":1000}'
+```
+
+Then apply the same arguments with `dryRun: false`:
+
+```bash
+npx convex run --prod --identity '<admin-identity-json>' \
+  crystal/sensoryPurge:purgeStaleOpenClawSensoryResidue \
+  '{"userId":"<target-user-id>","dryRun":false,"minAgeDays":30,"maxAccessCount":100,"maxMemories":1000}'
+```
+
+The action returns `matched`, `deleted`, `scanned`, `done`, and sample metadata. It also writes an audit log and adjusts dashboard graph totals.
+
+## Verify
+
+After cleanup:
+
+- rerun the dry-run and confirm `matched: 0`
+- check graph status and confirm actionable enrichment is not held down by `sensory_skip`
+- rerun the recall-quality smoke that exposed the issue
+- keep `kb_chunk` skips separate; KB child chunks normally skip graph enrichment because the parent chunk carries graph context
+
+## Source of truth
+
+- `convex/crystal/sensoryPurge.ts`
+- `convex/crystal/sensoryPolicy.ts`
+- `convex/crystal/dashboardTotals.ts`
