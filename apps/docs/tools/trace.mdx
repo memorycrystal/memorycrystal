@@ -1,0 +1,117 @@
+---
+title: crystal_trace
+description: Trace a memory back to its source conversation.
+---
+
+## What it does
+
+Retrieves the original conversation snapshot that created a specific memory. Use this to verify a memory's provenance, understand its context, or see exactly what was discussed when the memory was extracted. Returns the full conversation turn(s) that led to the memory capture.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| memoryId | string | Yes | — | The ID of the memory to trace back to its source. Must be non-empty. |
+
+## Returns
+
+```json
+{
+  "memoryId": "string",
+  "sourceConversation": {
+    "turns": [
+      {
+        "role": "user|assistant",
+        "content": "string",
+        "timestamp": 1234567890000
+      }
+    ],
+    "sessionId": "string",
+    "extractedAt": 1234567890000,
+    "extractionModel": "gpt-4o-mini"
+  },
+  "memory": {
+    "title": "string",
+    "content": "string",
+    "store": "sensory|episodic|semantic|procedural|prospective",
+    "category": "decision|lesson|person|rule|event|fact|goal|workflow|conversation"
+  }
+}
+```
+
+**Field descriptions:**
+- `sourceConversation.turns` — Array of conversation messages that led to this memory
+- `extractedAt` — Timestamp when the memory was extracted
+- `extractionModel` — Which model performed the extraction (usually gpt-4o-mini)
+- `memory` — The extracted memory metadata including store and category
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Trace a memory back to the conversation that created it
+crystal_trace({ memoryId: "mem_abc123def456" })
+
+// Result:
+// {
+//   "memoryId": "mem_abc123def456",
+//   "sourceConversation": {
+//     "turns": [
+//       {
+//         "role": "user",
+//         "content": "We decided to switch to Convex because Supabase had auth issues",
+//         "timestamp": 1713283200000
+//       },
+//       {
+//         "role": "assistant",
+//         "content": "Good call. Convex handles retries automatically.",
+//         "timestamp": 1713283210000
+//       }
+//     ],
+//     "sessionId": "session_xyz789",
+//     "extractedAt": 1713283220000,
+//     "extractionModel": "gpt-4o-mini"
+//   },
+//   "memory": {
+//     "title": "Chose Convex over Supabase for auth reliability",
+//     "content": "...",
+//     "store": "semantic",
+//     "category": "decision"
+//   }
+// }
+```
+
+### Advanced usage
+
+```javascript
+// Trace multiple memories to build a timeline of decisions
+const memoryIds = ["mem_1", "mem_2", "mem_3"];
+for (const id of memoryIds) {
+  const trace = await crystal_trace({ memoryId: id });
+  console.log(`${trace.memory.title} — extracted at ${new Date(trace.extractedAt)}`);
+}
+```
+
+## When to use this vs alternatives
+
+- **`crystal_trace`** — When you need to see the original conversation context for a specific memory
+- **`crystal_recent`** — When you want recent conversation messages without linking to a specific memory
+- **`crystal_what_do_i_know`** — When you want a broad topic summary across all related memories
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| "Invalid arguments" | memoryId not provided or null | Ensure memoryId is a non-empty string |
+| "memoryId is required" | memoryId is empty or not a string | Provide a valid memory ID from crystal_recall or crystal_what_do_i_know |
+| Memory not found | memoryId does not exist or was deleted | Verify the ID is correct; recall memories to find valid IDs |
+| API connection error | Convex endpoint unavailable | Retry; check `CONVEX_URL` environment variable |
+
+## Notes
+
+- The conversation snapshot is frozen at the time of extraction — it reflects what the extraction model saw, not necessarily all context
+- Some memories may have been extracted from partial conversations if the turn limit was hit
+- Tracing a memory does not modify it
+- If a memory was updated or edited after extraction, the trace still shows the original source
+- Use this before acting on a memory to verify it's not outdated or taken out of context

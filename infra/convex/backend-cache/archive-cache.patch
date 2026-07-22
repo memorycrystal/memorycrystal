@@ -1,0 +1,33 @@
+diff --git a/crates/search/src/searcher/in_process.rs b/crates/search/src/searcher/in_process.rs
+index 7ae059b23..26cea7172 100644
+--- a/crates/search/src/searcher/in_process.rs
++++ b/crates/search/src/searcher/in_process.rs
+@@ -141,10 +141,27 @@ pub struct InProcessSearcher<RT: Runtime> {
+ impl<RT: Runtime> InProcessSearcher<RT> {
+     pub fn new(runtime: RT) -> anyhow::Result<Self> {
+         let tmpdir = TempDir::new()?;
++        let archive_cache_mib = match std::env::var("CONVEX_SEARCH_ARCHIVE_CACHE_MIB") {
++            Ok(raw) => raw.parse::<u64>().map_err(|error| {
++                anyhow::anyhow!(
++                    "CONVEX_SEARCH_ARCHIVE_CACHE_MIB must be an integer number of MiB: {error}"
++                )
++            })?,
++            Err(std::env::VarError::NotPresent) => 500,
++            Err(error) => {
++                return Err(anyhow::anyhow!(
++                    "Unable to read CONVEX_SEARCH_ARCHIVE_CACHE_MIB: {error}"
++                ));
++            },
++        };
++        anyhow::ensure!(
++            (500..=65_536).contains(&archive_cache_mib),
++            "CONVEX_SEARCH_ARCHIVE_CACHE_MIB must be between 500 and 65536 MiB"
++        );
+         Ok(Self {
+             searcher: Arc::new(SearcherImpl::new(
+                 tmpdir.path(),
+-                bytesize::mib(500u64),
++                bytesize::mib(archive_cache_mib),
+                 100,
+                 false,
+                 runtime,

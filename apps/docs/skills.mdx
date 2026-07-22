@@ -1,0 +1,32 @@
+---
+title: "Skill Suite"
+description: "Five cross-CLI skills the installer ships alongside the MCP config — workflow discipline on top of memory capability."
+---
+
+The universal installer ships a small skill suite next to the MCP configuration
+for every host with a skill/command surface: Claude Code (`~/.claude/skills/`),
+Codex CLI and Codex Desktop (`~/.codex/skills/`, the open agent-skills
+standard), and OpenCode (`~/.config/opencode/commands/`). Hosts without a
+surface are skipped automatically. Opt out with `--no-skills` (PowerShell:
+`-NoSkills`).
+
+| Skill | What it does |
+|---|---|
+| `crystal-brief` | Session bootstrap: verifies the MCP server responds, loads context, then applies the mandatory memory discipline (identical, by lockstep test, to the homepage agent prompt). |
+| `crystal-kb` | Knowledge-base workflows: import with mandatory `dedupeKey` (one key = one chunk), enumerate, edit, empty-in-place, agent access, and reading per-agent priorities. |
+| `crystal-architect` | Documents a codebase into a re-runnable `Architecture: <repo>` knowledge base with deterministic `arch:*` dedupeKeys — refreshes in place, never duplicates. |
+| `crystal-hygiene` | Conversational-memory cleanup under the freshness policy: every fact is timeless, dated, or a pointer; contradictions resolve via `crystal_supersede`, never silent deletion. |
+| `crystal-checkpoint` | Milestone ritual: checkpoint + a durable summary memory, verified. |
+
+Skills only ever call Memory Crystal's MCP tools — they never edit agent
+config files. If the tools are missing, every skill stops and points you at
+the installer.
+
+## Current endpoints
+
+The canonical API base is `https://convex.memorycrystal.ai` (MCP:
+`https://api.memorycrystal.ai/mcp`). Legacy Convex-generated hosts —
+`rightful-mockingbird-389.convex.cloud`/`.convex.site` and earlier — were
+decommissioned on 2026-07-14 and return errors for every request. The
+installer migrates configs it manages automatically; if an agent reports
+500s from a legacy host, re-run the installer.

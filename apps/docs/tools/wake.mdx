@@ -1,0 +1,106 @@
+---
+title: crystal_wake
+description: Get an opening briefing for the current memory session.
+---
+
+## What it does
+
+Generates an opening briefing for the current session by scanning active goals and recent decisions from Memory Crystal. Use this at the start of a session to establish context before proceeding with substantive work.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| channel | string | No | — | Optional channel identifier to scope the briefing (e.g., "claude-code", "telegram") |
+
+## Returns
+
+```json
+{
+  "briefing": "string",
+  "openGoals": [
+    {
+      "title": "string",
+      "memoryId": "string"
+    }
+  ],
+  "recentDecisions": [
+    {
+      "title": "string",
+      "memoryId": "string"
+    }
+  ]
+}
+```
+
+**Field descriptions:**
+- `briefing` — Human-readable overview of session context and active priorities
+- `openGoals` — Array of goal memories marked as active/pending
+- `recentDecisions` — Array of recent decision memories (typically from last 7 days)
+- Each memory includes `title` and `memoryId` for reference/drill-down
+
+The text output also includes a formatted block showing:
+- The briefing text
+- Open goals (bulleted list, or "none" if empty)
+- Recent decisions (bulleted list, or "none" if empty)
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Get default session briefing
+crystal_wake()
+
+// Text output:
+// Briefing: You are working on the Memory Crystal MCP server...
+//
+// Open goals
+// - Implement KB filtering for multi-tenant isolation
+// - Add vector search optimizations
+//
+// Recent decisions
+// - Chose Convex mutations over HTTP actions for memory writes
+// - Switched from single embedding to cached batch processing
+```
+
+### Advanced usage
+
+```javascript
+// Get channel-scoped briefing
+crystal_wake({
+  channel: "claude-code"
+})
+
+// Get briefing for a specific project context
+crystal_wake({
+  channel: "telegram-coaching"
+})
+
+// Result includes goals/decisions specific to that channel
+```
+
+## When to use this vs alternatives
+
+- **`crystal_wake`** — At session start to establish context; summarizes goals and recent decisions
+- **`crystal_recall`** — When you need semantically relevant memories on a specific topic
+- **`crystal_what_do_i_know`** — When you want a broad topic scan without fixed recency/category filters
+- **`crystal_recent`** — When you need recent message history, not memory summaries
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| channel is not a string | Malformed channel input | Provide a string or omit the parameter |
+| Embedding service unavailable | OpenAI or vector database offline | Retry; check network and OPENAI_API_KEY |
+| No goals or decisions found | New session with no prior context | Not an error — returns empty arrays. Proceed with user's request. |
+| Authentication failed | Invalid Convex JWT or API key | Verify auth configuration in Convex client setup |
+
+## Notes
+
+- The briefing is generated fresh on each call, not cached.
+- Open goals are memories with category=`goal` and status=`active`. Recent decisions are category=`decision` within the last 7 days.
+- Channel filtering is optional; if omitted, returns cross-channel goals and decisions.
+- The formatted briefing output includes a defense header to prevent accidental instruction injection.
+- If no goals or decisions exist, the tool returns empty arrays but does not error.
+- The briefing is designed to be read by an AI before substantial work begins; it primes context without forcing action.
