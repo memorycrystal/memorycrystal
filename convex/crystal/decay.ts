@@ -1,0 +1,364 @@
+import { stableUserId } from "./auth";
+import { v } from "convex/values";
+import { action, internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { TIER_LIMITS } from "../../shared/tierLimits";
+import {
+  applyDashboardTotalsDelta,
+  buildMemoryTransitionDelta,
+  buildStrengthDelta,
+} from "./dashboardTotals";
+import { STRENGTH_FLOOR } from "./organic/enrichmentEligibility";
+import { archiveMemoryAndSyncCleanupProjection } from "./cleanupProjection";
+// The gradual-decay model moved to decayModel.ts and is now wired into
+// reinforcement-on-recall (memories.ts:updateMemoryAccessInternal) — it is no
+// longer dead code. Re-exported here for back-compat. NOTE: applyDecay below is
+// capacity-pressure archival, a separate mechanism, and is intentionally left
+// as-is (ILL-103 does not rebuild decay).
+import { computeDecay } from "./decayModel";
+export { computeDecay };
+
+/**
+ * M5 — If a decay-driven strength change crosses back above STRENGTH_FLOOR
+ * on a memory previously skipped with "below_strength_floor", clear the skip
+ * metadata so the next backfill cron picks it up. Mutates the patch in place.
+ */
+function maybeClearStrengthFloorSkip(
+  patch: Record<string, unknown>,
+  existing: { enrichmentSkippedReason?: string },
+  newStrength: number,
+) {
+  if (
+    existing.enrichmentSkippedReason === "below_strength_floor" &&
+    newStrength >= STRENGTH_FLOOR
+  ) {
+    patch.enrichmentSkippedReason = undefined;
+    patch.enrichmentAttempts = 0;
+  }
+}
+
+// null in TIER_LIMITS means "unlimited" — decay still needs a concrete ceiling
+// so pressure-based archival can function. 999_999 is the effective "no-limit" cap.
+const UNLIMITED_CAP = 999_999;
+
+const TIER_MEMORY_LIMITS: Record<string, number> = {
+  free: TIER_LIMITS.free.memories ?? UNLIMITED_CAP,
+  starter: TIER_LIMITS.starter.memories ?? UNLIMITED_CAP,
+  pro: TIER_LIMITS.pro.memories ?? UNLIMITED_CAP,
+  ultra: TIER_LIMITS.ultra.memories ?? UNLIMITED_CAP,
+  unlimited: TIER_LIMITS.unlimited.memories ?? UNLIMITED_CAP,
+};
+
+export const getMemoriesForDecay = internalQuery({
+  args: { userId: v.string(), limit: v.number() },
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(Math.trunc(args.limit), 1), 500);
+    // Fetch the oldest-accessed rows first. The previous `by_user` index returned
+    // rows in insertion order, so users with thousands of healthy memories never
+    // had their real decay tail reached — decay silently became a no-op at scale.
+    return ctx.db
+      .query("crystalMemories")
+      .withIndex("by_user_archived_last_accessed", (q) =>
+        q.eq("userId", args.userId).eq("archived", false)
+      )
+      .order("asc")
+      .take(limit);
+  },
+});
+
+export const applyDecayPatch = internalMutation({
+  args: {
+    memoryId: v.id("crystalMemories"),
+    strength: v.float64(),
+    archived: v.boolean(),
+    archivedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.memoryId);
+    if (!existing) throw new Error("Memory not found");
+
+    const patch: Record<string, unknown> = { strength: args.strength };
+    const willArchive = Boolean(args.archived);
+    const willUnarchive = !args.archived && existing.archived;
+
+    if (args.archived) {
+      patch.archived = true;
+      patch.archivedAt = args.archivedAt ?? Date.now();
+    }
+
+    // M5 — clear "below_strength_floor" skip when strength crosses back up.
+    maybeClearStrengthFloorSkip(patch, existing, args.strength);
+    const clearsStrengthFloorSkip = Object.prototype.hasOwnProperty.call(patch, "enrichmentSkippedReason");
+
+    if (willArchive || willUnarchive) {
+      await applyDashboardTotalsDelta(
+        ctx,
+        existing.userId,
+        buildMemoryTransitionDelta({
+          oldArchived: existing.archived,
+          oldStore: existing.store,
+          oldGraphEnriched: existing.graphEnriched === true,
+          oldEnrichmentSkippedReason: existing.enrichmentSkippedReason,
+          oldAccessCount: existing.accessCount,
+          newArchived: willArchive,
+          newStore: existing.store,
+          newGraphEnriched: existing.graphEnriched === true,
+          newEnrichmentSkippedReason: clearsStrengthFloorSkip ? undefined : existing.enrichmentSkippedReason,
+          newAccessCount: existing.accessCount,
+        })
+      );
+    }
+    if (!willArchive && !willUnarchive && clearsStrengthFloorSkip && existing.enrichmentSkippedReason && existing.graphEnriched !== true) {
+      await applyDashboardTotalsDelta(ctx, existing.userId, {
+        graphEligiblePendingMemoriesDelta: 1,
+        graphSkippedMemoriesDelta: -1,
+      });
+    }
+
+    // M7 — track totalStrength delta for the dashboard aggregate.
+    if (args.strength !== existing.strength) {
+      await applyDashboardTotalsDelta(
+        ctx,
+        existing.userId,
+        buildStrengthDelta(existing.strength, args.strength),
+      );
+    }
+
+    if (willArchive) {
+      await archiveMemoryAndSyncCleanupProjection(
+        ctx,
+        existing,
+        patch.archivedAt as number,
+        patch,
+      );
+    } else {
+      await ctx.db.patch(args.memoryId, patch);
+    }
+  },
+});
+
+// Public query still available for single-user contexts (authenticated)
+export const getMemoriesForDecayAuth = query({
+  args: { limit: v.number() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    return ctx.db
+      .query("crystalMemories")
+      .withIndex("by_user", (q) => q.eq("userId", stableUserId(identity.subject)).eq("archived", false))
+      .take(args.limit);
+  },
+});
+
+// Public patch for single-user authenticated contexts
+export const applyDecayPatchAuth = mutation({
+  args: {
+    memoryId: v.id("crystalMemories"),
+    strength: v.float64(),
+    archived: v.boolean(),
+    archivedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    const memory = await ctx.db.get(args.memoryId);
+    if (!memory || memory.userId !== stableUserId(identity.subject)) return;
+
+    const patch: Record<string, unknown> = { strength: args.strength };
+    const willArchive = Boolean(args.archived);
+    const willUnarchive = !args.archived && memory.archived;
+
+    if (args.archived) {
+      patch.archived = true;
+      patch.archivedAt = args.archivedAt ?? Date.now();
+    }
+
+    // M5 — clear "below_strength_floor" skip when strength crosses back up.
+    maybeClearStrengthFloorSkip(patch, memory, args.strength);
+    const clearsStrengthFloorSkip = Object.prototype.hasOwnProperty.call(patch, "enrichmentSkippedReason");
+
+    if (willArchive || willUnarchive) {
+      await applyDashboardTotalsDelta(
+        ctx,
+        memory.userId,
+        buildMemoryTransitionDelta({
+          oldArchived: memory.archived,
+          oldStore: memory.store,
+          oldGraphEnriched: memory.graphEnriched === true,
+          oldEnrichmentSkippedReason: memory.enrichmentSkippedReason,
+          oldAccessCount: memory.accessCount,
+          newArchived: willArchive,
+          newStore: memory.store,
+          newGraphEnriched: memory.graphEnriched === true,
+          newEnrichmentSkippedReason: clearsStrengthFloorSkip ? undefined : memory.enrichmentSkippedReason,
+          newAccessCount: memory.accessCount,
+        })
+      );
+    }
+    if (!willArchive && !willUnarchive && clearsStrengthFloorSkip && memory.enrichmentSkippedReason && memory.graphEnriched !== true) {
+      await applyDashboardTotalsDelta(ctx, memory.userId, {
+        graphEligiblePendingMemoriesDelta: 1,
+        graphSkippedMemoriesDelta: -1,
+      });
+    }
+
+    // M7 — track totalStrength delta for the dashboard aggregate.
+    if (args.strength !== memory.strength) {
+      await applyDashboardTotalsDelta(
+        ctx,
+        memory.userId,
+        buildStrengthDelta(memory.strength, args.strength),
+      );
+    }
+
+    if (willArchive) {
+      await archiveMemoryAndSyncCleanupProjection(
+        ctx,
+        memory,
+        patch.archivedAt as number,
+        patch,
+      );
+    } else {
+      await ctx.db.patch(args.memoryId, patch);
+    }
+  },
+});
+
+// Persistent rotation cursor (crystalJobCursors): each daily tick reads ONE
+// paginated page of user profiles instead of collecting the whole table.
+// Rotation is safe here because the per-user work is a skip-guarded storage-
+// pressure valve — users below 90% of their tier cap are no-ops, and when the
+// trim does fire its scoring is recomputed from timestamps at run time, so a
+// later visit performs the identical convergent trim an earlier one would have.
+const JOB_NAME = "crystal-decay";
+const DEFAULT_USERS_PER_TICK = 25;
+const MAX_USERS_PER_TICK = 200;
+
+const clampUsersLimit = (value: number | undefined) => {
+  const raw = Number.isFinite(value ?? NaN) ? Math.trunc(value as number) : DEFAULT_USERS_PER_TICK;
+  return Math.min(Math.max(raw, 1), MAX_USERS_PER_TICK);
+};
+
+/**
+ * Storage-pressure-based decay.
+ *
+ * Decay only fires for a user when they are at ≥90% of their tier memory limit.
+ * When triggered, the oldest/weakest memories are archived to bring them back
+ * to 85% of their limit.
+ *
+ * Scoring: combinedScore = strength * 0.4 + recencyScore * 0.6
+ * (lower score = archived first)
+ *
+ * Cost-bounded by design: each cron tick rotates through ONE page of user
+ * profiles (crystalJobCursors cursor, page size = usersLimit). When the
+ * rotation reaches the end of the table the cursor resets and the sweep
+ * starts over. Explicit single-user runs and dry runs never advance the
+ * shared cursor.
+ */
+export const applyDecay = action({
+  args: {
+    dryRun: v.optional(v.boolean()),
+    userId: v.optional(v.string()),
+    usersLimit: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args
+  ): Promise<{ archived: number; dryRun: boolean; users: number }> => {
+    const { dryRun } = args;
+    const usersLimit = clampUsersLimit(args.usersLimit);
+
+    let userIds: string[];
+    let nextCursor: string | undefined;
+    if (args.userId) {
+      userIds = [args.userId];
+    } else {
+      const cursor = (await ctx.runQuery(internal.crystal.jobCursors.getJobCursor, {
+        jobName: JOB_NAME,
+      })) as string | null;
+      let page: { userIds: string[]; continueCursor: string; isDone: boolean };
+      try {
+        page = await ctx.runQuery(internal.crystal.userProfiles.listUserIdsPage, {
+          cursor: cursor ?? undefined,
+          numItems: usersLimit,
+        });
+      } catch {
+        // Stale/invalidated pagination cursor (table churn between ticks):
+        // restart the rotation from the beginning rather than failing the tick.
+        page = await ctx.runQuery(internal.crystal.userProfiles.listUserIdsPage, {
+          numItems: usersLimit,
+        });
+      }
+      userIds = page.userIds;
+      nextCursor = page.isDone ? undefined : page.continueCursor;
+    }
+
+    let totalArchived = 0;
+
+    for (const userId of userIds) {
+      const tier: string = await ctx.runQuery(internal.crystal.userProfiles.getUserTier, { userId });
+      const limit = TIER_MEMORY_LIMITS[tier] ?? TIER_MEMORY_LIMITS.free;
+      const totals = await ctx.runQuery(internal.crystal.evalStats.getDashboardTotalsForUser, { userId }) as
+        | { activeMemories?: number }
+        | null;
+      const activeCount = totals?.activeMemories ?? 0;
+
+      if (activeCount < limit * 0.9) continue;
+
+      const targetCount = Math.floor(limit * 0.85);
+      const toArchive = activeCount - targetCount;
+      if (toArchive <= 0) continue;
+
+      const candidateLimit = Math.min(Math.max(toArchive * 4, 100), 500);
+      const allMemories: any[] = await ctx.runQuery(internal.crystal.decay.getMemoriesForDecay, {
+        userId,
+        limit: candidateLimit,
+      });
+      // Exempt KB memories from decay — they are managed by the knowledge base lifecycle
+      const memories = allMemories.filter((m: any) => !m.knowledgeBaseId);
+      if (memories.length === 0) continue;
+
+      console.log(
+        `[applyDecay] tier=${tier}: ${activeCount}/${limit} active (${Math.round(activeCount / limit * 100)}% full), archiving ${toArchive} to reach ${targetCount}`
+      );
+
+      const now = Date.now();
+      const scored = memories
+        .map((m) => {
+          // Guard against clock skew / future-dated lastAccessedAt which would make
+          // recencyScore > 1 and bump combinedScore above strength's natural range.
+          const rawAgeDays = (now - (m.lastAccessedAt ?? m.createdAt)) / 86400000;
+          const ageDays = Math.max(0, rawAgeDays);
+          const recencyScore = Math.exp(-0.05 * ageDays); // slow decay curve
+          const combinedScore = m.strength * 0.4 + recencyScore * 0.6;
+          return { ...m, combinedScore };
+        })
+        .sort((a, b) => a.combinedScore - b.combinedScore); // lowest score first
+
+      const candidates = scored.slice(0, toArchive);
+
+      for (const memory of candidates) {
+        if (!dryRun) {
+          await ctx.runMutation(internal.crystal.decay.applyDecayPatch, {
+            memoryId: memory._id,
+            strength: memory.strength * 0.5, // halve strength as final warning before archival
+            archived: true,
+            archivedAt: now,
+          });
+        }
+        totalArchived++;
+      }
+    }
+
+    // Advance (or reset) the rotation only for real cron sweeps: explicit
+    // single-user runs and dry runs must not move the shared cursor.
+    if (!args.userId && !dryRun) {
+      await ctx.runMutation(internal.crystal.jobCursors.setJobCursor, {
+        jobName: JOB_NAME,
+        cursor: nextCursor,
+      });
+    }
+
+    return { archived: totalArchived, dryRun: dryRun ?? false, users: userIds.length };
+  },
+});

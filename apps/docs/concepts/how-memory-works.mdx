@@ -1,0 +1,87 @@
+---
+title: How Memory Works
+description: Understand the full memory flow from capture to recall to long-term storage.
+---
+
+
+Memory Crystal listens, remembers the important parts, and brings the right memory back when your AI needs it.
+
+## What this means in practice
+
+The system is not just a note list.
+It combines:
+
+- short-term message history
+- long-term durable memories
+- ranking and filtering
+- knowledge-base retrieval
+- optional background enrichment
+
+That means your AI gets context that is both **recent** and **relevant**.
+
+## How it actually works
+
+High-level flow:
+
+1. a message arrives
+2. Memory Crystal decides whether this is a general prompt or a history / factual-recall prompt
+3. semantic long-term recall runs against saved memory
+4. if the prompt looks like history, exact wording, or factual personal recall, short-term message search also runs
+5. the best evidence is compressed into a compact `Relevant Memory Evidence` block
+6. that evidence is injected before the AI answers
+7. the conversation is captured
+8. durable memories can be extracted and stored
+
+## OpenClaw runtime behavior
+
+In OpenClaw, the plugin sits directly in the request / response loop:
+
+1. the user sends a message
+2. `before_agent_start` runs in the plugin
+3. Memory Crystal gathers scoped memory context
+4. OpenClaw prepends that context to the model prompt
+5. the model replies
+6. `llm_output` runs and the turn is captured back into memory
+
+Important behavior details:
+
+- semantic recall still runs for substantive prompts
+- message-history lookup is now narrower and only runs for prompts that look like real recall questions
+- wake context is still injected on first turn, but trimmed
+- tool-discipline guidance is injected once per session
+- default injection is optimized for lower context cost without removing recall capability
+
+Important source areas:
+
+- `plugin/recall-hook.js`
+- `plugin/capture-hook.js`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+
+## Commands / examples
+
+A user-facing install entrypoint is:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+After setup, tool-based clients can use flows like:
+
+- `crystal_recall`
+- `crystal_debug_recall`
+- `crystal_recent`
+- `crystal_search_messages`
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`

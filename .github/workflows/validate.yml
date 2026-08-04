@@ -1,0 +1,45 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        continue-on-error: true
+        run: npm run lint --workspace memorycrystal-app
+      - name: Typecheck
+        continue-on-error: true
+        run: npm run typecheck --workspace memorycrystal-app
+      - name: Audit strength-write sites
+        run: bash scripts/audit-strength-sites.sh
+
+  recall-eval-gate:
+    # Recall-quality release gate (ILL-102). Runs the versioned gold set through
+    # the real recall action offline+deterministically and prints recall@k/MRR.
+    # A ranking-weight or candidate-set change that regresses this fails here.
+    # See docs/recall-eval-gate.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Recall eval gate (recall@k / MRR)
+        run: npm run bench:recall
+      - name: Strength reinforcement/decay equilibrium (ILL-103)
+        run: npm run bench:strength
