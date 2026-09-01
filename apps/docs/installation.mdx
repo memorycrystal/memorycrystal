@@ -1,0 +1,158 @@
+---
+title: Installation
+description: Choose the universal installer, local-first mode, or a single-client install path.
+---
+
+Installation connects Memory Crystal to your AI client and chooses where Memory Crystal data should live.
+
+## Primary installer
+
+For Bash environments:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+For native Windows PowerShell, use the PowerShell companion when available for your release:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -UseBasicParsing | iex
+```
+
+The universal installer is the preferred path because it can detect supported clients, ask before changing each target, choose cloud or local-first backend mode, and print rollback guidance.
+
+Official platforms are Claude Code, Codex, Grok Build, OpenClaw, Hermes Agent, and Buzz. Each one shows a Support Tier derived from the capability table. See [Integration Contract and Support Tiers](/concepts/support-tiers) and [ADR-0007](https://github.com/illumin8ca/memorycrystal/blob/main/docs/adr/0007-support-tiers-bounded-by-harness-capability.md).
+
+Claude Desktop, Codex Desktop, OpenCode, and Factory Droid stay installable through the [generic MCP path](/integrations/mcp-server) or their existing `--targets` ids. They are not official platforms.
+
+## Agent Instructions
+
+Copy and paste this directly into your agent, and it will know what to do:
+
+```text
+Install Memory Crystal for this agent. Use the official installer command for this machine and client. Follow the installer prompts for authentication, backend mode, and config changes. Do not manually edit agent config files unless the installer fails and asks for a manual fallback. After installation, restart or reload the agent and verify that Memory Crystal tools are available. Refer to this page for the exact command to run for your platform and agent: https://docs.memorycrystal.ai/installation
+```
+
+Use the client matrix below when asking an agent to choose the exact command:
+
+| Client | Bash / macOS / Linux / WSL | Native Windows PowerShell | Verification |
+| --- | --- | --- | --- |
+| OpenClaw | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets openclaw` | `.\install.ps1 -Targets openclaw` writes generic MCP guidance; use Bash/WSL/Git Bash for the native plugin path | `openclaw plugins info crystal-memory`, `openclaw crystal_status` |
+| Hermes Agent | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets hermes` | Not supported by the PowerShell installer yet | `/plugins`, `/reload-mcp`, `/crystal_status` |
+| Claude Code | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets claude-code` | `.\install.ps1 -Targets claude-code` | Reopen Claude Code and confirm Memory Crystal MCP tools |
+| Claude Desktop | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets claude-desktop` | `.\install.ps1 -Targets claude-desktop` | Restart Claude Desktop and confirm `memory-crystal` loads |
+| Codex CLI | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets codex-cli` | `.\install.ps1 -Targets codex-cli` | `codex mcp list`, or restart and confirm tools |
+| Codex Desktop | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets codex-desktop` | Generic MCP/manual config (PowerShell installer support not available yet) | Restart Codex Desktop (or Settings → MCP → Reload) and confirm Memory Crystal tools |
+| Factory Droid | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets factory-droid` | `.\install.ps1 -Targets factory-droid` | `droid mcp list`, or reopen Factory Droid and confirm tools |
+| Cursor | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets cursor` | `.\install.ps1 -Targets cursor` | Reload Cursor and confirm Memory Crystal MCP tools, hooks, and the local plugin in Customize |
+| Grok Build (Capture tier) | `curl -fsSL https://memorycrystal.ai/crystal \| bash -s -- --targets grok` | `.\install.ps1 -Targets grok` | `grok inspect`; tools and capture only — no automatic recall |
+
+<Note>Codex Desktop shares `~/.codex/config.toml` with the Codex CLI, so `--targets codex-desktop` (or `codex-cli`) configures both surfaces. On native Windows PowerShell, use generic MCP/manual setup for Codex Desktop until `install.ps1` gains support.</Note>
+
+## Declared agent identity
+
+Every install writes a non-empty `agentId` to `~/.memory-crystal/config.json`. The value is the platform slug from the installer table (`claude-code`, `codex`, `grok`, `openclaw`, `hermes`, `cursor`, and the other rows). Codex CLI and Codex Desktop share `codex`.
+
+Declaring identity narrows knowledge-base reach: a KB whose allow-list is only `main` is no longer visible to `codex` or `claude-code`. The installer therefore prints a reach report in the same run — counts and names only, never KB contents — for example `3 of 14`. Unreachable bases do not fail the install. The printed remedy is to add the declared slug to each KB's agent allow-list in the dashboard ([Knowledge](https://memorycrystal.ai/knowledge) → Agents), or:
+
+```text
+crystal_set_knowledge_base_access with action=add and agentId=<slug>
+```
+
+A pre-existing user-set `agentId` is never overwritten on re-run. `MEMORY_CRYSTAL_AGENT_ID` still wins over config in hooks (`input → env → config`). Clearing `agentId` in `~/.memory-crystal/config.json` restores undeclared-identity reach without a redeploy.
+
+## Backend choices
+
+| Backend | What it uses | Notes |
+| --- | --- | --- |
+| Cloud | Hosted Memory Crystal backend | Recommended for most users |
+| Local-first | Docker Convex on `127.0.0.1` | Data plane is local; hosted auth/license is still required |
+| External self-hosted | Operator-provided Convex URL | Advanced path when supported by your release |
+
+Read [Local-First Setup](/configuration/local-first) before choosing local mode. It documents Docker requirements, local dashboard URLs, config backups, local credential behavior, and rollback.
+
+## Official platforms
+
+| Client | Support Tier | Recommended path |
+| --- | --- | --- |
+| Claude Code | Full | Universal installer, or [Claude Code](/integrations/claude-code) |
+| Codex | Full | Universal installer, or [Codex CLI](/integrations/codex-cli) |
+| Grok Build | Capture | `--targets grok`. Recall is deliberate: the harness cannot inject context. See [Grok Build](/integrations/grok) |
+| OpenClaw | Full | Universal installer, then accept the OpenClaw prompt |
+| Hermes Agent | Full | Universal installer, or [Hermes Agent](/integrations/hermes-agent) |
+| Buzz | Hosted | Install into the CLI Buzz is running. Channel memory is not available. See [Buzz](/integrations/buzz) |
+
+The Support Tier column matches `apps/web/public/install-assets/platforms.json` (`hooks.inject` / `tier`). Install-page badges are generated from that table. Do not hand-edit badge copy. Codex Desktop is Full in the table via shared `~/.codex` and is not in this official list.
+
+## Generic MCP path
+
+Claude Desktop, Codex Desktop, OpenCode, and Factory Droid remain installable:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets generic-mcp
+```
+
+Their existing ids (`claude-desktop`, `codex-desktop`, `opencode`, `factory-droid`) still work. See [MCP Server](/integrations/mcp-server), [Claude Desktop](/integrations/claude-desktop), and [Factory Droid](/integrations/factory-droid).
+
+Cursor stays an installer target (`--targets cursor`) and is tracked separately.
+
+## Single-client installer paths
+
+These paths remain available for compatibility and focused installs:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+OpenClaw and Hermes Agent use the primary `/crystal` installer.
+
+## Safety guarantees installers should preserve
+
+- ask before configuring each detected client
+- create a backup before every config mutation
+- validate JSON/TOML where applicable before and after writes
+- restore the previous config when validation fails
+- redact API keys, bearer tokens, device codes, and local credentials from logs
+- avoid package-manager or service changes without a prompt
+
+## Self-hosting
+
+For infrastructure-oriented self-hosting, see:
+
+- [Self-Hosting](/configuration/self-hosting)
+- [Railway deployment](/self-hosting/railway)
+- [Environment variables](/self-hosting/environment-variables)
+
+## Docs preview
+
+Mintlify docs for this repo live under `apps/docs`.
+
+```bash
+cd apps/docs
+npx mint dev
+```
+
+## Backend choices
+
+| Backend | Endpoint shape | Notes |
+| --- | --- | --- |
+| Cloud hosted | `https://api.memorycrystal.ai/mcp` | Default and easiest setup |
+| Local Docker Convex | `http://127.0.0.1:3211/api/mcp` | Local data plane with hosted auth/license bridge |
+| External self-hosted | your Convex site URL | Advanced operators; verify your deployment and auth policy |
+
+- run through [Quickstart](/quickstart)
+- verify tool access with `crystal_wake`, `crystal_remember`, and `crystal_recall`
+- keep the printed config backup path until you have verified the client works
+
+## Source of truth
+
+- `apps/web/public/install.sh`
+- `apps/web/public/install.ps1`
+- `apps/web/public/install-claude-mcp.sh`
+- `apps/web/public/install-codex-mcp.sh`
+- `apps/web/public/install-droid-mcp.sh`
+- `scripts/convex-local-*.sh`
+- `scripts/convex-local-*.ts`
+- `.env.example`

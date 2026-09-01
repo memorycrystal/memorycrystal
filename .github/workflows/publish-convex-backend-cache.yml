@@ -1,0 +1,129 @@
+name: Publish Convex Backend Cache Image
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    # Convex Rust backend image compile — Docker-heavy, same 4vcpu class as illumin8os CI.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+
+    steps:
+      - name: Checkout Memory Crystal
+        uses: actions/checkout@v4
+
+      - name: Reclaim runner disk for the Convex Rust build
+        run: |
+          # GitHub-hosted images ship these tool caches; Blacksmith images may not.
+          for path in \
+            /opt/hostedtoolcache \
+            /usr/local/lib/android \
+            /usr/local/.ghcup \
+            /usr/share/dotnet \
+            /usr/share/swift
+          do
+            if [ -d "$path" ]; then
+              sudo rm -rf "$path"
+            fi
+          done
+          docker system prune --all --force || true
+          df -h /
+
+      - name: Prepare pinned Convex source
+        id: source
+        shell: bash
+        run: |
+          context="$RUNNER_TEMP/convex-backend"
+          infra/convex/backend-cache/prepare-context.sh "$context"
+          revision="$(tr -d '[:space:]' < infra/convex/backend-cache/UPSTREAM_REVISION)"
+          timestamp="$(git -C "$context" show -s --format=%cI "$revision")"
+          patch_sha="$(sha256sum infra/convex/backend-cache/archive-cache.patch | cut -d' ' -f1)"
+          tag="${revision:0:12}-cache-${patch_sha:0:12}"
+          echo "context=$context" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+          echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.source.outputs.context }}
+          file: ${{ steps.source.outputs.context }}/self-hosted/docker-build/Dockerfile.backend
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${{ steps.source.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
+          build-args: |
+            VERGEN_GIT_SHA=${{ steps.source.outputs.revision }}
+            VERGEN_GIT_COMMIT_TIMESTAMP=${{ steps.source.outputs.timestamp }}
+
+      - name: Verify backend binary size (ILL-238 gate)
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}"
+          CONTAINER_ID="$(docker create "$IMAGE")"
+          docker cp "$CONTAINER_ID:/convex/convex-local-backend" /tmp/convex-local-backend
+          docker rm "$CONTAINER_ID"
+          
+          SIZE_BYTES="$(stat -c%s /tmp/convex-local-backend 2>/dev/null || stat -f%z /tmp/convex-local-backend)"
+          SIZE_MB="$((SIZE_BYTES / 1048576))"
+          
+          echo "convex-local-backend size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
+          
+          if [[ "$SIZE_BYTES" -lt 10485760 ]]; then
+            echo "❌ FATAL: Binary is ${SIZE_MB} MB (under 10 MB minimum)."
+            echo "This is likely a cargo-chef stub from failed compilation (ILL-238)."
+            echo "The published stub incident (sha256:f59136c6) was 338 KB."
+            echo "A real backend is tens of MB after stripping."
+            exit 1
+          fi
+          
+          if [[ "$SIZE_BYTES" -lt 20971520 ]]; then
+            echo "⚠️  WARNING: Binary is ${SIZE_MB} MB (real backends are typically 20+ MB)."
+            echo "Verify this is not a stub before deploying."
+          else
+            echo "✅ Binary size is acceptable (${SIZE_MB} MB)."
+          fi
+
+      - name: Push verified image
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}"
+          docker push "$IMAGE"
+
+      - name: Publish build identity
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PATCH_SHA: ${{ steps.source.outputs.patch_sha }}
+          REVISION: ${{ steps.source.outputs.revision }}
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          {
+            echo "## Patched Convex backend"
+            echo
+            echo "- Image: \`ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}\`"
+            echo "- Digest: \`${DIGEST}\`"
+            echo "- Upstream revision: \`${REVISION}\`"
+            echo "- Patch SHA-256: \`${PATCH_SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

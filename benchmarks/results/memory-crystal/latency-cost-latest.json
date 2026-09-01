@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "system": "Memory Crystal",
+  "status": "cheap_v1_verified_partial",
+  "boundary": "latency_cost_curve",
+  "run_id": "mc-cheap-v1-latency-cost-20260525T132157Z",
+  "run_at": "2026-05-25T13:21:57.865Z",
+  "source_artifact": "benchmarks/results/memory-crystal/latest.json",
+  "cost_policy": {
+    "mode": "cheap_v1",
+    "external_api_spend_usd": 0,
+    "max_future_100k_spend_usd": 250,
+    "max_future_100k_wall_clock_hours": 6,
+    "note": "User requested no expensive benchmark spend for V1."
+  },
+  "measured_sizes": [
+    {
+      "memory_count": 30,
+      "case_count": 30,
+      "boundary": "retrieval_seeded",
+      "score": 100,
+      "recall_at_1": 0.9333,
+      "recall_at_3": 1,
+      "recall_at_5": 1,
+      "p50_ms": 5.48,
+      "p95_ms": 9.52,
+      "external_api_spend_usd": 0,
+      "source_artifact": "benchmarks/results/memory-crystal/latest.json"
+    }
+  ],
+  "skipped_sizes": [
+    {
+      "memory_count": 100,
+      "status": "not_available",
+      "reason_code": "deferred_v1_cost_control",
+      "reason": "Deferred in cheap V1 to avoid paid hosted/API/model spend; run later when budget is explicitly approved.",
+      "max_spend_usd": null,
+      "max_wall_clock_hours": null
+    },
+    {
+      "memory_count": 1000,
+      "status": "not_available",
+      "reason_code": "deferred_v1_cost_control",
+      "reason": "Deferred in cheap V1 to avoid paid hosted/API/model spend; run later when budget is explicitly approved.",
+      "max_spend_usd": null,
+      "max_wall_clock_hours": null
+    },
+    {
+      "memory_count": 10000,
+      "status": "not_available",
+      "reason_code": "deferred_v1_cost_control",
+      "reason": "Deferred in cheap V1 to avoid paid hosted/API/model spend; run later when budget is explicitly approved.",
+      "max_spend_usd": null,
+      "max_wall_clock_hours": null
+    },
+    {
+      "memory_count": 100000,
+      "status": "not_available",
+      "reason_code": "cost_cap_not_spent_v1",
+      "reason": "Deferred in cheap V1 to avoid paid hosted/API/model spend; run later when budget is explicitly approved.",
+      "max_spend_usd": 250,
+      "max_wall_clock_hours": 6
+    }
+  ],
+  "redacted_environment": {
+    "external_network": false,
+    "credentials": "none",
+    "spend_policy": "no_paid_large_runs_in_v1"
+  },
+  "caveats": [
+    "This is a cheap V1 latency/cost artifact using the local seeded retrieval benchmark only.",
+    "Hosted production latency, extraction cost, and large-scale curves are intentionally deferred."
+  ]
+}

@@ -1,0 +1,16 @@
+---
+description: Mandatory Memory Crystal discipline for Cursor sessions
+alwaysApply: true
+---
+
+Use Memory Crystal in every Cursor session.
+
+- **Recall (read):** call crystal_recall (crystal_what_do_i_know for broad topics) when the task depends on past work, decisions, people, projects, or preferences. Never answer from vague recollection. Skip self-contained requests.
+- **Need exact past wording?** Use crystal_search_messages.
+- **Remember (write):** after learning any durable fact, decision, preference, lesson, or goal, save it with crystal_remember immediately, without being asked. Correct existing memories with crystal_update; replace outdated ones with crystal_supersede.
+- **Before risky changes:** crystal_preflight for the rules and lessons that apply.
+- **Reference material** lives in knowledge bases: crystal_list_knowledge_bases to discover them, crystal_query_knowledge_base with the KB name for targeted lookups.
+- **Changing something you didn't build:** crystal_why_did_we / crystal_who_owns / crystal_explain_connection.
+- **At major milestones, or when asked:** crystal_checkpoint.
+
+Only skip recall tools for greetings, small talk, or questions fully answered inside the current conversation.

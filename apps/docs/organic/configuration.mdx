@@ -1,0 +1,43 @@
+---
+title: Configuration
+description: Which Organic Memory behaviors are configurable today and where to verify them.
+---
+
+
+Configuration decides how often Organic Memory thinks and what kind of background work it does.
+
+## What this means in practice
+
+Useful public things to document here are:
+
+- tick cadence
+- background job scheduling
+- current public-safe model/provider knobs
+- operational limits or intervals visible in code
+
+## How it actually works
+
+Key sources:
+
+- `convex/crons.ts`
+- `convex/crystal/organic/**`
+- `docs/organic-memory/PRD-Organic-Memory.md`
+
+## Commands / examples
+
+A good public-safe place to understand runtime cadence is:
+
+- `convex/crons.ts`
+
+## Common mistakes
+
+- documenting PRD aspirations as if they are already runtime configuration
+- ignoring the cron schedule as the real operational evidence
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crons.ts`
+- `convex/crystal/organic/**`
+- `docs/organic-memory/PRD-Organic-Memory.md`

@@ -1,0 +1,110 @@
+{
+  "name": "memorycrystal",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "mcp-server",
+    "infra/cloudflare/worker"
+  ],
+  "testedWith": {
+    "_comment": "Advisory host compatibility as of 2026-07-01. Does not block installs; doctor emits soft warnings only. Keep in lockstep with apps/web/public/install.sh and scripts/crystal-doctor.sh.",
+    "openclaw": "2026.6.1",
+    "hermes": "v0.14.0",
+    "claude-code": "2.1.197",
+    "codex-cli": "0.142.5",
+    "codex-desktop": "0.142.5",
+    "claude-desktop": "cowork-ga",
+    "factory-droid": "0.162.0"
+  },
+  "scripts": {
+    "dev": "cd apps/web && npm run dev",
+    "build": "cd apps/web && npm run build",
+    "crystal:init": "bash scripts/crystal-init.sh",
+    "crystal:bootstrap": "bash scripts/crystal-bootstrap.sh",
+    "crystal:doctor": "bash scripts/crystal-doctor.sh",
+    "crystal:enable": "bash scripts/crystal-enable.sh",
+    "crystal:disable": "bash scripts/crystal-disable.sh",
+    "crystal:e2e": "bash scripts/crystal-e2e.sh",
+    "convex:deploy": "node scripts/convex-deploy-self-hosted.mjs",
+    "convex:run": "node scripts/convex-run-self-hosted.mjs",
+    "convex:self-hosted": "node scripts/convex-self-hosted-cli.mjs",
+    "test:convex-target": "node --test scripts/convex-self-hosted-env.test.mjs",
+    "test:smoke": "bash scripts/crystal-doctor.sh --smoke",
+    "test:capture-e2e": "node scripts/test-capture-e2e.cjs",
+    "convex:cost-smoke": "node scripts/convex-cost-smoke.mjs",
+    "install:hooks": "node scripts/install-hooks.mjs",
+    "sync:public": "node scripts/sync-public.mjs --dry-run",
+    "install:sweeper": "node scripts/install-launchd-plist.mjs",
+    "convex:local:up": "bash scripts/convex-local-up.sh",
+    "convex:local:down": "bash scripts/convex-local-down.sh",
+    "convex:local:doctor": "bash scripts/convex-local-doctor.sh",
+    "convex:local:reset": "bash scripts/convex-local-down.sh --wipe && npm run convex:local:up",
+    "convex:local:seed": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/convex-local-seed.ts",
+    "convex:local:backup": "bash scripts/convex-local-backup.sh",
+    "convex:local:restore": "bash scripts/convex-local-restore.sh",
+    "convex:local:repair": "bash scripts/convex-local-repair.sh",
+    "convex:snapshot:audit": "bash scripts/convex-snapshot-audit.sh audit",
+    "convex:snapshot:compare": "bash scripts/convex-snapshot-audit.sh compare",
+    "convex:local:provision-gerald": "node scripts/provision-gerald-research-key.mjs",
+    "convex:local:provision-moondev": "node scripts/provision-moondev-ingest-key.mjs",
+    "test:gerald-read-contract": "node scripts/gerald-read-contract-smoke.mjs",
+    "test:moondev-ingest-canary": "node scripts/moondev-ingest-canary.mjs",
+    "convex:local:auth-keys": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/convex-local-auth-keys.ts",
+    "convex:local:provision-env": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/convex-local-provision-env.ts",
+    "convex:local:write-env": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/convex-local-write-env.ts",
+    "web:backend:local": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/web-backend-env.ts local",
+    "web:backend:remote": "NODE_OPTIONS='--disable-warning=MODULE_TYPELESS_PACKAGE_JSON' node --experimental-strip-types scripts/web-backend-env.ts remote",
+    "test:local": "bash test-local.sh",
+    "test:remote": "bash test-remote.sh",
+    "package:local-backend": "node scripts/package-local-backend.mjs",
+    "test:local-backend-artifact": "node scripts/local-backend-artifact-smoke.mjs",
+    "test:local-backend-artifact:docker": "node scripts/local-backend-artifact-smoke.mjs --docker",
+    "test:local-backend-artifact:postgres": "node scripts/local-backend-artifact-smoke.mjs --postgres",
+    "test:research-scale": "node scripts/research-scale-fixture.mjs",
+    "test:research-e2e": "node scripts/research-e2e-smoke.mjs",
+    "chaos": "vitest run --config vitest.config.chaos.ts",
+    "e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "test:skills": "node --test scripts/skills-lint.test.mjs",
+    "test:plugin-shared": "node --test plugins/shared/*.test.mjs",
+    "test:plugin-checksums": "node --test scripts/plugin-checksums.test.mjs",
+    "bench:recall": "node scripts/bench-recall.mjs",
+    "bench:strength": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/bench-strength-trajectory.mjs",
+    "test:recall-eval": "vitest run convex/crystal/__tests__/recall-eval.test.ts convex/crystal/__tests__/recallMetrics.test.ts convex/crystal/__tests__/evalEmbedding.test.ts",
+    "test:reinforcement": "vitest run convex/crystal/__tests__/reinforcement.test.ts convex/crystal/__tests__/reinforcement-recall.test.ts",
+    "test:ltm-hygiene": "vitest run convex/crystal/__tests__/ltm-hygiene.test.ts"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "convex": "^1.35.1",
+    "convex-test": "^0.0.41",
+    "eslint-plugin-local-rules": "^3.0.2",
+    "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "router": {
+      "path-to-regexp": "8.4.0"
+    },
+    "vite": "7.3.5",
+    "hono": "4.12.25",
+    "@hono/node-server": "1.19.13",
+    "express-rate-limit": "8.5.2",
+    "fast-uri": "3.1.2",
+    "qs": "6.15.2",
+    "postcss": "8.5.16",
+    "ws": "8.21.0"
+  },
+  "optionalDependencies": {
+    "lightningcss-darwin-arm64": "1.32.0",
+    "lightningcss-darwin-x64": "1.32.0",
+    "lightningcss-linux-arm64-gnu": "1.32.0",
+    "lightningcss-linux-x64-gnu": "1.32.0"
+  },
+  "packageManager": "npm@10.9.4",
+  "dependencies": {
+    "fflate": "^0.8.2"
+  }
+}

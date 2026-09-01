@@ -1,0 +1,178 @@
+# Memory Crystal — Self-Hosted Docker Bundle
+#
+# Purpose: Runs the full Memory Crystal stack on a tenant's Mac (or Linux box).
+#          cloudflared creates a permanent named tunnel so the stack is reachable
+#          at https://{slug}.tunnels.memorycrystal.ai from any machine.
+#
+# Env-var contract (see .env.example):
+#   MC_VERSION          — image tag for web-selfhosted and mcp images (e.g. v1.0.0)
+#   MC_TENANT_SLUG      — unique slug assigned at signup (e.g. "alice-studio")
+#   MC_TUNNEL_TOKEN     — cloudflared tunnel token issued during signup
+#   MC_BOOTSTRAP_TOKEN  — single-use 1h-TTL token; consumed on first boot by web
+#
+# DO NOT use this file for local development. For local dev, use:
+#   infra/convex/docker-compose.yml
+#
+# Services:
+#   backend     — Convex self-hosted backend (ports 3210 / 3211 are internal only)
+#   dashboard   — Convex dashboard UI on :6791
+#   web         — Memory Crystal Next.js app (self-hosted variant)
+#   mcp         — Memory Crystal MCP HTTP server on :8788
+#   fallback    — Caddy :8089 — Tier-1 structured-503 responder (always healthy)
+#   cloudflared — Cloudflare tunnel sidecar (depends only on fallback)
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # backend — Convex self-hosted backend
+  # Image pinned to the same digest used in infra/convex/docker-compose.yml.
+  # TODO M9: pin cloudflare/cloudflared to a digest once the pool-worker publish
+  # pipeline is in place.
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ghcr.io/get-convex/convex-backend@sha256:104b8bc70e29b31fa4a57551596090bfc9eedc3d1f27fd4b8cd8d0e782b9b070
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    volumes:
+      - convex-data:/convex/data
+    environment:
+      - CONVEX_CLOUD_ORIGIN=http://backend:3210
+      - CONVEX_SITE_ORIGIN=http://backend:3211
+      - INSTANCE_NAME=${MC_TENANT_SLUG}
+      - INSTANCE_SECRET
+      - RUST_LOG=${RUST_LOG:-info}
+      - DISABLE_METRICS_ENDPOINT=${DISABLE_METRICS_ENDPOINT:-true}
+      - DOCUMENT_RETENTION_DELAY=${DOCUMENT_RETENTION_DELAY:-172800}
+      - DO_NOT_REQUIRE_SSL=true
+      - APPLICATION_MAX_CONCURRENT_MUTATIONS=${APPLICATION_MAX_CONCURRENT_MUTATIONS:-16}
+      - APPLICATION_MAX_CONCURRENT_NODE_ACTIONS=${APPLICATION_MAX_CONCURRENT_NODE_ACTIONS:-16}
+      - APPLICATION_MAX_CONCURRENT_QUERIES=${APPLICATION_MAX_CONCURRENT_QUERIES:-16}
+      - APPLICATION_MAX_CONCURRENT_V8_ACTIONS=${APPLICATION_MAX_CONCURRENT_V8_ACTIONS:-16}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3210/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # dashboard — Convex dashboard UI
+  # ---------------------------------------------------------------------------
+  dashboard:
+    image: ghcr.io/get-convex/convex-dashboard@sha256:60b04b339d6cd6623057b03e5275329a20011051907ec5e689a38a401cfdc409
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      - "${DASHBOARD_PORT:-6791}:6791"
+    environment:
+      - NEXT_PUBLIC_DEPLOYMENT_URL=http://backend:3210
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6791 || wget -q --spider http://localhost:6791"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # web — Memory Crystal Next.js app (self-hosted variant)
+  # Image published to GHCR by M9 CI. The image does not exist yet; bootstrap.sh
+  # will docker pull it at install time once M9 publishes it.
+  # ---------------------------------------------------------------------------
+  web:
+    image: ghcr.io/memorycrystal/web-selfhosted:${MC_VERSION}
+    restart: unless-stopped
+    environment:
+      - MC_DEPLOY_TARGET=self_hosted
+      - NEXT_PUBLIC_CONVEX_URL=http://backend:3210
+      - CRYSTAL_CONVEX_URL=http://backend:3211
+      - MC_TENANT_SLUG=${MC_TENANT_SLUG}
+      - MC_BOOTSTRAP_TOKEN=${MC_BOOTSTRAP_TOKEN}
+    healthcheck:
+      # /api/health is implemented in M3; plumbed here so depends_on works once it lands
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || wget -q --spider http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # mcp — Memory Crystal MCP HTTP server
+  # NOTE: MEMORY_CRYSTAL_API_KEY is intentionally absent here (R4 decision):
+  #       the mcp-server queries the local Convex apiKeys table directly.
+  #       API-key env-var auth is removed from the server side in M5.
+  # ---------------------------------------------------------------------------
+  mcp:
+    image: ghcr.io/memorycrystal/mcp:${MC_VERSION}
+    restart: unless-stopped
+    environment:
+      - CONVEX_URL=http://backend:3210
+      - CRYSTAL_CONVEX_SITE_URL=http://backend:3211
+      - MC_TENANT_SLUG=${MC_TENANT_SLUG}
+      - CRYSTAL_MCP_MODE=http
+      - CRYSTAL_MCP_HOST=0.0.0.0
+      - CRYSTAL_MCP_PORT=8788
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8788/healthz || wget -q --spider http://localhost:8788/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # fallback — Tier-1 structured-503 responder (Caddy, ≤16 MB compressed)
+  #
+  # AC3 §3.3 Fork 1 Approach A: when web/mcp are down but the Mac is on and
+  # cloudflared is up, Caddy serves the §10 JSON envelope so clients get a
+  # structured 503 instead of a bare CF HTML error page.
+  #
+  # NO depends_on web/mcp/backend — fallback must stay healthy even when the
+  # rest of the stack is down. cloudflared's final ingress rule routes to
+  # http://fallback:8089 only after /api/mcp/* → mcp and * → web are tried.
+  # ---------------------------------------------------------------------------
+  fallback:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    environment:
+      - MC_TENANT_SLUG=${MC_TENANT_SLUG}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8089/_health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    # No depends_on — intentional. See AC3 rationale above.
+
+  # ---------------------------------------------------------------------------
+  # cloudflared — Cloudflare tunnel sidecar
+  # depends_on ONLY fallback (not web/mcp/backend).
+  # Ingress order: /api/mcp/* → mcp, * → web, final → http://fallback:8089
+  # This ensures structured 503 is always served (Tier 1) even when web/mcp
+  # are starting up or crashed.
+  # TODO M9: pin cloudflare/cloudflared to a digest after verifying the
+  # release digest for the version shipped with v1.
+  # ---------------------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    environment:
+      - TUNNEL_TOKEN=${MC_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      fallback:
+        condition: service_healthy
+
+volumes:
+  convex-data: {}

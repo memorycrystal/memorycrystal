@@ -1,0 +1,22 @@
+{
+  "name": "memory-crystal",
+  "version": "1.0.0",
+  "description": "Persistent Memory Crystal memory for Cursor: MCP tools, capture/recall hooks, and the crystal skill suite.",
+  "author": {
+    "name": "Memory Crystal"
+  },
+  "homepage": "https://memorycrystal.ai",
+  "license": "MIT",
+  "keywords": ["memory", "mcp", "hooks", "skills"],
+  "variables": {
+    "type": "object",
+    "properties": {
+      "MEMORY_CRYSTAL_API_KEY": {
+        "type": "string",
+        "title": "Memory Crystal API key",
+        "description": "Bearer token for the hosted Memory Crystal MCP server"
+      }
+    },
+    "required": ["MEMORY_CRYSTAL_API_KEY"]
+  }
+}
