@@ -1,0 +1,230 @@
+---
+title: "Remember & edit"
+description: "The memory-writing side of the public tool surface: remember, checkpoint, edit, archive, and related maintenance actions."
+---
+
+
+These are the tools that help the AI put something into memory or change memory on purpose.
+
+## What this means in practice
+
+This family covers things like:
+
+- remembering a new fact or lesson manually
+- saving a checkpoint to mark a session milestone
+- editing an existing memory to refine or correct it
+- archiving or forgetting a memory to clean up
+
+## crystal_remember — Save a memory
+
+Create a new memory with semantic embedding, vector storage, and optional Obsidian export.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `store` | string | Yes | Memory store type: `sensory`, `episodic`, `semantic`, `procedural`, or `prospective`. See guidance below. |
+| `category` | string | Yes | Memory category: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, or `conversation`. |
+| `title` | string | Yes | Brief, specific title (5–80 characters). E.g., "Chose Convex over Supabase for backend". |
+| `content` | string | Yes | Full memory content. Include reasoning, context, and relevant details. |
+| `tags` | array | No | Array of tags for organization. E.g., `["backend", "architecture"]`. |
+| `confidence` | number | No | Confidence score (0–1). Default: 0.7. Higher = more certain. |
+| `valence` | number | No | Emotional valence (-1 to 1). -1 = negative, 0 = neutral, 1 = positive. Default: 0. |
+| `arousal` | number | No | Arousal level (0–1). 0 = calm, 1 = intense. Default: 0.3. |
+| `channel` | string | No | Channel identifier for scoped memories. |
+| `agentId` | string | No | Declared agent label stored on the new memory. An explicit value wins. The OpenClaw plugin fills the resolved agent when the argument is omitted. The stdio server fills `MEMORY_CRYSTAL_AGENT_ID`, then `CRYSTAL_AGENT_ID`. Neither fills it from a channel prefix. The hosted server forwards only an explicit argument: it does not read the server environment or the channel. |
+
+### Valid enum values from schema
+
+**Stores:**
+
+| Store | Purpose |
+|-------|---------|
+| `sensory` | Direct observations, impressions, raw input |
+| `episodic` | Specific events, conversations, timestamps |
+| `semantic` | Facts, decisions, lessons, patterns |
+| `procedural` | How-to guides, workflows, steps |
+| `prospective` | Goals, intentions, future plans |
+
+**Categories:**
+
+| Category | Best for |
+|----------|----------|
+| `decision` | A choice made or conclusion reached |
+| `lesson` | Insight gained from experience |
+| `person` | Information about a person |
+| `rule` | A constraint, principle, or guideline |
+| `event` | A specific occurrence or meeting |
+| `fact` | An objective piece of information |
+| `goal` | An objective or aspiration |
+| `skill` | A demonstrated reusable capability |
+| `workflow` | A process or sequence of steps |
+| `conversation` | A discussion or exchange |
+
+### Which surfaces stamp a memory
+
+A stamp is written only when a memory row is created.
+
+- `crystal_remember` stamps from the explicit `agentId`, or from a declared identity: the plugin's resolved agent, or the stdio server's `MEMORY_CRYSTAL_AGENT_ID` / `CRYSTAL_AGENT_ID`. A channel prefix is never a stamp.
+- The hosted `crystal_remember` tool forwards only an explicit `agentId`. An omitted argument stays omitted.
+- `crystal_update` and `crystal_edit` never add, change, or remove a stamp. On a stamped row the stored label is kept and the replacement metadata must be a JSON object or empty (empty metadata stores only the label). On an unstamped row an `agentId` key in replacement metadata is dropped.
+- `crystal_supersede` copies the predecessor's stamp. The request's `agentId` is not written onto the successor.
+
+### Returns
+
+Successful `crystal_remember` responses may include `relatedExisting`: up to
+three active, same-scope memories with lexically similar titles or content.
+Use `crystal_supersede` when one is stale instead of saving a duplicate.
+
+```json
+{
+  "memoryId": "mem_abc123",
+  "title": "Chose Convex over Supabase",
+  "store": "semantic",
+  "obsidianPath": "/Users/user/vault/Memories/semantic/decisions/convex.md"
+}
+```
+
+### Examples
+
+**Save a decision:**
+
+```json
+{
+  "store": "semantic",
+  "category": "decision",
+  "title": "Chose PostgreSQL over SQLite for session storage",
+  "content": "PostgreSQL supports concurrent writes and ACID transactions needed for multi-user sessions. SQLite would cause lock contention under load.",
+  "tags": ["database", "architecture"],
+  "confidence": 0.95
+}
+```
+
+**Save a lesson from past experience:**
+
+```json
+{
+  "store": "semantic",
+  "category": "lesson",
+  "title": "Mutations preferred over HTTP actions in Convex",
+  "content": "Convex mutations are transactional and automatically retried on failure. HTTP actions lack these guarantees and should only be used for external integrations.",
+  "tags": ["convex", "reliability"],
+  "confidence": 0.9,
+  "valence": 0.7,
+  "arousal": 0.4
+}
+```
+
+**Save a procedural workflow:**
+
+```json
+{
+  "store": "procedural",
+  "category": "workflow",
+  "title": "Deploy to Railway via git push",
+  "content": "1. Make changes locally\n2. Commit and push to main\n3. Railway automatically deploys from the push\n4. Monitor deployment status in Railway dashboard",
+  "tags": ["deployment", "railway"],
+  "confidence": 0.85
+}
+```
+
+**Save a goal:**
+
+```json
+{
+  "store": "prospective",
+  "category": "goal",
+  "title": "Complete LTM vector cutover",
+  "content": "Verify the authoritative long-term-memory vector index, record the count audit, and keep rollback evidence before retiring legacy state.",
+  "tags": ["project", "memory-crystal"],
+  "confidence": 0.8
+}
+```
+
+**Save information about a person:**
+
+```json
+{
+  "store": "semantic",
+  "category": "person",
+  "title": "Alice — Product lead",
+  "content": "Alice is the product lead for the mobile team. Prefers async communication. Timezone: Pacific.",
+  "tags": ["team", "alice"],
+  "confidence": 0.9,
+  "channel": "product-team"
+}
+```
+
+## Tagging best practices
+
+- Use lowercase, hyphen-separated tags (e.g., `backend-architecture`, not `BackendArchitecture`)
+- Keep tags concise and reusable across memories
+- Avoid redundant tags (don't tag with both `architecture` and `architectural-decision`)
+- Use 2–5 tags per memory for good searchability without noise
+- Group related topics under a common tag prefix (e.g., `convex-*`, `deploy-*`)
+
+## When to use vs alternatives
+
+| Use case | Tool |
+|----------|------|
+| Manually save a fact, decision, or lesson | **`crystal_remember`** |
+| Automatically persist a completed user/assistant turn | `/api/mcp/turn` (via supported host hook) |
+| Save a session checkpoint | `crystal_checkpoint` |
+| Update an existing memory | `crystal_edit` |
+| Hide or remove a memory | `crystal_forget` |
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Invalid store | Store is not one of the five valid types. | Use: `sensory`, `episodic`, `semantic`, `procedural`, `prospective`. |
+| Invalid category | Category is not a recognized memory category. | Use a valid category: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, `conversation`. |
+| Title length error | Title is shorter than 5 or longer than 80 characters. | Rewrite the title within the character limit. |
+| Content required | Content is empty or missing. | Provide substantive content for the memory. |
+| Invalid confidence | Confidence is not between 0 and 1. | Use a number from 0 (low) to 1 (high). |
+| Invalid valence | Valence is not between -1 and 1. | Use a number from -1 (negative) to 1 (positive). |
+| Invalid arousal | Arousal is not between 0 and 1. | Use a number from 0 (calm) to 1 (intense). |
+| Tags not array | Tags is not an array of strings. | Pass an array: `["tag1", "tag2"]`. |
+| Obsidian export failed | The system couldn't write to the Obsidian vault. | Check that `OBSIDIAN_VAULT_PATH` is configured and writable. |
+
+## How it actually works
+
+Key repo surfaces:
+
+- `mcp-server/src/tools/remember.ts` — tool definition and input validation
+- `convex/crystal/memories.ts` — memory creation, embedding, and storage logic
+- `convex/crystal/mcp.ts` — HTTP endpoint routing
+- `mcp-server/src/lib/obsidian.ts` — Obsidian vault integration
+
+The flow:
+
+1. Tool validates all input parameters against the schema and enums
+2. ConvexClient POSTs to `/api/mcp/capture`
+3. Backend embeds the content with the owner's configured OpenRouter embedding key
+4. Memory metadata is stored in `crystalMemories`; its vector is stored in the authoritative `crystalMemoryEmbeddings` index
+5. If `OBSIDIAN_VAULT_PATH` is set, memory is also exported as markdown
+6. Tool returns the memory ID and Obsidian path (if applicable)
+
+## Common mistakes
+
+- Assuming explicit `crystal_remember` and automatic completed-turn capture are the same path (the former writes durable LTM; the latter stores an idempotent transcript pair without per-turn inference)
+- Forgetting that checkpoints are a distinct concept from ordinary memories (checkpoints are milestones; memories are facts/lessons)
+- Not setting `confidence` and `valence` — the defaults are reasonable, but explicit values help the system prioritize
+- Using vague titles (❌ "decision") instead of specific ones (✅ "Chose Convex over Supabase")
+- Storing multiple unrelated facts in one memory instead of breaking them into separate memories
+
+## Source of truth
+
+Primary files behind this page:
+
+- `mcp-server/src/tools/remember.ts` — tool definition
+- `convex/crystal/memories.ts` — backend logic
+- `convex/schema.ts` — valid enum values
+- `convex/crystal/mcp.ts`
+- `convex/crystal/checkpoints.ts`
+
+## Notes
+
+### Shared-mode agent scoping (new in 0.7.15)
+
+When an agent is configured with `mode: "shared"` in `agentScopePolicies`, `crystal_remember` now writes to `${scope}:main-${agentId}` so two shared agents under the same scope don't bleed captures into one bucket. Single-shared-agent installs (the common case) continue to write to `${scope}:main` — this change is backward compatible. If you intentionally want captures to merge across shared agents, route them under a single agentId or write to an explicit channel with that effect.

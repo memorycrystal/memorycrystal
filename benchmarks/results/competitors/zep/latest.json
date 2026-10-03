@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "system": "Zep",
+  "status": "not_reproduced",
+  "boundary": "turn_extraction_e2e",
+  "run_id": "zep-unavailable-20260525T132127Z",
+  "run_at": "2026-05-25T13:21:27.937Z",
+  "stage": "competitor_reproduction",
+  "reason_code": "not_run_v1_cost_control",
+  "reason": "V1 does not spend on competitor API runs. Zep public claims remain separated from reproduced Memory Crystal results.",
+  "retryable": true,
+  "score": null,
+  "source_artifact": "benchmarks/results/competitors/public-claims.json",
+  "redacted_environment": {
+    "external_network": false,
+    "credential_env": "ZEP_API_KEY",
+    "credential_present": false,
+    "spend_policy": "no_paid_competitor_runs_in_v1"
+  },
+  "caveats": [
+    "This is an explicit unavailable/not-reproduced artifact, not a benchmark score.",
+    "Public claims for this system remain visible only as sourced public claims."
+  ]
+}

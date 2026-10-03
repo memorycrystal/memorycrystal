@@ -1,0 +1,563 @@
+diff --git a/crates/search/src/archive/cache.rs b/crates/search/src/archive/cache.rs
+index 7ebfa8414..48993c186 100644
+--- a/crates/search/src/archive/cache.rs
++++ b/crates/search/src/archive/cache.rs
+@@ -69,6 +69,16 @@ struct IndexTempDirWithSize {
+     size: u64,
+ }
+ 
++impl std::fmt::Debug for IndexTempDirWithSize {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("IndexTempDirWithSize")
++            .field("dir", &self.dir)
++            .field("search_file_type", &self.search_file_type)
++            .field("size", &self.size)
++            .finish_non_exhaustive()
++    }
++}
++
+ impl Drop for IndexTempDirWithSize {
+     fn drop(&mut self) {
+         let _ = self
+@@ -98,11 +108,17 @@ impl IndexTempDirWithSize {
+     }
+ }
+ 
+-struct IndexMeta {
++/// Metadata for cached index with reference-counted cleanup coordination.
++/// Clone to share ownership; directory deleted only when all clones drop.
++#[derive(Clone, Debug)]
++pub struct IndexMeta {
+     size: u64,
+     /// A path under `tempdir.dir`; may not be the directory itself
+-    path: PathBuf,
+-    _tempdir: IndexTempDirWithSize,
++    pub path: PathBuf,
++    pub storage_key: ObjectKey,
++    pub search_file_type: SearchFileType,
++    /// Wrapped in Arc so cloning IndexMeta shares ownership
++    _tempdir: Arc<IndexTempDirWithSize>,
+ }
+ 
+ impl SizedValue for IndexMeta {
+@@ -204,9 +220,11 @@ impl<RT: Runtime> ArchiveFetcher<RT> {
+             metric_labels.clone(),
+         );
+         Ok(IndexMeta {
+-            _tempdir: IndexTempDirWithSize::new(destination, metric_labels, bytes_used),
+             size: bytes_used,
+             path,
++            storage_key: key.clone(),
++            search_file_type,
++            _tempdir: Arc::new(IndexTempDirWithSize::new(destination, metric_labels, bytes_used)),
+         })
+     }
+ 
+@@ -357,6 +375,24 @@ impl<RT: Runtime> ArchiveCacheManager<RT> {
+         search_file_type: SearchFileType,
+         metric_labels: SearchIndexMetricLabels<'_>,
+     ) -> anyhow::Result<PathBuf> {
++        let timer = metrics::archive_get_timer(search_file_type);
++        let result = self
++            .get_logged(search_storage, key, search_file_type, metric_labels)
++            .await;
++        timer.finish(result.is_ok());
++        result.map(|meta| meta.path.clone())
++    }
++
++    /// Get with IndexMeta for segment LRU coordination.
++    /// Segment LRUs hold Arc<IndexMeta> to prevent premature directory deletion.
++    #[fastrace::trace]
++    pub async fn get_with_meta(
++        &self,
++        search_storage: Arc<dyn Storage>,
++        key: &ObjectKey,
++        search_file_type: SearchFileType,
++        metric_labels: SearchIndexMetricLabels<'_>,
++    ) -> anyhow::Result<Arc<IndexMeta>> {
+         let timer = metrics::archive_get_timer(search_file_type);
+         let result = self
+             .get_logged(search_storage, key, search_file_type, metric_labels)
+@@ -375,10 +411,10 @@ impl<RT: Runtime> ArchiveCacheManager<RT> {
+     ) -> anyhow::Result<PathBuf> {
+         // The archive cache always dumps things into directories, but we want a
+         // specific file path.
+-        let parent_dir: PathBuf = self
+-            .get(search_storage, storage_path, file_type, metric_labels)
++        let meta = self
++            .get_with_meta(search_storage, storage_path, file_type, metric_labels)
+             .await?;
+-        let mut read_dir = fs::read_dir(parent_dir).await?;
++        let mut read_dir = fs::read_dir(&meta.path).await?;
+         let mut paths = Vec::with_capacity(1);
+         while let Some(entry) = read_dir.next_entry().await? {
+             paths.push(entry.path());
+@@ -397,7 +433,7 @@ impl<RT: Runtime> ArchiveCacheManager<RT> {
+         key: &ObjectKey,
+         search_file_type: SearchFileType,
+         metric_labels: SearchIndexMetricLabels<'_>,
+-    ) -> anyhow::Result<PathBuf> {
++    ) -> anyhow::Result<Arc<IndexMeta>> {
+         let archive_fetcher = ArchiveFetcher {
+             cache_path: self.path.clone(),
+             rt: self.rt.clone(),
+@@ -423,17 +459,17 @@ impl<RT: Runtime> ArchiveCacheManager<RT> {
+                 format!("Failed to get cache_key {cache_key:?} in {search_storage:?}")
+             })?;
+ 
+-        let path = result.path.clone();
++        let path = &result.path;
+         let current_size = self.cache.size();
+         tracing::debug!(
+-            "Finished fetching archive for key {key:?}, cached path: {}(space used: {} / {})",
++            "Finished fetching archive for key {key:?}, cached path: {} (space used: {} / {})",
+             path.display(),
+             ByteSize(current_size),
+             ByteSize(self.max_size)
+         );
+         metrics::log_bytes_used(current_size, self.max_size);
+ 
+-        Ok(result.path.clone())
++        Ok(result)
+     }
+ }
+ 
+diff --git a/crates/search/src/fragmented_segment.rs b/crates/search/src/fragmented_segment.rs
+index 5189baf4a..bc332fa2e 100644
+--- a/crates/search/src/fragmented_segment.rs
++++ b/crates/search/src/fragmented_segment.rs
+@@ -1,4 +1,7 @@
+-use std::sync::Arc;
++use std::{
++    path::PathBuf,
++    sync::Arc,
++};
+ 
+ use common::{
+     bootstrap_model::index::vector_index::FragmentedVectorSegment,
+@@ -97,7 +100,7 @@ impl<RT: Runtime> FragmentedSegmentFetcher<RT> {
+         search_storage: Arc<dyn Storage>,
+         fragments: Vec<T>,
+         metric_labels: SearchIndexMetricLabels<'a>,
+-    ) -> impl Stream<Item = anyhow::Result<UntarredVectorDiskSegmentPaths>> + 'a
++    ) -> impl Stream<Item = anyhow::Result<crate::searcher::segment_cache::VectorSegmentPaths>> + 'a
+     where
+         anyhow::Error: From<T::Error>,
+     {
+@@ -120,38 +123,66 @@ impl<RT: Runtime> FragmentedSegmentFetcher<RT> {
+         search_storage: Arc<dyn Storage>,
+         fragment: T,
+         metric_labels: SearchIndexMetricLabels<'_>,
+-    ) -> anyhow::Result<UntarredVectorDiskSegmentPaths>
++    ) -> anyhow::Result<crate::searcher::segment_cache::VectorSegmentPaths>
+     where
+         anyhow::Error: From<T::Error>,
+     {
+         let paths: FragmentedSegmentStorageKeys = fragment.try_into()?;
+         let archive_cache = self.archive_cache.clone();
+         let segment_path = paths.segment.clone();
+-        let fetch_segment = archive_cache.get(
++        let fetch_segment = archive_cache.get_with_meta(
+             search_storage.clone(),
+             &segment_path,
+             SearchFileType::FragmentedVectorSegment,
+             metric_labels.clone(),
+         );
+ 
+-        let fetch_id_tracker = archive_cache.get_single_file(
++        let fetch_id_tracker = archive_cache.get_with_meta(
+             search_storage.clone(),
+             &paths.id_tracker,
+             SearchFileType::VectorIdTracker,
+             metric_labels.clone(),
+         );
+-        let fetch_bitset = archive_cache.get_single_file(
++        let fetch_bitset = archive_cache.get_with_meta(
+             search_storage.clone(),
+             &paths.deleted_bitset,
+             SearchFileType::VectorDeletedBitset,
+             metric_labels,
+         );
+-        let (segment, id_tracker, bitset) =
++        let (segment_meta, id_tracker_meta, bitset_meta) =
+             futures::try_join!(fetch_segment, fetch_id_tracker, fetch_bitset)?;
+-        Ok(UntarredVectorDiskSegmentPaths::new(
+-            segment, id_tracker, bitset,
++
++        // Extract single file paths where needed
++        let id_tracker_path = Self::extract_single_file(&id_tracker_meta.path).await?;
++        let bitset_path = Self::extract_single_file(&bitset_meta.path).await?;
++
++        let untarred_paths = UntarredVectorDiskSegmentPaths::new(
++            segment_meta.path.clone(),
++            id_tracker_path,
++            bitset_path,
++        );
++
++        Ok(crate::searcher::segment_cache::VectorSegmentPaths::new(
++            untarred_paths,
++            segment_meta,
++            id_tracker_meta,
++            bitset_meta,
+         ))
+     }
++
++    async fn extract_single_file(parent_dir: &PathBuf) -> anyhow::Result<PathBuf> {
++        let mut read_dir = tokio::fs::read_dir(parent_dir).await?;
++        let mut paths = Vec::with_capacity(1);
++        while let Some(entry) = read_dir.next_entry().await? {
++            paths.push(entry.path());
++        }
++        anyhow::ensure!(
++            paths.len() == 1,
++            "Expected one file but found multiple paths: {:?}",
++            paths,
++        );
++        Ok(paths[0].to_owned())
++    }
+ }
+ 
+ pub(crate) struct FragmentedSegmentCompactor<RT: Runtime> {
+@@ -196,13 +227,14 @@ impl<RT: Runtime> FragmentedSegmentCompactor<RT> {
+         let segments: Vec<_> = self
+             .segment_fetcher
+             .stream_fetch_fragmented_segments(search_storage.clone(), segments, labels)
+-            .and_then(|paths| async move {
+-                let paths_clone = paths.clone();
++            .and_then(|vector_paths| async move {
++                let vector_paths_clone = vector_paths.clone();
++                let paths = vector_paths.paths.clone();
+                 let segment = self
+                     .blocking_thread_pool
+                     .execute(|| load_disk_segment(paths))
+                     .await??;
+-                anyhow::Ok((paths_clone, segment))
++                anyhow::Ok((vector_paths_clone, segment))
+             })
+             .try_collect()
+             .await?;
+@@ -222,7 +254,7 @@ impl<RT: Runtime> FragmentedSegmentCompactor<RT> {
+                 let result = merge_disk_segments_hnsw(
+                     segments
+                         .iter()
+-                        .map(|(paths, segment)| (Some(paths.clone()), segment))
++                        .map(|(vector_paths, segment)| (Some(vector_paths.paths.clone()), segment))
+                         .collect_vec(),
+                     dimension,
+                     &scratch_dir,
+diff --git a/crates/search/src/searcher/mod.rs b/crates/search/src/searcher/mod.rs
+index 33711e610..bef2b49d7 100644
+--- a/crates/search/src/searcher/mod.rs
++++ b/crates/search/src/searcher/mod.rs
+@@ -3,7 +3,7 @@ mod metrics;
+ #[allow(clippy::module_inception)]
+ mod searcher;
+ mod searchlight_knobs;
+-mod segment_cache;
++pub(crate) mod segment_cache;
+ 
+ pub use in_process::{
+     InProcessSearcher,
+diff --git a/crates/search/src/searcher/searcher.rs b/crates/search/src/searcher/searcher.rs
+index f2196b135..a05b4ead5 100644
+--- a/crates/search/src/searcher/searcher.rs
++++ b/crates/search/src/searcher/searcher.rs
+@@ -8,7 +8,10 @@ use std::{
+         Add,
+         AddAssign,
+     },
+-    path::Path,
++    path::{
++        Path,
++        PathBuf,
++    },
+     sync::Arc,
+     time::{
+         Duration,
+@@ -65,6 +68,7 @@ use tantivy::{
+     TantivyError,
+ };
+ use text_search::tracker::StaticDeletionTracker;
++use tokio::fs;
+ use value::InternalId;
+ use vector::{
+     qdrant_segments::UntarredVectorDiskSegmentPaths,
+@@ -86,6 +90,7 @@ use super::{
+         TextDiskSegmentPaths,
+         TextSegment,
+         TextSegmentCache,
++        TextSegmentKey,
+         VectorSegmentCache,
+     },
+ };
+@@ -358,9 +363,9 @@ impl<RT: Runtime> SearcherImpl<RT> {
+ 
+     async fn load_fragmented_segment(
+         &self,
+-        paths: UntarredVectorDiskSegmentPaths,
++        segment_paths: crate::searcher::segment_cache::VectorSegmentPaths,
+     ) -> anyhow::Result<Arc<SizedVectorSegment>> {
+-        self.vector_segment_cache.get(paths).await
++        self.vector_segment_cache.get(segment_paths).await
+     }
+ 
+     async fn vector_query_segment(
+@@ -408,39 +413,73 @@ impl<RT: Runtime> SearcherImpl<RT> {
+             alive_bitset,
+         }: FragmentedTextStorageKeys,
+         labels: SearchIndexMetricLabels<'_>,
+-    ) -> anyhow::Result<TextDiskSegmentPaths> {
+-        let (index_path, alive_bitset_path, deleted_term_path, id_tracker_path) = try_join!(
+-            self.archive_cache.get(
++    ) -> anyhow::Result<(TextSegmentKey, TextDiskSegmentPaths)> {
++        let (index_meta, alive_meta, deleted_meta, tracker_meta) = try_join!(
++            self.archive_cache.get_with_meta(
+                 storage.clone(),
+                 &segment,
+                 SearchFileType::Text,
+                 labels.clone(),
+             ),
+-            self.archive_cache.get_single_file(
++            self.archive_cache.get_with_meta(
+                 storage.clone(),
+                 &alive_bitset,
+                 SearchFileType::TextAliveBitset,
+                 labels.clone(),
+             ),
+-            self.archive_cache.get_single_file(
++            self.archive_cache.get_with_meta(
+                 storage.clone(),
+                 &deleted_terms_table,
+                 SearchFileType::TextDeletedTerms,
+                 labels.clone(),
+             ),
+-            self.archive_cache.get_single_file(
++            self.archive_cache.get_with_meta(
+                 storage.clone(),
+                 &id_tracker,
+                 SearchFileType::TextIdTracker,
+                 labels,
+             )
+         )?;
+-        Ok(TextDiskSegmentPaths {
++
++        let key = TextSegmentKey {
++            segment: segment.clone(),
++            id_tracker: id_tracker.clone(),
++            deleted_terms_table: deleted_terms_table.clone(),
++            alive_bitset: alive_bitset.clone(),
++        };
++
++        // Extract single file path from each meta
++        let index_path = index_meta.path.clone();
++        let alive_bitset_path = Self::extract_single_file(&alive_meta.path).await?;
++        let deleted_term_path = Self::extract_single_file(&deleted_meta.path).await?;
++        let id_tracker_path = Self::extract_single_file(&tracker_meta.path).await?;
++
++        let paths = TextDiskSegmentPaths {
+             index_path,
+             alive_bitset_path,
+             deleted_terms_table_path: deleted_term_path,
+             id_tracker_path,
+-        })
++            _index_meta: index_meta,
++            _alive_meta: alive_meta,
++            _deleted_meta: deleted_meta,
++            _tracker_meta: tracker_meta,
++        };
++
++        Ok((key, paths))
++    }
++
++    async fn extract_single_file(parent_dir: &PathBuf) -> anyhow::Result<PathBuf> {
++        let mut read_dir = fs::read_dir(parent_dir).await?;
++        let mut paths = Vec::with_capacity(1);
++        while let Some(entry) = read_dir.next_entry().await? {
++            paths.push(entry.path());
++        }
++        anyhow::ensure!(
++            paths.len() == 1,
++            "Expected one file but found multiple paths: {:?}",
++            paths,
++        );
++        Ok(paths[0].to_owned())
+     }
+ 
+     async fn load_text_segment(
+@@ -449,10 +488,10 @@ impl<RT: Runtime> SearcherImpl<RT> {
+         text_storage_keys: FragmentedTextStorageKeys,
+         labels: SearchIndexMetricLabels<'_>,
+     ) -> anyhow::Result<Arc<TextSegment>> {
+-        let paths = self
++        let (key, paths) = self
+             .load_text_segment_paths(storage, text_storage_keys, labels)
+             .await?;
+-        self.text_segment_cache.get(paths).await
++        self.text_segment_cache.get(key, paths).await
+     }
+ }
+ 
+diff --git a/crates/search/src/searcher/segment_cache.rs b/crates/search/src/searcher/segment_cache.rs
+index ad4e32132..efcda01e2 100644
+--- a/crates/search/src/searcher/segment_cache.rs
++++ b/crates/search/src/searcher/segment_cache.rs
+@@ -12,6 +12,7 @@ use common::{
+     bounded_thread_pool::BoundedThreadPool,
+     id_tracker::StaticIdTracker,
+     runtime::Runtime,
++    types::ObjectKey,
+ };
+ use qdrant_segment::segment::Segment;
+ use tantivy::Searcher;
+@@ -24,7 +25,51 @@ use vector::qdrant_segments::{
+     UntarredVectorDiskSegmentPaths,
+ };
+ 
++use crate::archive::cache::IndexMeta;
+ use crate::disk_index::index_reader_for_directory;
++use crate::SearchFileType;
++
++/// Wrapper for vector segment paths with held metadata references.
++/// Prevents archive cache from deleting directories while segment is in LRU.
++#[derive(Clone, Debug)]
++pub struct VectorSegmentPaths {
++    pub paths: UntarredVectorDiskSegmentPaths,
++    /// Held IndexMeta references keep archive dirs alive
++    _segment_meta: Arc<IndexMeta>,
++    _uuids_meta: Arc<IndexMeta>,
++    _deleted_meta: Arc<IndexMeta>,
++}
++
++impl VectorSegmentPaths {
++    pub fn new(
++        paths: UntarredVectorDiskSegmentPaths,
++        segment_meta: Arc<IndexMeta>,
++        uuids_meta: Arc<IndexMeta>,
++        deleted_meta: Arc<IndexMeta>,
++    ) -> Self {
++        Self {
++            paths,
++            _segment_meta: segment_meta,
++            _uuids_meta: uuids_meta,
++            _deleted_meta: deleted_meta,
++        }
++    }
++}
++
++// Hash and Eq based on paths only (metadata is for lifetime, not identity)
++impl std::hash::Hash for VectorSegmentPaths {
++    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
++        self.paths.hash(state);
++    }
++}
++
++impl PartialEq for VectorSegmentPaths {
++    fn eq(&self, other: &Self) -> bool {
++        self.paths == other.paths
++    }
++}
++
++impl Eq for VectorSegmentPaths {}
+ 
+ #[derive(Clone)]
+ struct VectorSegmentGenerator<RT: Runtime> {
+@@ -50,18 +95,18 @@ impl Deref for SizedVectorSegment {
+ impl<RT: Runtime> VectorSegmentGenerator<RT> {
+     async fn generate_value(
+         self,
+-        paths: UntarredVectorDiskSegmentPaths,
++        segment_paths: VectorSegmentPaths,
+     ) -> anyhow::Result<SizedVectorSegment> {
+         let segment = self
+             .thread_pool
+-            .execute(move || load_disk_segment(paths))
++            .execute(move || load_disk_segment(segment_paths.paths))
+             .await??;
+         Ok(SizedVectorSegment(segment))
+     }
+ }
+ 
+ pub(crate) struct VectorSegmentCache<RT: Runtime> {
+-    lru: AsyncLru<RT, UntarredVectorDiskSegmentPaths, SizedVectorSegment>,
++    lru: AsyncLru<RT, VectorSegmentPaths, SizedVectorSegment>,
+     segment_generator: VectorSegmentGenerator<RT>,
+ }
+ 
+@@ -86,22 +131,30 @@ impl<RT: Runtime> VectorSegmentCache<RT> {
+ 
+     pub async fn get(
+         &self,
+-        paths: UntarredVectorDiskSegmentPaths,
++        segment_paths: VectorSegmentPaths,
+     ) -> anyhow::Result<Arc<SizedVectorSegment>> {
+         self.lru
+-            .get(&paths, || {
+-                self.segment_generator.clone().generate_value(paths.clone())
++            .get(&segment_paths, || {
++                self.segment_generator.clone().generate_value(segment_paths.clone())
+             })
+             .await
+     }
+ }
+ 
+-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
++/// Paths for text segment files.
++/// Holds Arc<IndexMeta> references to keep archive directories alive
++/// while this segment is loaded in the LRU.
++#[derive(Clone, Debug)]
+ pub struct TextDiskSegmentPaths {
+     pub index_path: PathBuf,
+     pub alive_bitset_path: PathBuf,
+     pub deleted_terms_table_path: PathBuf,
+     pub id_tracker_path: PathBuf,
++    /// Held IndexMeta references prevent archive cache from deleting directories
++    pub _index_meta: Arc<IndexMeta>,
++    pub _alive_meta: Arc<IndexMeta>,
++    pub _deleted_meta: Arc<IndexMeta>,
++    pub _tracker_meta: Arc<IndexMeta>,
+ }
+ 
+ pub enum TextSegment {
+@@ -133,6 +186,10 @@ impl<RT: Runtime> TextSegmentGenerator<RT> {
+             alive_bitset_path,
+             deleted_terms_table_path,
+             id_tracker_path,
++            _index_meta,
++            _alive_meta,
++            _deleted_meta,
++            _tracker_meta,
+         }: TextDiskSegmentPaths,
+     ) -> anyhow::Result<TextSegment> {
+         let load_text_segment = move || async move {
+@@ -158,8 +215,18 @@ impl<RT: Runtime> TextSegmentGenerator<RT> {
+     }
+ }
+ 
++/// Key for text segment LRU cache based on segment identity (ObjectKeys)
++/// rather than filesystem paths.
++#[derive(Clone, Hash, PartialEq, Eq, Debug)]
++pub struct TextSegmentKey {
++    pub segment: ObjectKey,
++    pub id_tracker: ObjectKey,
++    pub deleted_terms_table: ObjectKey,
++    pub alive_bitset: ObjectKey,
++}
++
+ pub(crate) struct TextSegmentCache<RT: Runtime> {
+-    lru: AsyncLru<RT, TextDiskSegmentPaths, TextSegment>,
++    lru: AsyncLru<RT, TextSegmentKey, TextSegment>,
+     text_segment_generator: TextSegmentGenerator<RT>,
+ }
+ 
+@@ -176,9 +243,9 @@ impl<RT: Runtime> TextSegmentCache<RT> {
+         }
+     }
+ 
+-    pub async fn get(&self, paths: TextDiskSegmentPaths) -> anyhow::Result<Arc<TextSegment>> {
++    pub async fn get(&self, key: TextSegmentKey, paths: TextDiskSegmentPaths) -> anyhow::Result<Arc<TextSegment>> {
+         self.lru
+-            .get(&paths, || {
++            .get(&key, || {
+                 self.text_segment_generator
+                     .clone()
+                     .generate_value(paths.clone())

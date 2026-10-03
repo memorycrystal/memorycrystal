@@ -1,0 +1,56 @@
+---
+title: Pricing
+description: How Memory Crystal is packaged today, how plan limits show up in the repo, and what changes across tiers.
+---
+
+
+Memory Crystal is packaged as hosted plans for managed cloud usage, plus local or self-hosted deployment paths for operators who want to run their own backend.
+Pricing controls capacity for stored memories, short-term messages, channels, raw sensory retention, asset storage, and managed Gemini usage.
+
+## Current hosted plans
+
+| Plan | Price | Core limits |
+| --- | ---: | --- |
+| Free | $0/mo | 500 memories, 500 short-term messages, 3 channels, 7-day message retention, 7-day raw sensory retention, 250 MB multimodal asset storage |
+| Pro | $29/mo | 25,000 memories, 25,000 short-term messages, unlimited channels, 30-day message retention, 14-day raw sensory retention, 2 GB multimodal asset storage |
+| Ultra | $79/mo | Unlimited memories, unlimited short-term messages, unlimited channels, 90-day message retention, 30-day raw sensory retention, 10 GB multimodal asset storage |
+| Enterprise | Custom | Custom limits, custom retention, custom multimodal asset storage, multi-seat/team usage, custom deployment options, dedicated support and SLAs |
+
+Pro and Ultra use 7-day trial checkout links on the public pricing page. Enterprise is contact-only.
+
+## How it actually works
+
+The public website renders current plan limits from the shared tier model where possible. Treat `shared/tierLimits.ts` as the repo-level source of truth for memories, short-term message caps, channel caps, retention windows, and managed Gemini behavior.
+
+Important source files:
+
+- `shared/tierLimits.ts`
+- `apps/web/app/pricing/page.tsx`
+- `docs/PRICING.md`
+- `README.md`
+- `convex/crystal/geminiGuardrail.ts`
+- relevant backend enforcement paths in `convex/crystal/*`
+
+## Plan behavior notes
+
+- `starter` exists in `shared/tierLimits.ts` as a legacy Pro-style alias. It is not a separate public hosted plan.
+- Free does not include managed Gemini. Pro includes managed Gemini with a 500-call daily cap. Ultra and Enterprise-style unlimited tiers allow BYOK/custom caps and have no default managed Gemini daily cap.
+- Raw uploaded files are not exposed directly to model context today. Recall uses derived text, transcripts, summaries, and metadata.
+- Local or self-hosted setup is a deployment mode. Do not assume hosted-tier behavior, support, backups, migrations, or tunnel behavior unless the current install docs and code support it.
+
+## Common mistakes
+
+- treating marketing copy as the technical source of truth for limits
+- listing `starter` as a current public plan
+- assuming hosted-tier behavior and self-hosted behavior are the same thing
+- forgetting that memory limits, message retention, raw sensory retention, asset storage, and model usage are separate controls
+
+## Source of truth
+
+Primary files behind this page:
+
+- `shared/tierLimits.ts`
+- `apps/web/app/pricing/page.tsx`
+- `docs/PRICING.md`
+- `README.md`
+- `apps/web/app/data/releases.ts`

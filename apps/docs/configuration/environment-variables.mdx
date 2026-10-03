@@ -1,0 +1,152 @@
+---
+title: Environment Variables
+description: Which variables matter, who uses them, and how they map to the install scripts, MCP servers, and backend runtime.
+---
+
+
+Environment variables are little labels that tell the program important secrets and addresses.
+They answer questions like:
+
+- Where is the backend?
+- Which API key should I use?
+- Where is my local vault?
+
+## What this means in practice
+
+Important variables across the repo include:
+
+### Client / MCP-facing
+- `MEMORY_CRYSTAL_API_KEY`
+- `MEMORY_CRYSTAL_API_URL`
+
+### Backend / embedding/runtime
+- `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `GEMINI_EMBEDDING_MODEL`
+- `EMBEDDING_PROVIDER`
+- `CONVEX_URL`
+- `OBSIDIAN_VAULT_PATH`
+
+### Local MCP/process wiring
+- `CRYSTAL_MCP_MODE`
+- `CRYSTAL_MCP_HOST`
+- `CRYSTAL_MCP_PORT`
+
+## How it actually works
+
+Different layers use different names:
+
+- the docs and modern MCP setup prefer `MEMORY_CRYSTAL_*`
+- backend paths use provider-specific variables such as `GEMINI_API_KEY` and `OPENROUTER_API_KEY`
+
+The right thing to document is not just the variable name, but **which surface consumes it**.
+
+## Commands / examples
+
+Example from `.env.example`:
+
+```env
+CONVEX_URL=https://convex.memorycrystal.ai
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+GEMINI_EMBEDDING_MODEL=gemini-embedding-2-preview
+OBSIDIAN_VAULT_PATH=/path/to/your/obsidian/vault
+CRYSTAL_MCP_MODE=stdio
+CRYSTAL_MCP_HOST=127.0.0.1
+CRYSTAL_MCP_PORT=8788
+EMBEDDING_PROVIDER=gemini
+MEMORY_CRYSTAL_API_KEY=
+MEMORY_CRYSTAL_API_URL=https://convex.memorycrystal.ai
+```
+
+Use `CRYSTAL_MCP_MODE=stdio` for command-launched local MCP.
+Reserve `CRYSTAL_MCP_MODE=http` for the deprecated local network MCP listener.
+
+Helpful verification command:
+
+```bash
+npm run crystal:doctor
+```
+
+
+## Recall cost breaker
+
+Memory Crystal tracks estimated retrieval work to protect the service and its tenants. The breaker is on by default on every backend. Set `MC_COST_BREAKER_ENABLED="0"` to disable it.
+
+The eight threshold values are bytes. Each user variable applies to each user's row; each global variable applies to the shared global row. If a threshold variable is set, its value applies unchanged on every surface. When it is unset, `kb` uses four times the default threshold and `recall` and `messages` use the default.
+
+| Variable | Default bytes |
+|---|---:|
+| `MC_COST_BREAKER_USER_WARN_VECTOR_BYTES` | 214958080000 |
+| `MC_COST_BREAKER_USER_EMERGENCY_VECTOR_BYTES` | 429916160000 |
+| `MC_COST_BREAKER_USER_WARN_TEXT_BYTES` | 47185920000 |
+| `MC_COST_BREAKER_USER_EMERGENCY_TEXT_BYTES` | 94371840000 |
+| `MC_COST_BREAKER_GLOBAL_WARN_VECTOR_BYTES` | 42991616000000 |
+| `MC_COST_BREAKER_GLOBAL_EMERGENCY_VECTOR_BYTES` | 85983232000000 |
+| `MC_COST_BREAKER_GLOBAL_WARN_TEXT_BYTES` | 9437184000000 |
+| `MC_COST_BREAKER_GLOBAL_EMERGENCY_TEXT_BYTES` | 18874368000000 |
+
+### How it works
+
+One recall unit is 820 MiB of vector work and 180 MiB of text work. The text amount covers three indexes at 60 MiB each. Each standalone message search is charged 60 MiB of text work. A KB-scoped recall is charged one unit per KB searched; a standalone KB query is charged one vector unit and three text-index units.
+
+The default envelope is measured in full recall units per UTC day. User warn and emergency are 250 and 500 recalls; global warn and emergency are 50,000 and 100,000 recalls. The `kb` defaults are 4x the recall envelope: a four-KB recall reaches user warn/emergency at 250/500 calls, a 12-KB recall at about 84/167 calls, and standalone vector emergency at 2,000 queries. Broad recall without KB scope has no `kb` charge.
+
+The message envelope is 1,500 searches per user per day and 300,000 searches globally at emergency. This follows from the text-byte thresholds and the 60 MiB estimate per search.
+
+### Default envelope
+
+All thresholds reset at UTC midnight. Emergencies persist until midnight unless thresholds are raised.
+
+| Scope | Surface | Warn | Emergency |
+|---|---|---:|---:|
+| User | Recall units | 250 recalls | 500 recalls |
+| Global | Recall units | 50,000 recalls | 100,000 recalls |
+| User | Messages | 750 searches | 1,500 searches |
+| Global | Messages | 150,000 searches | 300,000 searches |
+| User | KB units | 1,000 units | 2,000 units |
+| Global | KB units | 200,000 units | 400,000 units |
+
+### Per-account global cap
+
+The global contribution cap is configured from the same byte thresholds: each account can add at most its own user emergency threshold to the global row, per surface and dimension. The debit that crosses the threshold counts in full; later debits add zero for that dimension. Changing the configured user emergency values changes this cap.
+
+### Ultra and unlimited
+
+Ultra and unlimited tenants are exempt from vector depth reduction and text search skipping on recall, KB queries, `/api/mcp/search-messages`, and both message-search lanes.
+
+### Surfaces governed
+
+- `/api/mcp/recall` (recall surface, plus KB surface when `knowledgeBaseIds` are supplied)
+- `/api/mcp/search-messages` (messages surface)
+- `/api/knowledge-bases/{id}/query` (kb surface)
+- Public `api.crystal.recall.recallMemories` (recall surface)
+- Public `api.crystal.messages.searchMessages` (messages surface)
+- Public `api.crystal.knowledgeBases.queryKnowledgeBase` (kb surface)
+
+The public `api.crystal.messages.searchMessages` action is charged against the messages surface and counts toward the per-account global cap, but it is never degraded: it runs its text search even when a messages threshold is in emergency.
+
+### Surfaces not governed
+
+The breaker does not charge dashboard, research, dedupe, hygiene, vector-audit, or seeding operations.
+
+### Recovery
+
+An environment rollback changes the thresholds only. Restoring the previous byte defaults restores the base thresholds; the global contribution cap, lane credits, and tier exemption remain active.
+
+## Common mistakes
+
+- setting `MEMORY_CRYSTAL_API_KEY` and expecting it to work as a backend Gemini/OpenRouter provider key
+- using a Memory Crystal bearer token as `GEMINI_API_KEY`
+- forgetting `MEMORY_CRYSTAL_API_URL` for MCP server setups
+- assuming smoke-test failures are always code failures instead of environment misconfiguration
+
+## Source of truth
+
+Primary files behind this page:
+
+- `.env.example`
+- `scripts/crystal-doctor.sh`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+- `apps/web/public/install.sh`

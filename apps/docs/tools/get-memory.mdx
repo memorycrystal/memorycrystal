@@ -1,0 +1,55 @@
+---
+title: crystal_get_memory
+description: Fetch the full text of one visible memory.
+---
+
+## What it does
+
+Fetches one memory by ID, including the full text used by recall. Use it after
+`crystal_recall` returns a memory flagged `truncated` to read the complete
+text. Channel and knowledge-base gating match recall exactly, so a memory the
+caller may not see is reported as not found. The project filter, archived state,
+and empty-text rows are not applied by ID.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| memoryId | string | Yes | — | Non-empty ID returned by a memory read such as `crystal_recall`. |
+| channel | string | No | — | Channel or peer scope for visibility enforcement. |
+| agentId | string | No | — | Agent identifier for knowledge-base visibility. |
+| projectId | string | No | — | Project store ID for repo-scoped visibility. |
+| repoSlug | string | No | — | Repository slug for automatic project-store scoping. |
+
+## Returns
+
+The agent-facing memory object, including its full `content`. Content is
+redacted when it contains secret-shaped text. The response has no truncation
+marker.
+
+## Example
+
+```javascript
+const result = await crystal_get_memory({
+  memoryId: "mem_synthetic_123",
+  channel: "team-chat:synthetic-peer",
+});
+// result.memory.content contains the complete, redacted memory text.
+```
+
+## Errors
+
+| Error | Cause | Resolution |
+|---|---|---|
+| `memoryId is required` | The ID is missing, empty, or not a string. | Pass a non-empty memory ID. |
+| `Memory not found` (hosted literal) | The ID does not exist or is outside the caller's visible scope. | Recall the memory with the same scope and use its returned ID. |
+| API connection error | The backend could not be reached. | Retry and check the MCP server's API endpoint. |
+
+## Notes
+
+- The literal `Memory not found` text is specific to the hosted server; stdio wraps backend errors differently.
+- A whitespace-only ID is rejected locally by stdio. Hosted trims and forwards it to the backend.
+
+- A tombstoned memory returns empty content.
+- Fetching a memory counts as an access, like other memory reads, and does not change visibility.
+- A knowledge-base chunk's fetched text can differ slightly from what the KB lane returned because fetch may use a stored summary or trimmed text.

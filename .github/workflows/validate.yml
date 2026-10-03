@@ -1,0 +1,184 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Validate public mirror sync output
+        env:
+          PUBLIC_MIRROR_SOURCE_DIR: ${{ github.workspace }}
+        run: node scripts/sync-public.mjs --dry-run
+      - name: Public mirror leak checks
+        run: node --test scripts/sync-public-leak-check.test.mjs
+      - name: Lint
+        run: npm run lint --workspace memorycrystal-app
+      - name: Typecheck
+        run: npm run typecheck --workspace memorycrystal-app
+      - name: Audit strength-write sites
+        run: bash scripts/audit-strength-sites.sh
+      - name: Backend and web regression suites
+        run: |
+          npx vitest run
+          npx vitest run --config apps/web/vitest.config.ts
+      - name: Backend typecheck and MCP package builds
+        run: |
+          npx tsc --noEmit -p convex/tsconfig.json
+          npm run build --workspace @memorycrystal/mcp-server
+          npm run build --workspace @memorycrystal/streamable-http-mcp-server
+      - name: Plugin and checksum regression tests (offline)
+        run: node --test plugin/index.test.js scripts/plugin-checksums.test.mjs
+      - name: Recall script contracts (offline)
+        run: npm run test:recall-scripts
+      - name: Local backend packaging and installer identity contracts (offline)
+        run: node --test scripts/package-local-backend.test.mjs scripts/local-backend-artifact-smoke.test.mjs scripts/installer-local-identity.test.mjs scripts/local-backend-artifact-privacy-test.test.mjs scripts/installer-default-version.test.mjs scripts/ops/reembed-vectorless.test.mjs
+      - name: Committed 0.9.0, 0.9.1, 0.9.2 and installer-default 0.9.3 archives pass unpack, smoke and typecheck (offline)
+        run: |
+          set -euo pipefail
+          assets=apps/web/public/install-assets/local-backend
+          root="$(mktemp -d)"
+          trap 'rm -rf "$root"' EXIT
+          for version in 0.9.0 0.9.1 0.9.2 0.9.3; do
+            mkdir -p "$root/$version/tar" "$root/$version/zip"
+            tar -xzf "$assets/memorycrystal-local-backend-$version.tar.gz" -C "$root/$version/tar"
+            unzip -q "$assets/memorycrystal-local-backend-$version.zip" -d "$root/$version/zip"
+            for format in tar zip; do
+              artifact="$root/$version/$format/memorycrystal-local-backend-$version"
+              CRYSTAL_TEST_ARTIFACT_ROOT="$artifact" node scripts/local-backend-artifact-smoke.mjs
+              ln -s "$GITHUB_WORKSPACE/node_modules" "$artifact/node_modules"
+              (cd "$artifact" && "$GITHUB_WORKSPACE/node_modules/.bin/tsc" --noEmit -p convex/tsconfig.json)
+            done
+          done
+          # 0.9.3 only. The harness unpacks the committed tar, copies the A04
+          # privacy tests (the packager excludes convex/**/__tests__), and runs
+          # them against the shipped handlers. 0.9.2 is the sensitivity case
+          # and is not part of this gate.
+          node scripts/local-backend-artifact-privacy-test.mjs 0.9.3
+      - name: Every committed local backend archive passes the privacy gate in both formats (offline)
+        # ILL-356: extracts the tar.gz and the zip of every archive under
+        # apps/web/public/install-assets/local-backend/ and fails on any mirror
+        # needle, client stem, secret-like string, hosted-only path, removed
+        # path, manifest drift or tar/zip disagreement. Hit values are redacted.
+        run: |
+          node scripts/sanitize-published-local-backends.mjs --check
+          node --test scripts/sanitize-published-local-backends.test.mjs
+      - name: Public web and docs privacy scan (offline)
+        run: node --test scripts/web-public-privacy.test.mjs
+      - name: Retained MCP contracts (offline)
+        run: |
+          node scripts/generate-mcp-tool-contract.mjs --check
+          node --test mcp-server/tests/*.mjs
+          node --experimental-strip-types --test packages/mcp-server/test/hosted-health.test.js packages/mcp-server/test/kb-tool-parity.test.js packages/mcp-server/test/scope-passthrough.test.js packages/mcp-server/test/recall-defaults.test.js packages/mcp-server/test/recall-provenance.test.js packages/mcp-server/test/secret-redaction-static.test.js packages/mcp-server/test/allow-redacted-content.test.js packages/mcp-server/test/recall-content-limit.test.js packages/mcp-server/test/recall-message-lane.test.js packages/mcp-server/test/build-identity.test.mjs packages/mcp-server/test/trim-surrogate.test.mjs packages/mcp-server/test/trim-cut-points.test.mjs packages/mcp-server/test/asset-trim-bound.test.mjs packages/mcp-server/test/surface-baseline.test.mjs packages/mcp-server/test/missing-arguments.test.mjs packages/mcp-server/test/remember-declared-agent.test.js
+          node --test scripts/mcp-pack-smoke.test.mjs
+
+  recall-eval-gate:
+    # Recall v2 production-path gate (ILL-304). `npm run bench:recall` runs
+    # mcpRecall in recorded mode for both vector read modes. It fails on
+    # private-scope leaks, expectedAbsent violations, KB parity diffs, and
+    # legacy-69 R@3/MRR below the committed baseline. Missing fixture inputs
+    # or baselines and insufficient split representation also fail the gate.
+    # Legacy 69 through recallMemories stay on `npm run test:recall-eval`.
+    # See docs/recall-eval-gate.md.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Recall eval gate (recall@k / MRR)
+        run: npm run bench:recall
+      - name: Strength reinforcement/decay equilibrium (ILL-103)
+        run: npm run bench:strength
+
+  contract-tests:
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Skills and plugin-shared contract tests
+        run: |
+          npm run test:skills
+          npm run test:plugin-shared
+
+  mcp-pack-smoke:
+    # `npm pack` does not contact the registry. Installing that tarball does:
+    # npm resolves the packed package's dependency manifests, and an earlier
+    # `npm ci` cache does not satisfy that lookup. The install step needs network.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Pack, install, start, and list tools
+        run: node scripts/mcp-pack-smoke.mjs
+
+  ltm-hygiene:
+    # ILL-285 covering gate. A later break of merge/archive/fluff hygiene
+    # must fail PR CI, not only a local vitest run.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: LTM hygiene covering tests
+        run: npm run test:ltm-hygiene
+
+  local-backend-upgrade:
+    # Upgrade verification exercises both the pinned historical installer and
+    # the Docker-mode runtime path.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # pinned historical 0.9.0 installer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Upgrade 0.9.2 to 0.9.3 without Docker (identity and staging)
+        env:
+          CRYSTAL_TEST_OLD_VERSION: 0.9.2
+        run: bash scripts/local-backend-upgrade.test.sh
+      - name: Upgrade 0.9.1 to 0.9.3 without Docker (identity and staging)
+        run: bash scripts/local-backend-upgrade.test.sh
+      - name: Upgrade 0.9.0 to 0.9.3 without Docker (identity and staging)
+        env:
+          CRYSTAL_TEST_OLD_VERSION: 0.9.0
+        run: bash scripts/local-backend-upgrade.test.sh
+      - name: Installer no-terminal and pseudo-terminal regression tests
+        run: bash scripts/installer-no-tty.test.sh
+      - name: Upgrade 0.9.1 to 0.9.3 with Docker (runtime canary)
+        continue-on-error: false
+        # A1 is the 0.9.1 old-version leg and keeps both synthetic keys: that
+        # committed archive ships the pre-fix convex-local-up.sh. A2, A3 and
+        # the fresh 0.9.3 legs are the new-version legs and run without
+        # GEMINI_API_KEY or OPENROUTER_API_KEY; the new-version log must contain
+        # "No Gemini API key provided; using local stub". A 0.9.2 to 0.9.3
+        # Docker leg is not run; the no-Docker matrix already covers that pair.
+        env:
+          GEMINI_API_KEY: synthetic-gemini-upgrade-test-key
+          OPENROUTER_API_KEY: synthetic-openrouter-upgrade-test-key
+        run: bash scripts/local-backend-upgrade.test.sh --docker
