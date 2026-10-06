@@ -1,0 +1,89 @@
+---
+title: Tools Overview
+description: Memory Crystal's lean v0.9.0 tools, transport differences, and deliberate retrieval paths.
+---
+
+Memory Crystal exposes a focused durable-memory surface. Broad recall never
+starts hidden graph, Organic, knowledge-base, asset, or research work.
+
+## Core hosted surface
+
+The current Streamable HTTP MCP server exposes these 23 tools:
+
+| Family | Tools |
+| --- | --- |
+| Recall and continuity | `crystal_recall`, `crystal_recent`, `crystal_search_messages`, `crystal_wake`, `crystal_trace`, `crystal_get_memory` |
+| Focused recall | `crystal_what_do_i_know`, `crystal_why_did_we`, `crystal_preflight` |
+| Durable writes | `crystal_remember`, `crystal_update`, `crystal_supersede`, `crystal_forget` |
+| Manual backup | `crystal_checkpoint` |
+| Operations | `crystal_stats`, `crystal_health` |
+| Knowledge bases | `crystal_create_knowledge_base`, `crystal_list_knowledge_bases`, `crystal_list_knowledge_base_memories`, `crystal_empty_knowledge_base`, `crystal_set_knowledge_base_access`, `crystal_query_knowledge_base`, `crystal_import_knowledge` |
+
+The deprecated local stdio/HTTP package exposes the same core plus seven
+explicit compatibility/workflow tools: `crystal_edit` and the six
+`crystal_research_*` collection/ingest/status/query/trace/promote tools.
+
+Some native plugins also expose local diagnostics. Do not assume a
+plugin-specific diagnostic exists on both MCP transports; discover the active
+server's tool list.
+
+## Retrieval paths
+
+- `crystal_recall` performs bounded durable LTM vector and lexical retrieval,
+  plus bounded lexical/recent transcript retrieval.
+- `crystal_get_memory` fetches the full text when a recall result is flagged
+  `truncated`.
+- `crystal_search_messages` searches retained transcript text without raw-message
+  embeddings.
+- `crystal_query_knowledge_base` deliberately searches one named or identified
+  KB. Broad recall does not search KBs implicitly.
+- Asset and research access remain explicit workflows.
+- `crystal_preflight` applies rule, lesson, and decision filters before risky
+  work; pass `projectId` or `repoSlug` when the repository is known.
+
+## Common choices
+
+| Need | Tool |
+| --- | --- |
+| Relevant durable context | `crystal_recall` |
+| Read the full text of a truncated result | `crystal_get_memory` |
+| Exact retained wording | `crystal_search_messages` |
+| Recent chronological turns | `crystal_recent` |
+| A broad topic scan | `crystal_what_do_i_know` |
+| Rationale for a past decision | `crystal_why_did_we` |
+| Rules before a risky action | `crystal_preflight` |
+| Save a durable fact or decision | `crystal_remember` |
+| Correct the same memory | `crystal_update` |
+| Replace a stale memory with lineage | `crystal_supersede` |
+| Search reference material | `crystal_query_knowledge_base` |
+| Create a checkpoint requested by the user | `crystal_checkpoint` |
+
+## Cost shape
+
+- Recall uses at most one owner-funded query embedding on a cache miss and no
+  generative call.
+- Transcript search and recent-message reads use no embedding.
+- Explicit durable or KB writes embed the material being saved.
+- Listing, stats, trace, access management, and checkpoint metadata avoid model
+  calls.
+
+## Scope
+
+Pass `agentId`, `channel`, `projectId`, and `repoSlug` whenever the client knows
+them. On peer-capable hosts, a bare or missing peer scope must not widen a read
+across clients. Knowledge-base `agentIds` control visibility within an account;
+separate accounts/API keys remain the hard tenant boundary.
+
+## Default host behavior
+
+Completed-turn capture is automatic on supported hosts and persists one
+idempotent transcript pair without per-turn inference. Recall defaults to
+deliberate tool calls. Operators can opt in to bounded context injection with
+`MEMORY_CRYSTAL_INJECT_RECALL=true` where the host supports it.
+
+## Source of truth
+
+- Hosted transport: `packages/mcp-server/src/index.ts`
+- Deprecated local transport: `mcp-server/src/index.ts`
+- Backend HTTP surface: `convex/crystal/mcp.ts`
+- Knowledge-base HTTP surface: `convex/crystal/knowledgeHttp.ts`

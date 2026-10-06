@@ -1,0 +1,287 @@
+name: Publish Convex Backend Cache Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_only:
+        description: "Compile and run the focused Rust test only; build and push no image"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    # Convex Rust backend image compile — Docker-heavy, same 4vcpu class as illumin8os CI.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+
+    steps:
+      - name: Checkout Memory Crystal
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Reclaim runner disk for the Convex Rust build
+        run: |
+          # GitHub-hosted images ship these tool caches; Blacksmith images may not.
+          for path in \
+            /opt/hostedtoolcache \
+            /usr/local/lib/android \
+            /usr/local/.ghcup \
+            /usr/share/dotnet \
+            /usr/share/swift
+          do
+            if [ -d "$path" ]; then
+              sudo rm -rf "$path"
+            fi
+          done
+          docker system prune --all --force || true
+          df -h /
+
+      - name: Prepare pinned Convex source
+        id: source
+        shell: bash
+        run: |
+          context="$RUNNER_TEMP/convex-backend"
+          infra/convex/backend-cache/prepare-context.sh "$context"
+          revision="$(tr -d '[:space:]' < infra/convex/backend-cache/UPSTREAM_REVISION)"
+          timestamp="$(git -C "$context" show -s --format=%cI "$revision")"
+          patch_sha="$(sha256sum infra/convex/backend-cache/archive-cache.patch | cut -d' ' -f1)"
+          export_patch_sha="$(sha256sum infra/convex/backend-cache/export-cleanup-notfound.patch | cut -d' ' -f1)"
+          patch_dir="infra/convex/backend-cache"
+          prepare_script="$patch_dir/prepare-context.sh"
+          if [[ ! -f "$prepare_script" ]]; then
+            echo "::error::backend cache prepare-context.sh is missing"
+            exit 1
+          fi
+          mapfile -t applied_patches < <(
+            sed -nE 's|^[[:space:]]*git -C "\$DESTINATION" apply "\$SCRIPT_DIR/([^"/]+\.patch)"[[:space:]]*$|\1|p' "$prepare_script"
+          )
+          if ((${#applied_patches[@]} == 0)); then
+            echo "::error::prepare-context.sh has no patch apply lines"
+            exit 1
+          fi
+          apply_candidates="$(
+            awk '
+              /^[[:space:]]*#/ { next }
+              /\.patch/ && (/(^|[^[:alnum:]_])apply([^[:alnum:]_]|$)/ || /^[[:space:]]*(command[[:space:]]+)?patch([[:space:]]|$)/) { count += 1 }
+              END { print count + 0 }
+            ' "$prepare_script"
+          )"
+          if (( apply_candidates != ${#applied_patches[@]} )); then
+            echo "::error::prepare-context.sh contains an unsupported patch application line"
+            exit 1
+          fi
+          patch_paths=()
+          for patch in "${applied_patches[@]}"; do
+            if [[ ! "$patch" =~ ^[A-Za-z0-9._-]+\.patch$ || ! -f "$patch_dir/$patch" ]]; then
+              echo "::error::prepare-context.sh lists a missing or invalid patch file"
+              exit 1
+            fi
+            patch_paths+=("$patch_dir/$patch")
+          done
+          # Hash applied patches in script order, then other context inputs in
+          # path order. Any new apply line or changed build input changes the tag.
+          context_sha="$(
+            {
+              sha256sum "${patch_paths[@]}"
+              find "$patch_dir" -maxdepth 1 -type f \( -name '*.overlay.sh' -o -name 'prepare-context.sh' -o -name 'UPSTREAM_REVISION' \) -print0 \
+                | LC_ALL=C sort -z \
+                | xargs -0 sha256sum
+            } | sha256sum | cut -d' ' -f1
+          )"
+          rust_toolchain="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)"[[:space:]]*$/\1/p' "$context/rust-toolchain")"
+          if [[ ! "$rust_toolchain" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::prepared Convex source has a missing or invalid rust-toolchain channel"
+            exit 1
+          fi
+          tag="${revision:0:12}-cache-${context_sha:0:12}"
+          if [[ "$GITHUB_REF" == refs/heads/* ]]; then
+            tag="${tag}-candidate-${GITHUB_SHA:0:7}"
+          fi
+          # The patched entrypoint must carry the ILL-347 startup temp cleanup.
+          grep -qF 'startup temp cleanup: removed' "$context/self-hosted/docker-build/run_backend.sh"
+          echo "context=$context" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+          echo "rust_toolchain=$rust_toolchain" >> "$GITHUB_OUTPUT"
+          echo "node_version=$(tr -d '[:space:]' < "$context/.nvmrc")" >> "$GITHUB_OUTPUT"
+          echo "patch_sha=$patch_sha" >> "$GITHUB_OUTPUT"
+          echo "export_patch_sha=$export_patch_sha" >> "$GITHUB_OUTPUT"
+          echo "context_sha=$context_sha" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned Convex Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.source.outputs.rust_toolchain }}
+
+      - name: Set up pinned Convex Node version
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.source.outputs.node_version }}
+
+      - name: Prepare Convex Rust test dependencies
+        env:
+          CONTEXT: ${{ steps.source.outputs.context }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev libsodium-dev librocksdb-dev libsnappy-dev libclang-dev
+          mise_version="$(sed -nE 's/^min_version = "([^"]+)"/\1/p' "$CONTEXT/mise.toml")"
+          # mise runs in shim mode unless the binary is literally named "mise".
+          mkdir -p "$RUNNER_TEMP/ill349"
+          mise_bin="$RUNNER_TEMP/ill349/mise"
+          curl -fsSL https://mise.run | MISE_VERSION="v${mise_version}" MISE_INSTALL_PATH="$mise_bin" sh
+          cd "$CONTEXT"
+          "$mise_bin" trust
+          "$mise_bin" install --locked just cmake protoc
+          npm ci --prefix scripts/
+          "$mise_bin" exec -- just install-js
+
+      - name: Test expired export cleanup (ILL-349)
+        env:
+          CONTEXT: ${{ steps.source.outputs.context }}
+          MISE_BIN: ${{ runner.temp }}/ill349/mise
+        run: |
+          cd "$CONTEXT"
+          PROTOC="$("$MISE_BIN" which protoc)" "$MISE_BIN" exec -- cargo test --locked -p application --features testing system_table_cleanup::export_cleanup_tests
+          rm -rf target scripts/node_modules npm-packages/node_modules
+
+      - name: Set up Docker Buildx
+        if: ${{ !inputs.test_only }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: ${{ !inputs.test_only }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        if: ${{ !inputs.test_only }}
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.source.outputs.context }}
+          file: ${{ steps.source.outputs.context }}/self-hosted/docker-build/Dockerfile.backend
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${{ steps.source.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.revision }}
+          build-args: |
+            VERGEN_GIT_SHA=${{ steps.source.outputs.revision }}
+            VERGEN_GIT_COMMIT_TIMESTAMP=${{ steps.source.outputs.timestamp }}
+
+      - name: Verify backend binary size (ILL-238 gate)
+        if: ${{ !inputs.test_only }}
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}"
+          CONTAINER_ID="$(docker create "$IMAGE")"
+          docker cp "$CONTAINER_ID:/convex/convex-local-backend" /tmp/convex-local-backend
+          docker rm "$CONTAINER_ID"
+          
+          SIZE_BYTES="$(stat -c%s /tmp/convex-local-backend 2>/dev/null || stat -f%z /tmp/convex-local-backend)"
+          SIZE_MB="$((SIZE_BYTES / 1048576))"
+          
+          echo "convex-local-backend size: ${SIZE_MB} MB (${SIZE_BYTES} bytes)"
+          
+          if [[ "$SIZE_BYTES" -lt 10485760 ]]; then
+            echo "❌ FATAL: Binary is ${SIZE_MB} MB (under 10 MB minimum)."
+            echo "This is likely a cargo-chef stub from failed compilation (ILL-238)."
+            echo "The published stub incident (sha256:f59136c6) was 338 KB."
+            echo "A real backend is tens of MB after stripping."
+            exit 1
+          fi
+          
+          if [[ "$SIZE_BYTES" -lt 20971520 ]]; then
+            echo "⚠️  WARNING: Binary is ${SIZE_MB} MB (real backends are typically 20+ MB)."
+            echo "Verify this is not a stub before deploying."
+          else
+            echo "✅ Binary size is acceptable (${SIZE_MB} MB)."
+          fi
+
+      - name: Push verified image
+        if: ${{ !inputs.test_only }}
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}"
+          docker push "$IMAGE"
+
+      - name: Record registry digest and verify the candidate by digest (ILL-347)
+        if: ${{ !inputs.test_only }}
+        id: digest
+        env:
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          REPO="ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend"
+          IMAGE="${REPO}:${TAG}"
+          # The digest comes from the registry after the push, not from the
+          # local build (load: true produces a local image id, not a manifest digest).
+          if ! FORMATTED_DIGEST="$(docker buildx imagetools inspect "$IMAGE" --format '{{.Manifest.Digest}}' 2>/dev/null)"; then
+            echo "❌ FATAL: registry formatted digest check failed"
+            exit 1
+          fi
+          DIGEST="$(printf '%s\n' "$FORMATTED_DIGEST" | grep -oE 'sha256:[0-9a-f]{64}' | head -n 1 || true)"
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "❌ FATAL: registry formatted digest is missing or malformed"
+            exit 1
+          fi
+          if ! RAW_DIGEST="sha256:$(docker buildx imagetools inspect "$IMAGE" --raw 2>/dev/null | sha256sum | cut -d' ' -f1)"; then
+            echo "❌ FATAL: registry raw manifest digest check failed"
+            exit 1
+          fi
+          if [[ ! "$RAW_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "❌ FATAL: registry raw manifest digest is missing or malformed"
+            exit 1
+          fi
+          if [[ "$DIGEST" != "$RAW_DIGEST" ]]; then
+            echo "❌ FATAL: registry formatted and raw manifest digest checks differ"
+            exit 1
+          fi
+          # The candidate must be pullable by digest alone.
+          docker image rm "$IMAGE" >/dev/null 2>&1 || true
+          docker pull "${REPO}@${DIGEST}" >/dev/null 2>&1
+          # The image entrypoint must be the upstream run_backend.sh and it must
+          # contain the startup temp cleanup overlay.
+          ENTRYPOINT="$(docker inspect --format '{{json .Config.Entrypoint}}' "${REPO}@${DIGEST}")"
+          if [[ "$ENTRYPOINT" != '["./run_backend.sh"]' ]]; then
+            echo "❌ FATAL: unexpected image entrypoint"
+            exit 1
+          fi
+          if ! docker run --rm --entrypoint cat "${REPO}@${DIGEST}" /convex/run_backend.sh 2>/dev/null | grep -qF 'startup temp cleanup: removed'; then
+            echo "❌ FATAL: the image entrypoint does not contain the startup temp cleanup (ILL-347)"
+            exit 1
+          fi
+          echo "✅ Candidate image pulled by digest; entrypoint carries the startup temp cleanup."
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Publish build identity
+        if: ${{ !inputs.test_only }}
+        env:
+          PATCH_SHA: ${{ steps.source.outputs.patch_sha }}
+          CONTEXT_SHA: ${{ steps.source.outputs.context_sha }}
+          REVISION: ${{ steps.source.outputs.revision }}
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          {
+            echo "## Patched Convex backend (candidate for ILL-352)"
+            echo
+            echo "- Image: \`ghcr.io/${{ github.repository_owner }}/memorycrystal-convex-backend:${TAG}\`"
+            echo "- Upstream revision: \`${REVISION}\`"
+            echo "- archive-cache.patch SHA-256: \`${PATCH_SHA}\`"
+            echo "- export-cleanup-notfound.patch SHA-256: \`${{ steps.source.outputs.export_patch_sha }}\`"
+            echo "- Build-context hash (patches + overlays + prepare-context.sh + UPSTREAM_REVISION): \`${CONTEXT_SHA}\`"
+            echo "- Entrypoint verified to contain the startup temp cleanup (ILL-347)."
+            echo "- Candidate registry digest is recorded in the PR and Linear for ILL-352."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"

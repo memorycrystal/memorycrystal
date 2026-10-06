@@ -1,0 +1,69 @@
+---
+title: Knowledge Bases
+description: The reference-data side of Memory Crystal's public tool surface.
+---
+
+
+Knowledge Bases are the shelf of books your AI can read when it needs stable reference material.
+
+## What this means in practice
+
+Use them for:
+
+- documentation
+- policies
+- runbooks
+- reference notes
+- scoped project or workspace knowledge
+
+They are different from conversational memory because they are meant to stay stable and be queried deliberately.
+
+Knowledge-base lookup should stay separate from broad recall. Use KB tools when the user names a manual, voice guide, transcript library, product docs, runbook, or imported reference corpus. Use recall when the agent needs a blended view across durable memories plus any relevant scoped KB evidence.
+
+## Scope and source roles
+
+Knowledge bases can carry:
+
+- `scope` — tenant, channel, peer, or project visibility boundary
+- `agentId` — agent/client visibility boundary
+- `sourceRole` — why this corpus exists, such as `voice_style`, `persona_guardrail`, `canonical_reference`, or `client_context`
+
+Recall can use `sourceRole` for ranking, but KB list/query calls keep visibility explicit. A KB that exists but is not listed may be hidden by `agentId`, `scope`, `channel`, inactive status, or strict peer policy.
+
+The universal installer now declares a platform-slug `agentId` at install time and prints reachable-versus-total knowledge bases for that identity. To grant a declared identity access to a restricted KB, add the slug to the KB's agent allow-list in the dashboard (Knowledge → Agents) or run `crystal_set_knowledge_base_access` with `action=add` and that `agentId`. Strict and peer-isolated KBs stay fail-closed; this does not change server-side gate logic.
+
+For coding workflows, associate imported repo docs and remembered repo facts with `projectId` or `repoSlug` so agents working in one repository do not receive unrelated repository context.
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+
+## Common mistakes
+
+- treating Knowledge Bases as just another name for memory stores
+- forgetting the difference between stable reference data and conversational memory
+- documenting import/query behavior without checking the actual HTTP/tool surfaces
+- using broad recall when the user asked about a named KB or source document
+- omitting `agentId`, `channel`, `projectId`, or `repoSlug` in multi-agent or multi-repo clients
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeBases.ts`
+- `convex/crystal/knowledgeHttp.ts`
+- `packages/mcp-server/README.md`
+- `convex/schema.ts`

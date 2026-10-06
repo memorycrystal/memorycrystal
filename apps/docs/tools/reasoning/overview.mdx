@@ -1,0 +1,67 @@
+---
+title: Reasoning tools
+description: Bounded durable-memory helpers for topic scans, decision archaeology, and preflight checks.
+---
+
+## What this means in practice
+
+Reasoning helpers apply focused filters to the same bounded durable-memory recall path. They answer:
+
+- What do I know about X?
+- Why did we make decision Z?
+- Which recorded rules, lessons, or decisions should gate an action?
+
+## How it actually works
+
+These tools operate on the lean recall path:
+
+- **Vector search** finds durable memories by semantic similarity
+- **Lexical fallback** keeps recent unextracted messages recallable without raw-message embeddings
+- **Ranking** prioritizes results by deterministic recency, strength, confidence, and category signals
+- **Scope filtering** (for multi-tenant systems) ensures memories from different channels/projects don't bleed together
+
+Key repo surfaces:
+
+- `convex/crystal/recall.ts` — Core recall logic shared across all reasoning tools
+- `convex/crystal/recallRanking.ts` — Ranking and filtering logic
+- `convex/crystal/mcp.ts` — MCP tool definitions
+
+## Commands / examples
+
+Representative tool names:
+
+- `crystal_what_do_i_know` — Broad topic scan
+- `crystal_why_did_we` — Reason archaeology for decisions
+- `crystal_preflight` — Rules, lessons, and decisions before risky work
+
+## When to use each
+
+| Tool | Use when | Example |
+|---|---|---|
+| **`crystal_what_do_i_know`** | You want an overview of everything known about a topic, across all memory stores | "What do I know about Convex auth?" |
+| **`crystal_why_did_we`** | You want to understand the reasoning behind a past decision | "Why did we use Convex instead of Supabase?" |
+| **`crystal_preflight`** | You need applicable rules and lessons before a risky action | "What should gate this production migration?" |
+
+## Differences from recall and search
+
+| Tool Family | Purpose | Returns |
+|---|---|---|
+| **Recall** (`crystal_recall`, `crystal_recent`) | Deliberate retrieval of relevant memories or recent context | Top-K memories or chronological messages |
+| **Search** (`crystal_search_messages`) | Find messages by keyword or phrase | Messages matching the search pattern |
+| **Reasoning** (`crystal_what_do_i_know`, `crystal_why_did_we`, `crystal_preflight`) | Explore a topic, past decision, or safety constraint | Bounded durable-memory results |
+
+**Key difference**: recall accepts general filters, while the helpers package common deliberate queries. Tool-mode is the default; capture remains independent of recall injection.
+
+## Common mistakes
+
+- Using `crystal_recall` when you should use `crystal_what_do_i_know` for broad topic scans
+- Forgetting that reasoning tools and recall are deliberate calls unless an operator explicitly enables injection
+- Conflating `crystal_why_did_we` (decision archaeology) with `crystal_recall` (memory retrieval)
+- Expecting a helper to search named KBs, assets, or research collections implicitly
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/recall.ts`
+- `convex/crystal/mcp.ts`

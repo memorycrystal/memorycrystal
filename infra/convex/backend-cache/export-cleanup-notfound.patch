@@ -1,0 +1,108 @@
+diff --git a/crates/application/src/system_table_cleanup/mod.rs b/crates/application/src/system_table_cleanup/mod.rs
+index 754d0f612..bb339e76a 100644
+--- a/crates/application/src/system_table_cleanup/mod.rs
++++ b/crates/application/src/system_table_cleanup/mod.rs
+@@ -496,8 +496,11 @@ impl<RT: Runtime> SystemTableCleanupWorker<RT> {
+             .await?;
+         let num_deleted = object_keys_to_del.len();
+         for object_key in object_keys_to_del {
+-            self.exports_storage.delete_object(&object_key).await?;
+-            log_exports_s3_cleanup();
++            delete_expired_export_blob(
++                &object_key,
++                self.exports_storage.delete_object(&object_key),
++            )
++            .await?;
+         }
+         self.database
+             .commit_with_write_source(tx, "system_table_cleanup")
+@@ -549,6 +552,89 @@ impl<RT: Runtime> SystemTableCleanupWorker<RT> {
+     }
+ }
+ 
++async fn delete_expired_export_blob(
++    object_key: &common::types::ObjectKey,
++    delete_result: impl Future<Output = anyhow::Result<()>>,
++) -> anyhow::Result<()> {
++    match delete_result.await {
++        Ok(()) => {
++            log_exports_s3_cleanup();
++            Ok(())
++        },
++        Err(error)
++            if error
++                .downcast_ref::<std::io::Error>()
++                .map(|error| error.kind())
++                == Some(std::io::ErrorKind::NotFound) =>
++        {
++            tracing::warn!(object_key = ?object_key, "Expired export blob was already missing");
++            Ok(())
++        },
++        Err(error) => Err(error),
++    }
++}
++
++#[cfg(test)]
++mod export_cleanup_tests {
++    use common::{
++        runtime::Runtime,
++        types::ObjectKey,
++    };
++    use runtime::prod::ProdRuntime;
++    use storage::{
++        LocalDirStorage,
++        Storage,
++    };
++
++    use super::delete_expired_export_blob;
++
++    // The open-source tree ships no `TestRuntime`, so these tests drive the
++    // production runtime from plain `#[test]` functions. `init_tokio` refuses
++    // to run inside a Tokio context, so `#[tokio::test]` cannot be used.
++
++    // This key represents the zip_object_key selected from an expired
++    // Completed export by ExportsModel::cleanup_expired.
++    #[test]
++    fn cleanup_expired_export_with_missing_local_blob_returns_ok() -> anyhow::Result<()> {
++        let tokio_rt = ProdRuntime::init_tokio()?;
++        let rt = ProdRuntime::new(&tokio_rt);
++        let storage = LocalDirStorage::new(rt.clone())?;
++        let object_key = ObjectKey::try_from(rt.new_uuid_v4().to_string())?;
++
++        let result = tokio_rt.block_on(delete_expired_export_blob(
++            &object_key,
++            storage.delete_object(&object_key),
++        ));
++
++        assert!(result.is_ok(), "a missing expired export blob is tolerated");
++        Ok(())
++    }
++
++    #[test]
++    fn cleanup_expired_export_propagates_non_not_found_storage_error() -> anyhow::Result<()> {
++        let tokio_rt = ProdRuntime::init_tokio()?;
++        let rt = ProdRuntime::new(&tokio_rt);
++        let object_key = ObjectKey::try_from(rt.new_uuid_v4().to_string())?;
++        let injected_error = std::io::Error::new(
++            std::io::ErrorKind::PermissionDenied,
++            "injected export storage failure",
++        );
++
++        let result = tokio_rt.block_on(delete_expired_export_blob(&object_key, async {
++            Err(anyhow::Error::from(injected_error))
++        }));
++
++        let error = result.expect_err("non-NotFound errors must propagate");
++        assert_eq!(
++            error
++                .downcast_ref::<std::io::Error>()
++                .map(|error| error.kind()),
++            Some(std::io::ErrorKind::PermissionDenied),
++        );
++        Ok(())
++    }
++}
++
+ #[derive(Clone, Copy, Debug)]
+ enum CreationTimeInterval {
+     #[allow(dead_code)]

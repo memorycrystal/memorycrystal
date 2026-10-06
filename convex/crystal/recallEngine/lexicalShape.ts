@@ -1,0 +1,40 @@
+import type { RecallRankingCandidate } from "../recallRanking";
+
+/** The shape the shared compositor receives from the lexical lane. */
+export function shapeLexicalCandidates(candidates: Array<RecallRankingCandidate & { _id: string }>): any[] {
+  return candidates.map((candidate) => ({
+    _id: candidate._id,
+    title: candidate.title,
+    content: candidate.content,
+    topicText: candidate.topicText ?? candidate.content,
+    dedupeText: candidate.dedupeText ?? candidate.content,
+    metadata: (candidate as { metadata?: string }).metadata,
+    store: candidate.store,
+    category: candidate.category,
+    tags: candidate.tags ?? [],
+    createdAt: candidate.createdAt ?? Date.now(),
+    source: candidate.source,
+    supersededByMemoryId: candidate.supersededByMemoryId,
+    knowledgeBaseId: candidate.knowledgeBaseId,
+    knowledgeBaseName: candidate.knowledgeBaseName,
+    kbAgentPriority: candidate.kbAgentPriority,
+    score: 0,
+    vectorScore: candidate.vectorScore ?? 0,
+    textMatchScore: candidate.textMatchScore ?? 0,
+    identifierMatchScore: candidate.identifierMatchScore ?? 0,
+    identifierMatch: candidate.identifierMatch ?? false,
+    requestedPrTicketMatch: candidate.requestedPrTicketMatch ?? false,
+    decisiveIdentifierMatch: candidate.decisiveIdentifierMatch ?? false,
+    exactPhraseMatch: candidate.exactPhraseMatch ?? false,
+    strength: candidate.strength,
+    confidence: candidate.confidence ?? 0.7,
+    accessCount: candidate.accessCount ?? 0,
+    lastAccessedAt: candidate.lastAccessedAt,
+    salienceScore: candidate.salienceScore,
+    channel: candidate.channel,
+    sameProject: candidate.sameProject,
+    sourceRole: candidate.sourceRole,
+    sourceRoleSource: candidate.sourceRoleSource,
+    projectId: candidate.projectId,
+  }));
+}

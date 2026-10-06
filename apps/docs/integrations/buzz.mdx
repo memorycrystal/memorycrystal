@@ -1,0 +1,37 @@
+---
+title: Buzz
+description: Memory Crystal installs into the CLIs Buzz runs. Buzz is Hosted. Channel memory is not available.
+---
+
+Buzz hosts agents through `buzz-acp`. It is not a Memory Crystal install target.
+
+Install Memory Crystal into the CLI that session is actually running: Claude Code, Codex, Grok Build, or another official CLI. Memory Crystal then follows that CLI's Support Tier.
+
+There is no `--targets buzz`.
+
+## What works today
+
+Lookups against memory you already stored still work. After the hosted CLI is installed, the agent can use the Explicit Tool Surface (`crystal_recall`, `crystal_remember`, and the rest).
+
+Automatic capture and recall belong to the hosted CLI. Grok Build is Capture tier: recall is a deliberate tool call because that harness cannot inject hook output into context.
+
+## What is not available
+
+Channel memory is not available.
+
+Buzz cannot yet issue a read-only, single-channel, expiring key. Memory Crystal does not capture Buzz channels and does not isolate one channel from another. Do not treat a Buzz room as a private memory boundary. That boundary is not enforced.
+
+## Install
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Accept the CLI Buzz launched, or pass that CLI's `--targets` id. See [Installation](/installation) and [Support Tiers](/concepts/support-tiers).
+
+## Source of truth
+
+- `apps/web/public/install-assets/platforms.json` (`publication.hosted.buzz`)
+- `apps/web/app/buzz/page.tsx`
+- `docs/adr/0007-support-tiers-bounded-by-harness-capability.md`
+- `CONTEXT.md`

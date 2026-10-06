@@ -1,0 +1,105 @@
+name: MCP Container Health
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mcp-server/**"
+      - "infra/selfhosted/**"
+      - ".github/workflows/mcp-container-health.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mcp-server/**"
+      - "infra/selfhosted/**"
+      - ".github/workflows/mcp-container-health.yml"
+
+# Least-privilege: contents:read only. This job never pushes an image.
+permissions:
+  contents: read
+
+jobs:
+  container-health:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      MC_VERSION: ci-health-test
+      MC_TENANT_SLUG: ci-health-test
+      MC_TUNNEL_TOKEN: unused
+      MC_BOOTSTRAP_TOKEN: unused
+      # Disposable test instance only; never used outside this job.
+      INSTANCE_SECRET: "0000000000000000000000000000000000000000000000000000000000000000"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build MCP image
+        run: |
+          docker build \
+            -t mcp-health-test \
+            -f mcp-server/Dockerfile \
+            .
+
+      - name: Run container and poll until healthy
+        run: |
+          # The -e flags mirror the compose mcp environment exactly (literal
+          # values; MC_TENANT_SLUG is interpolated in compose). The contract test
+          # mcp-server/tests/selfhosted-contract.test.mjs fails if they drift.
+          docker run -d \
+            --name mcp-health-test \
+            --add-host backend:127.0.0.1 \
+            -e CONVEX_URL=http://backend:3210 \
+            -e CRYSTAL_CONVEX_SITE_URL=http://backend:3211 \
+            -e MEMORY_CRYSTAL_API_URL=http://backend:3211 \
+            -e MC_TENANT_SLUG=ci-test \
+            -e CRYSTAL_MCP_MODE=http \
+            -e CRYSTAL_MCP_HOST=0.0.0.0 \
+            -e CRYSTAL_MCP_PORT=8788 \
+            -p 8788:8788 \
+            mcp-health-test
+
+          # Poll docker inspect until healthy (120 s max)
+          for i in $(seq 1 24); do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' mcp-health-test 2>/dev/null || echo "starting")
+            echo "[$i/24] Health status: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Container reached healthy state."
+              break
+            fi
+            if [ "$STATUS" = "unhealthy" ]; then
+              echo "::error::Container became unhealthy"
+              docker logs mcp-health-test
+              exit 1
+            fi
+            sleep 5
+          done
+
+          FINAL=$(docker inspect -f '{{.State.Health.Status}}' mcp-health-test)
+          if [ "$FINAL" != "healthy" ]; then
+            echo "::error::Container did not reach healthy within 120s (final: $FINAL)"
+            docker logs mcp-health-test
+            exit 1
+          fi
+
+      - name: Exec compose healthcheck command
+        run: |
+          docker exec mcp-health-test sh -c 'curl -f http://127.0.0.1:8788/healthz || wget -q --spider http://127.0.0.1:8788/healthz'
+          echo "Compose healthcheck command exited 0"
+
+      - name: Exec wget spider probe
+        run: |
+          docker exec mcp-health-test wget -q --spider http://127.0.0.1:8788/healthz
+          echo "wget spider probe exited 0"
+
+      - name: Probe backend dashboard and fallback compose healthchecks
+        run: |
+          # Use the compose healthchecks themselves, so probe changes cannot drift.
+          # Web's image build is unavailable in this checkout;
+          # see infra/selfhosted/README.md for this job's coverage boundary.
+          docker compose -p ci-health-test -f infra/selfhosted/docker-compose.yml \
+            up -d --wait --wait-timeout 180 backend dashboard fallback
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f mcp-health-test 2>/dev/null || true
+          docker compose -p ci-health-test -f infra/selfhosted/docker-compose.yml down -v

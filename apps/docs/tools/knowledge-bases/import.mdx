@@ -1,0 +1,46 @@
+---
+title: Importing data
+description: The public import paths for loading stable reference material into a Knowledge Base.
+---
+
+
+Importing data is how you put books onto the shelf so the AI can read them later.
+
+## What this means in practice
+
+Knowledge can be imported through:
+
+- MCP knowledge-base tools
+- HTTP endpoints
+- larger migration/import workflows in the repo
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`
+
+These files show how imports are accepted, stored, and enriched.
+
+## Commands / examples
+
+Examples:
+
+- `crystal_import_knowledge`
+- `POST /api/knowledge-bases/:knowledgeBaseId/import`
+
+## Common mistakes
+
+- assuming imports are only an MCP concern and forgetting the HTTP path
+- documenting import as if it immediately means “fully enriched and searchable” without mentioning follow-up processing
+- mixing conversational memory ingestion and KB import semantics
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/knowledgeHttp.ts`
+- `convex/crystal/knowledgeBases.ts`
+- `packages/mcp-server/README.md`

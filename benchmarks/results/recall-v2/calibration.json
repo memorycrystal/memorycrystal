@@ -1,0 +1,1991 @@
+{
+  "issue": "ILL-306",
+  "version": "ILL-306-r1",
+  "splitUsedForCalibration": "calibration",
+  "splitSalt": "recall-v2-r1-salt-v76",
+  "splitCounts": {
+    "calibration": 91,
+    "heldout": 88
+  },
+  "calibrationMethod": "Ranking and coverage constants were selected using calibration-split outcomes only. Heldout metrics are retained as acceptance gates and were not used to choose constants.",
+  "constants": {
+    "vectorWeight": 0.76,
+    "lexicalWeight": 0.24,
+    "identifierQueryWeights": {
+      "vector": 0.2,
+      "lexical": 0.18,
+      "identifier": 0.62
+    },
+    "relevanceFloor": 0.2,
+    "strongThreshold": 0.52,
+    "strongLexicalMinimum": 0.35,
+    "strongVectorMinimum": 0.35,
+    "injectRankThreshold": 0.62,
+    "injectScoreThreshold": 0.35,
+    "lowContentWeakMaximum": 0.519
+  },
+  "scoreMapping": {
+    "type": "monotone piecewise linear",
+    "anchor": {
+      "rankScore": 0.62,
+      "score": 0.35
+    },
+    "domain": [
+      -0.05,
+      1.05
+    ]
+  },
+  "benchmarkInputs": {
+    "beforeRecorded": "baseline.before.json",
+    "afterRecorded": "after.recorded.json",
+    "beforeHashed": "baseline.hashed.before.json",
+    "afterHashed": "after.hashed.json"
+  },
+  "calibrationMetrics": {
+    "recorded": {
+      "default": {
+        "caseCount": 91,
+        "positiveCount": 69,
+        "negativeCount": 22,
+        "hitAt1": 0.913,
+        "hitAt3": 1,
+        "hitAt5": 1,
+        "mrr": 0.9565,
+        "strongRate": 0.0455,
+        "strongPrecision": 0.9851,
+        "strongRecall": 0.9565
+      },
+      "side": {
+        "caseCount": 91,
+        "positiveCount": 69,
+        "negativeCount": 22,
+        "hitAt1": 0.913,
+        "hitAt3": 1,
+        "hitAt5": 1,
+        "mrr": 0.9565,
+        "strongRate": 0.0455,
+        "strongPrecision": 0.9851,
+        "strongRecall": 0.9565
+      }
+    },
+    "hashed": {
+      "default": {
+        "caseCount": 91,
+        "positiveCount": 69,
+        "negativeCount": 22,
+        "hitAt1": 0.8986,
+        "hitAt3": 0.9275,
+        "hitAt5": 0.9275,
+        "mrr": 0.9106,
+        "strongRate": 0,
+        "strongPrecision": 1,
+        "strongRecall": 0.6087
+      },
+      "side": {
+        "caseCount": 91,
+        "positiveCount": 69,
+        "negativeCount": 22,
+        "hitAt1": 0.8986,
+        "hitAt3": 0.9275,
+        "hitAt5": 0.9275,
+        "mrr": 0.9106,
+        "strongRate": 0,
+        "strongPrecision": 1,
+        "strongRecall": 0.6087
+      }
+    }
+  },
+  "heldoutMetrics": {
+    "recorded": {
+      "default": {
+        "caseCount": 88,
+        "positiveCount": 73,
+        "negativeCount": 15,
+        "hitAt1": 0.9178,
+        "hitAt3": 0.9863,
+        "hitAt5": 0.9863,
+        "mrr": 0.9521,
+        "strongRate": 0,
+        "strongPrecision": 0.9855,
+        "strongRecall": 0.9452
+      },
+      "side": {
+        "caseCount": 88,
+        "positiveCount": 73,
+        "negativeCount": 15,
+        "hitAt1": 0.9178,
+        "hitAt3": 0.9863,
+        "hitAt5": 0.9863,
+        "mrr": 0.9521,
+        "strongRate": 0,
+        "strongPrecision": 0.9855,
+        "strongRecall": 0.9452
+      }
+    },
+    "hashed": {
+      "default": {
+        "caseCount": 88,
+        "positiveCount": 73,
+        "negativeCount": 15,
+        "hitAt1": 0.8767,
+        "hitAt3": 0.9452,
+        "hitAt5": 0.9452,
+        "mrr": 0.9087,
+        "strongRate": 0,
+        "strongPrecision": 0.9773,
+        "strongRecall": 0.6027
+      },
+      "side": {
+        "caseCount": 88,
+        "positiveCount": 73,
+        "negativeCount": 15,
+        "hitAt1": 0.8767,
+        "hitAt3": 0.9452,
+        "hitAt5": 0.9452,
+        "mrr": 0.9087,
+        "strongRate": 0,
+        "strongPrecision": 0.9773,
+        "strongRecall": 0.6027
+      }
+    }
+  },
+  "legacyMetrics": {
+    "recorded": {
+      "default": {
+        "caseCount": 69,
+        "mrr": 1
+      },
+      "side": {
+        "caseCount": 69,
+        "mrr": 1
+      }
+    },
+    "hashed": {
+      "default": {
+        "caseCount": 69,
+        "mrr": 1
+      },
+      "side": {
+        "caseCount": 69,
+        "mrr": 1
+      }
+    }
+  },
+  "classMetrics": {
+    "recorded": {
+      "default": {
+        "identifier": {
+          "calibration": {
+            "caseCount": 11,
+            "positiveCount": 5,
+            "negativeCount": 6,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 13,
+            "positiveCount": 11,
+            "negativeCount": 2,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8182
+          }
+        },
+        "kb": {
+          "calibration": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "legacy": {
+          "calibration": {
+            "caseCount": 34,
+            "positiveCount": 34,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 35,
+            "positiveCount": 35,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "low-content": {
+          "calibration": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.8,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.9,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.6,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.8,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8
+          }
+        },
+        "message": {
+          "calibration": {
+            "caseCount": 7,
+            "positiveCount": 0,
+            "negativeCount": 7,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 0,
+            "negativeCount": 5,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "negative": {
+          "calibration": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0.125,
+            "strongPrecision": 0,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "people": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "preflight": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "recency": {
+          "calibration": {
+            "caseCount": 9,
+            "positiveCount": 9,
+            "negativeCount": 0,
+            "hitAt1": 0.4444,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.7222,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.2,
+            "hitAt3": 0.8,
+            "hitAt5": 0.8,
+            "mrr": 0.5,
+            "strongRate": 0,
+            "strongPrecision": 0.8,
+            "strongRecall": 1
+          }
+        },
+        "scope": {
+          "calibration": {
+            "caseCount": 10,
+            "positiveCount": 9,
+            "negativeCount": 1,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.7778
+          },
+          "heldout": {
+            "caseCount": 6,
+            "positiveCount": 6,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8333
+          }
+        }
+      },
+      "side": {
+        "identifier": {
+          "calibration": {
+            "caseCount": 11,
+            "positiveCount": 5,
+            "negativeCount": 6,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 13,
+            "positiveCount": 11,
+            "negativeCount": 2,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8182
+          }
+        },
+        "kb": {
+          "calibration": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "legacy": {
+          "calibration": {
+            "caseCount": 34,
+            "positiveCount": 34,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 35,
+            "positiveCount": 35,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "low-content": {
+          "calibration": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.8,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.9,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.6,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.8,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8
+          }
+        },
+        "message": {
+          "calibration": {
+            "caseCount": 7,
+            "positiveCount": 0,
+            "negativeCount": 7,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 0,
+            "negativeCount": 5,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "negative": {
+          "calibration": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0.125,
+            "strongPrecision": 0,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "people": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "preflight": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "recency": {
+          "calibration": {
+            "caseCount": 9,
+            "positiveCount": 9,
+            "negativeCount": 0,
+            "hitAt1": 0.4444,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.7222,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.2,
+            "hitAt3": 0.8,
+            "hitAt5": 0.8,
+            "mrr": 0.5,
+            "strongRate": 0,
+            "strongPrecision": 0.8,
+            "strongRecall": 1
+          }
+        },
+        "scope": {
+          "calibration": {
+            "caseCount": 10,
+            "positiveCount": 9,
+            "negativeCount": 1,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.7778
+          },
+          "heldout": {
+            "caseCount": 6,
+            "positiveCount": 6,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.8333
+          }
+        }
+      }
+    },
+    "hashed": {
+      "default": {
+        "identifier": {
+          "calibration": {
+            "caseCount": 11,
+            "positiveCount": 5,
+            "negativeCount": 6,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.6
+          },
+          "heldout": {
+            "caseCount": 13,
+            "positiveCount": 11,
+            "negativeCount": 2,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.5455
+          }
+        },
+        "kb": {
+          "calibration": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "legacy": {
+          "calibration": {
+            "caseCount": 34,
+            "positiveCount": 34,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 35,
+            "positiveCount": 35,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.9714
+          }
+        },
+        "low-content": {
+          "calibration": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.4,
+            "hitAt3": 0.6,
+            "hitAt5": 0.6,
+            "mrr": 0.4667,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.4
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0,
+            "hitAt3": 0.2,
+            "hitAt5": 0.2,
+            "mrr": 0.0667,
+            "strongRate": 0,
+            "strongPrecision": 0,
+            "strongRecall": 0.2
+          }
+        },
+        "message": {
+          "calibration": {
+            "caseCount": 7,
+            "positiveCount": 0,
+            "negativeCount": 7,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 0,
+            "negativeCount": 5,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "negative": {
+          "calibration": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "people": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 0.75,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.875,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "preflight": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 0.5,
+            "hitAt3": 0.5,
+            "hitAt5": 0.5,
+            "mrr": 0.5,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "recency": {
+          "calibration": {
+            "caseCount": 9,
+            "positiveCount": 9,
+            "negativeCount": 0,
+            "hitAt1": 0.8889,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.9444,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.4,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.7,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "scope": {
+          "calibration": {
+            "caseCount": 10,
+            "positiveCount": 9,
+            "negativeCount": 1,
+            "hitAt1": 0.7778,
+            "hitAt3": 0.7778,
+            "hitAt5": 0.7778,
+            "mrr": 0.7778,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 6,
+            "positiveCount": 6,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        }
+      },
+      "side": {
+        "identifier": {
+          "calibration": {
+            "caseCount": 11,
+            "positiveCount": 5,
+            "negativeCount": 6,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.6
+          },
+          "heldout": {
+            "caseCount": 13,
+            "positiveCount": 11,
+            "negativeCount": 2,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.5455
+          }
+        },
+        "kb": {
+          "calibration": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 3,
+            "positiveCount": 3,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          }
+        },
+        "legacy": {
+          "calibration": {
+            "caseCount": 34,
+            "positiveCount": 34,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 1
+          },
+          "heldout": {
+            "caseCount": 35,
+            "positiveCount": 35,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.9714
+          }
+        },
+        "low-content": {
+          "calibration": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.4,
+            "hitAt3": 0.6,
+            "hitAt5": 0.6,
+            "mrr": 0.4667,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0.4
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0,
+            "hitAt3": 0.2,
+            "hitAt5": 0.2,
+            "mrr": 0.0667,
+            "strongRate": 0,
+            "strongPrecision": 0,
+            "strongRecall": 0.2
+          }
+        },
+        "message": {
+          "calibration": {
+            "caseCount": 7,
+            "positiveCount": 0,
+            "negativeCount": 7,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 0,
+            "negativeCount": 5,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "negative": {
+          "calibration": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 8,
+            "positiveCount": 0,
+            "negativeCount": 8,
+            "hitAt1": 0,
+            "hitAt3": 0,
+            "hitAt5": 0,
+            "mrr": 0,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "people": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 0.75,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.875,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "preflight": {
+          "calibration": {
+            "caseCount": 2,
+            "positiveCount": 2,
+            "negativeCount": 0,
+            "hitAt1": 0.5,
+            "hitAt3": 0.5,
+            "hitAt5": 0.5,
+            "mrr": 0.5,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 4,
+            "positiveCount": 4,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "recency": {
+          "calibration": {
+            "caseCount": 9,
+            "positiveCount": 9,
+            "negativeCount": 0,
+            "hitAt1": 0.8889,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.9444,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 5,
+            "positiveCount": 5,
+            "negativeCount": 0,
+            "hitAt1": 0.4,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 0.7,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        },
+        "scope": {
+          "calibration": {
+            "caseCount": 10,
+            "positiveCount": 9,
+            "negativeCount": 1,
+            "hitAt1": 0.7778,
+            "hitAt3": 0.7778,
+            "hitAt5": 0.7778,
+            "mrr": 0.7778,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          },
+          "heldout": {
+            "caseCount": 6,
+            "positiveCount": 6,
+            "negativeCount": 0,
+            "hitAt1": 1,
+            "hitAt3": 1,
+            "hitAt5": 1,
+            "mrr": 1,
+            "strongRate": 0,
+            "strongPrecision": 1,
+            "strongRecall": 0
+          }
+        }
+      }
+    }
+  },
+  "beforeAfterDeltas": {
+    "recorded": {
+      "default": {
+        "overall": {
+          "hitAt3": 0.1127,
+          "mrr": 0.1801,
+          "strongRate": -0.6216,
+          "strongPrecision": 0.2184,
+          "strongRecall": -0.0282
+        },
+        "calibration": {
+          "hitAt3": 0.0725,
+          "mrr": 0.1468,
+          "strongRate": -0.5909,
+          "strongRecall": -0.0145
+        },
+        "heldout": {
+          "hitAt3": 0.1507,
+          "mrr": 0.2116,
+          "strongRate": -0.6667,
+          "strongRecall": -0.0411
+        },
+        "legacy": {
+          "mrr": 0.0459
+        },
+        "perClass": {
+          "identifier": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.5667,
+              "strongRate": -1,
+              "strongPrecision": 0.5455,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0.1818,
+              "mrr": 0.5008,
+              "strongRate": -1,
+              "strongPrecision": 0.3077,
+              "strongRecall": -0.1818
+            }
+          },
+          "kb": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "legacy": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.049,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0.0429,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "low-content": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.7267,
+              "strongRate": 0,
+              "strongPrecision": 0.6,
+              "strongRecall": -0.2
+            },
+            "heldout": {
+              "hitAt3": 0.8,
+              "mrr": 0.56,
+              "strongRate": 0,
+              "strongPrecision": 0.8,
+              "strongRecall": -0.2
+            }
+          },
+          "message": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "negative": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -0.875,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            }
+          },
+          "people": {
+            "calibration": {
+              "hitAt3": 0.5,
+              "mrr": 0.5,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0.5
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.7417,
+              "strongRate": 0,
+              "strongPrecision": 0.5,
+              "strongRecall": 0
+            }
+          },
+          "preflight": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.3333,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.6667,
+              "strongRate": 0,
+              "strongPrecision": 0.5,
+              "strongRecall": 0
+            }
+          },
+          "recency": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": -0.0741,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": -0.3,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "scope": {
+            "calibration": {
+              "hitAt3": 0.1111,
+              "mrr": 0.1111,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.1111
+            },
+            "heldout": {
+              "hitAt3": 0.1667,
+              "mrr": 0.25,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          }
+        }
+      },
+      "side": {
+        "overall": {
+          "hitAt3": 0.1127,
+          "mrr": 0.1801,
+          "strongRate": -0.6216,
+          "strongPrecision": 0.2184,
+          "strongRecall": -0.0282
+        },
+        "calibration": {
+          "hitAt3": 0.0725,
+          "mrr": 0.1468,
+          "strongRate": -0.5909,
+          "strongRecall": -0.0145
+        },
+        "heldout": {
+          "hitAt3": 0.1507,
+          "mrr": 0.2116,
+          "strongRate": -0.6667,
+          "strongRecall": -0.0411
+        },
+        "legacy": {
+          "mrr": 0.0459
+        },
+        "perClass": {
+          "identifier": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.5667,
+              "strongRate": -1,
+              "strongPrecision": 0.5455,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0.1818,
+              "mrr": 0.5008,
+              "strongRate": -1,
+              "strongPrecision": 0.3077,
+              "strongRecall": -0.1818
+            }
+          },
+          "kb": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "legacy": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.049,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0.0429,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "low-content": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.7267,
+              "strongRate": 0,
+              "strongPrecision": 0.6,
+              "strongRecall": -0.2
+            },
+            "heldout": {
+              "hitAt3": 0.8,
+              "mrr": 0.56,
+              "strongRate": 0,
+              "strongPrecision": 0.8,
+              "strongRecall": -0.2
+            }
+          },
+          "message": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "negative": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -0.875,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            }
+          },
+          "people": {
+            "calibration": {
+              "hitAt3": 0.5,
+              "mrr": 0.5,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0.5
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.7417,
+              "strongRate": 0,
+              "strongPrecision": 0.5,
+              "strongRecall": 0
+            }
+          },
+          "preflight": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0.3333,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.6667,
+              "strongRate": 0,
+              "strongPrecision": 0.5,
+              "strongRecall": 0
+            }
+          },
+          "recency": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": -0.0741,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": -0.3,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "scope": {
+            "calibration": {
+              "hitAt3": 0.1111,
+              "mrr": 0.1111,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.1111
+            },
+            "heldout": {
+              "hitAt3": 0.1667,
+              "mrr": 0.25,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          }
+        }
+      }
+    },
+    "hashed": {
+      "default": {
+        "overall": {
+          "hitAt3": 0.2958,
+          "mrr": 0.2826,
+          "strongRate": -0.5135,
+          "strongPrecision": 0.3963,
+          "strongRecall": -0.331
+        },
+        "calibration": {
+          "hitAt3": 0.2753,
+          "mrr": 0.262,
+          "strongRate": -0.5,
+          "strongRecall": -0.3188
+        },
+        "heldout": {
+          "hitAt3": 0.3151,
+          "mrr": 0.3021,
+          "strongRate": -0.5333,
+          "strongRecall": -0.3425
+        },
+        "legacy": {
+          "mrr": 0
+        },
+        "perClass": {
+          "identifier": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.7,
+              "strongRate": -0.5,
+              "strongPrecision": 0.75,
+              "strongRecall": -0.4
+            },
+            "heldout": {
+              "hitAt3": 0.6364,
+              "mrr": 0.747,
+              "strongRate": 0,
+              "strongPrecision": 0.7,
+              "strongRecall": -0.3636
+            }
+          },
+          "kb": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "legacy": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.0286
+            }
+          },
+          "low-content": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.4667,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -0.6
+            },
+            "heldout": {
+              "hitAt3": 0.2,
+              "mrr": 0.0667,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.8
+            }
+          },
+          "message": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "negative": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            }
+          },
+          "people": {
+            "calibration": {
+              "hitAt3": 1,
+              "mrr": 1,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 1,
+              "mrr": 0.875,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            }
+          },
+          "preflight": {
+            "calibration": {
+              "hitAt3": 0.5,
+              "mrr": 0.375,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            },
+            "heldout": {
+              "hitAt3": 0.75,
+              "mrr": 0.75,
+              "strongRate": 0,
+              "strongPrecision": 0.75,
+              "strongRecall": -1
+            }
+          },
+          "recency": {
+            "calibration": {
+              "hitAt3": 1,
+              "mrr": 0.9444,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            },
+            "heldout": {
+              "hitAt3": 1,
+              "mrr": 0.7,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            }
+          },
+          "scope": {
+            "calibration": {
+              "hitAt3": 0.1111,
+              "mrr": 0.1111,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.6667
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.5833,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.5
+            }
+          }
+        }
+      },
+      "side": {
+        "overall": {
+          "hitAt3": 0.2958,
+          "mrr": 0.2826,
+          "strongRate": -0.5135,
+          "strongPrecision": 0.3963,
+          "strongRecall": -0.331
+        },
+        "calibration": {
+          "hitAt3": 0.2753,
+          "mrr": 0.262,
+          "strongRate": -0.5,
+          "strongRecall": -0.3188
+        },
+        "heldout": {
+          "hitAt3": 0.3151,
+          "mrr": 0.3021,
+          "strongRate": -0.5333,
+          "strongRecall": -0.3425
+        },
+        "legacy": {
+          "mrr": 0
+        },
+        "perClass": {
+          "identifier": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.7,
+              "strongRate": -0.5,
+              "strongPrecision": 0.75,
+              "strongRecall": -0.4
+            },
+            "heldout": {
+              "hitAt3": 0.6364,
+              "mrr": 0.747,
+              "strongRate": 0,
+              "strongPrecision": 0.7,
+              "strongRecall": -0.3636
+            }
+          },
+          "kb": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "legacy": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.0286
+            }
+          },
+          "low-content": {
+            "calibration": {
+              "hitAt3": 0.6,
+              "mrr": 0.4667,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -0.6
+            },
+            "heldout": {
+              "hitAt3": 0.2,
+              "mrr": 0.0667,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.8
+            }
+          },
+          "message": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            }
+          },
+          "negative": {
+            "calibration": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 0,
+              "mrr": 0,
+              "strongRate": -1,
+              "strongPrecision": 1,
+              "strongRecall": 0
+            }
+          },
+          "people": {
+            "calibration": {
+              "hitAt3": 1,
+              "mrr": 1,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": 0
+            },
+            "heldout": {
+              "hitAt3": 1,
+              "mrr": 0.875,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            }
+          },
+          "preflight": {
+            "calibration": {
+              "hitAt3": 0.5,
+              "mrr": 0.375,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            },
+            "heldout": {
+              "hitAt3": 0.75,
+              "mrr": 0.75,
+              "strongRate": 0,
+              "strongPrecision": 0.75,
+              "strongRecall": -1
+            }
+          },
+          "recency": {
+            "calibration": {
+              "hitAt3": 1,
+              "mrr": 0.9444,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            },
+            "heldout": {
+              "hitAt3": 1,
+              "mrr": 0.7,
+              "strongRate": 0,
+              "strongPrecision": 1,
+              "strongRecall": -1
+            }
+          },
+          "scope": {
+            "calibration": {
+              "hitAt3": 0.1111,
+              "mrr": 0.1111,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.6667
+            },
+            "heldout": {
+              "hitAt3": 0.5,
+              "mrr": 0.5833,
+              "strongRate": 0,
+              "strongPrecision": 0,
+              "strongRecall": -0.5
+            }
+          }
+        }
+      }
+    }
+  },
+  "gates": {
+    "recorded": {
+      "failures": [],
+      "ok": true,
+      "reportOnly": []
+    },
+    "hashed": {
+      "failures": [],
+      "ok": true,
+      "reportOnly": []
+    }
+  },
+  "diagnosticsTimingsNote": "The harness freezes Date for deterministic output; diagnostic timing values are not a live latency measurement."
+}
