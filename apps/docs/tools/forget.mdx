@@ -1,0 +1,95 @@
+---
+title: crystal_forget
+description: Archive or permanently delete a memory.
+---
+
+## What it does
+
+Removes a memory from active retrieval either by soft-archiving (default, recoverable) or permanent deletion (irreversible). Soft archive is the safe default; use permanent deletion only when you are certain the memory should be irretrievably destroyed.
+
+## Parameters
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| memoryId | string | Yes | — | ID of the memory to archive or delete |
+| permanent | boolean | No | false | If true, permanently and irretrievably deletes. If false (default), soft-archives so recovery is possible. |
+| reason | string | No | — | Optional reason for archival/deletion (logged in audit trail) |
+| channel | string | No | — | Optional channel identifier for filtering context |
+
+## Returns
+
+```json
+{
+  "success": true,
+  "action": "archived|deleted",
+  "archived": true|false
+}
+```
+
+**Field descriptions:**
+- `success` — Whether the operation succeeded
+- `action` — The action taken: `"archived"` (soft-delete) or `"deleted"` (permanent)
+- `archived` — Whether the memory was archived (true) or permanently deleted (false)
+
+## Examples
+
+### Basic usage
+
+```javascript
+// Soft-archive a memory (recoverable)
+crystal_forget({
+  memoryId: "abc123def456"
+})
+
+// Result:
+// {
+//   "success": true,
+//   "action": "archived",
+//   "archived": true
+// }
+```
+
+### Advanced usage
+
+```javascript
+// Permanently delete with a reason
+crystal_forget({
+  memoryId: "xyz789",
+  permanent: true,
+  reason: "Duplicate of memory xyz790, consolidating"
+})
+
+// Soft-archive with audit trail
+crystal_forget({
+  memoryId: "mem_old",
+  permanent: false,
+  reason: "Outdated deployment procedure, replaced by new Railway CI",
+  channel: "devops"
+})
+```
+
+## When to use this vs alternatives
+
+- **`crystal_forget`** — When you want to remove a memory from active recall (default soft-archive) or destroy it permanently
+- **`crystal_edit`** — When you want to modify a memory instead of removing it
+- **`crystal_remember`** — When you want to save a new memory
+
+## Error handling
+
+| Error | Cause | Resolution |
+|---|---|---|
+| Invalid memoryId | Missing, empty, or non-existent ID | Provide a valid memory ID from recall results |
+| permanent is not boolean | Malformed input | Use `true` or `false` (omit for default false) |
+| reason is not a string | Malformed reason | Provide a string or omit the field |
+| channel is not a string | Malformed channel | Provide a string or omit the field |
+| Memory not found | ID does not exist or was already deleted | Verify ID against recent recall results |
+| Authentication failed | Invalid Convex JWT or API key | Verify auth configuration in Convex client setup |
+
+## Notes
+
+- **Soft archive (default)**: Memory is marked `archived=true` but retained in the database. Soft-archived memories do not appear in recall results but can be recovered by an admin or via a separate unarchive operation.
+- **Permanent deletion**: Memory and all associated metadata are irreversibly removed. This action cannot be undone.
+- The `reason` field is optional but recommended for audit trails, especially for permanent deletions.
+- The `channel` field provides context but does not filter which memories can be deleted — it's only for logging.
+- Archival operations update the memory's `archivedAt` timestamp.
+- All deletion/archival operations are transactional.

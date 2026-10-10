@@ -1,0 +1,80 @@
+---
+title: How Memory Works
+description: Understand the full memory flow from capture to recall to long-term storage.
+---
+
+
+Memory Crystal listens, remembers the important parts, and brings the right memory back when your AI needs it.
+
+## What this means in practice
+
+The system is not just a note list.
+It combines:
+
+- short-term message history
+- long-term durable memories
+- ranking and filtering
+- explicit knowledge-base retrieval
+- bounded durable extraction and maintenance
+
+That means your AI gets context that is both **recent** and **relevant**.
+
+## How it actually works
+
+High-level flow:
+
+1. a completed turn is captured once into short-term message storage
+2. bounded extraction can distill eligible turns into durable memories
+3. when an agent calls recall, one durable-memory vector lookup runs
+4. recent unextracted messages can contribute lexical evidence
+5. deterministic ranking and scope filters select a bounded result set
+6. named knowledge bases, assets, and research collections are queried only through their explicit tools
+
+## OpenClaw runtime behavior
+
+In OpenClaw, the plugin sits directly in the request / response loop:
+
+1. the user sends a message and the model replies
+2. the plugin records the completed turn idempotently
+3. the agent calls Memory Crystal tools when prior context is relevant
+4. if an operator explicitly enables `MEMORY_CRYSTAL_INJECT_RECALL=true`, the plugin may gather and prepend bounded scoped context before the model call
+
+Important behavior details:
+
+- tool-mode recall is the default, so ordinary turns pay no read tax
+- automatic capture is independent and remains enabled
+- explicit recall uses a bounded durable-memory vector lookup plus recent lexical fallback
+- optional injection keeps the same bounded path and timeout controls
+
+Important source areas:
+
+- `plugin/index.js`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+
+## Commands / examples
+
+A user-facing install entrypoint is:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+After setup, tool-based clients can use flows like:
+
+- `crystal_recall`
+- `crystal_recent`
+- `crystal_search_messages`
+
+## Source of truth
+
+Primary files behind this page:
+
+- `README.md`
+- `docs/00-project-overview/OVERVIEW.md`
+- `convex/crystal/messages.ts`
+- `convex/crystal/memories.ts`
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`

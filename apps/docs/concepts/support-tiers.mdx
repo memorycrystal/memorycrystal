@@ -1,0 +1,52 @@
+---
+title: Integration Contract and Support Tiers
+description: One Integration Contract for every platform, with a Support Tier derived from harness capability.
+---
+
+Memory Crystal uses one **Integration Contract** for every platform. The public **Support Tier** is the portion of that contract the harness can actually honour.
+
+Vocabulary matches `CONTEXT.md`. The decision record is [ADR-0007](https://github.com/illumin8ca/memorycrystal/blob/main/docs/adr/0007-support-tiers-bounded-by-harness-capability.md).
+
+## Integration Contract
+
+The contract is one set of layers, not a per-platform recipe:
+
+1. Credentials registered
+2. Native Memory Provider active when the harness can host it
+3. Explicit Tool Surface registered
+4. Discipline layer delivered, by Context Injection or a Managed Block
+5. Declared Agent Identity set
+6. A verification pass that asserts only the layers that platform claimed
+
+The Universal Agent Prompt runs the installer and then verifies. Agents do not hand-edit harness config.
+
+## Support Tiers
+
+Tiers are derived from the capability table (`apps/web/public/install-assets/platforms.json`). Badge text is generated from `hooks.inject` and `tier`. Do not hand-author a Full badge for a host that cannot inject context.
+
+| Tier | Harness capability | Who |
+| --- | --- | --- |
+| Full | Explicit Tool Surface, automatic capture, context injection capability (default off on all hosts) | Official: Claude Code, Codex, Cursor, OpenClaw, Hermes Agent |
+| Capture | Tools and automatic capture. Recall is deliberate because the harness cannot inject hook output into context | Official: Grok Build |
+| Tools | Explicit Tool Surface only | Generic MCP hosts: Claude Desktop, OpenCode, Factory Droid |
+| Hosted | Runs other agents. Install into the CLIs it hosts | Official: Buzz |
+
+**Context Injection** is the deciding capability. Grok Build has hooks, but passive events ignore stdout, so it cannot recall automatically. That is a harness limit, not missing Memory Crystal work.
+
+## Official platforms
+
+Claude Code, Codex, Grok Build, OpenClaw, Hermes Agent, and Buzz.
+
+## Generic MCP path
+
+Claude Desktop, Codex Desktop, OpenCode, and Factory Droid stay installable. They are not official platforms. Codex Desktop stays Full because it shares `~/.codex` with Codex.
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets generic-mcp
+```
+
+Their existing installer ids still work. See [MCP Server](/integrations/mcp-server).
+
+## Buzz
+
+Buzz is Hosted. Install Memory Crystal into the CLI Buzz is running. Channel memory is not available, and channel isolation is not enforced. See [Buzz](/integrations/buzz).

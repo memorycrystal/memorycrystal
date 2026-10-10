@@ -1,0 +1,78 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege. The mirror transform requires explicit read-only
+# permissions before it may drop steps.
+permissions:
+  contents: read
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Workflow contract tests (offline)
+        # dockerfile.lint.test.sh stays a manual check: it lints the self-hosted
+        # web Dockerfile, which the mirror excludes, and the runners have no hadolint.
+        run: |
+          bash .github/workflows/__tests__/cosign-regexp.validate.sh
+          bash .github/workflows/__tests__/publish-images-dispatch.test.sh
+          bash .github/workflows/__tests__/publish-images.lint.test.sh
+          bash .github/workflows/__tests__/image-size.test.sh
+          bash .github/workflows/__tests__/publish-images-structure.test.sh
+          bash .github/workflows/__tests__/publish-images-merge.test.sh
+          bash infra/selfhosted/__tests__/bootstrap-args.test.sh
+      - name: Audit strength-write sites
+        run: bash scripts/audit-strength-sites.sh
+      - name: Hermes plugin unit tests (offline)
+        run: python3 -m unittest discover -s integrations/hermes/crystal-memory -p 'test_crystal_memory.py'
+
+  recall-eval-gate:
+    # Recall v2 production-path gate (ILL-304). `npm run bench:recall` runs
+    # mcpRecall in recorded mode for both vector read modes. It fails on
+    # private-scope leaks, expectedAbsent violations, KB parity diffs, and
+    # legacy-69 R@3/MRR below the committed baseline. Missing fixture inputs
+    # or baselines and insufficient split representation also fail the gate.
+    # Legacy 69 through recallMemories stay on `npm run test:recall-eval`.
+    # See docs/recall-eval-gate.md.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Strength reinforcement/decay equilibrium (ILL-103)
+        run: npm run bench:strength
+
+  mcp-pack-smoke:
+    # `npm pack` does not contact the registry. Installing that tarball does:
+    # npm resolves the packed package's dependency manifests, and an earlier
+    # `npm ci` cache does not satisfy that lookup. The install step needs network.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build MCP server
+        working-directory: mcp-server
+        run: npm run build
+      - name: Pack, install, start, and list tools
+        run: node scripts/mcp-pack-smoke.mjs

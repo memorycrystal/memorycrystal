@@ -1,0 +1,54 @@
+---
+title: Grok Build
+description: Connect Memory Crystal to Grok Build at Capture tier — tools, automatic capture, skills, and Managed Block. No automatic recall.
+---
+
+Grok Build is **Capture tier**. Memory Crystal registers the tool surface, captures turns automatically, installs skills, and writes a Managed Block to `~/.grok/AGENTS.md`. Recall is deliberate, not automatic: the harness ignores hook stdout on passive events, so it cannot inject context. Call `crystal_recall` or `crystal_what_do_i_know` when you need past context.
+
+Do not expect memories to appear in the prompt on their own. Do not use Claude-compat (`[compat.claude]`) as a substitute for this install.
+
+## Recommended: universal installer
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets grok
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets grok
+```
+
+<Note>PowerShell configures MCP and skills. Shared capture hooks and the Managed Block are installed by the Bash installer (`hooks.shells` is bash-only).</Note>
+
+### Agent Instructions
+
+```text
+Install Memory Crystal for Grok Build. Grok is Capture tier: automatic capture and tools, no automatic recall (the harness cannot inject context). Run the official installer, follow auth/backend prompts, and do not hand-edit ~/.grok config unless the installer fails. After install, run grok inspect and confirm memory-crystal MCP, hooks, skills, and ~/.grok/AGENTS.md. Use crystal_recall / crystal_what_do_i_know before answering from past work.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets grok
+
+Windows PowerShell:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets grok
+```
+
+For local data storage, add `--backend local` in Bash or `-Backend local` in PowerShell. See [Local-First Setup](/configuration/local-first).
+
+## What the installer writes
+
+- MCP via `grok mcp add` when the CLI is present, otherwise `[mcp_servers.memory-crystal]` with `url` and `headers` in `~/.grok/config.toml`
+- Capture hooks at `~/.grok/hooks/memory-crystal.json` (SessionStart, UserPromptSubmit, Stop — **no matcher** on lifecycle events)
+- Skills under `~/.grok/skills/`
+- Managed Block in `~/.grok/AGENTS.md` only (no other instruction files)
+
+## Verify
+
+Restart Grok or run `grok inspect` and confirm the memory-crystal MCP server, the hooks file, the skill suite, and `~/.grok/AGENTS.md`.
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets grok
+```
+
+Removes the hook file, the MCP entry, the Managed Block, and Crystal skills. See [Uninstall](/help/uninstall).

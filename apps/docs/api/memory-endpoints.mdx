@@ -1,0 +1,402 @@
+---
+title: Memory endpoints
+description: The HTTP endpoints that capture, recall, search, trace, and inspect Memory Crystal state.
+---
+
+
+These are the HTTP doors for the memory side of the system.
+
+## What this means in practice
+
+Important endpoint families include:
+
+- capture
+- recall
+- search-messages
+- recent-messages
+- wake
+- checkpoint
+- trace
+- stats
+
+Important related tool surfaces include:
+
+- `crystal_recall`
+- `crystal_search_messages`
+- `crystal_recent`
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`
+
+The modern and legacy MCP packages both depend on this underlying memory/API surface, even though they package it differently.
+
+## Endpoint Reference
+
+### Session Initialization
+
+#### `POST /api/mcp/wake`
+
+Fetch the last session summary and recent messages to initialize a new session.
+
+**Request:**
+```json
+{
+  "channel": "claude-code",
+  "userId": "user_123"
+}
+```
+
+**Response:**
+```json
+{
+  "lastSessionSummary": "Yesterday's meeting covered Q2 roadmap...",
+  "recentMessages": [
+    { "timestamp": 1681234567890, "role": "user", "text": "..." },
+    { "timestamp": 1681234568000, "role": "assistant", "text": "..." }
+  ]
+}
+```
+
+### Memory Recall
+
+#### `POST /api/mcp/recall`
+
+Vector search over memories by semantic query.
+
+**Request:**
+```json
+{
+  "query": "authentication implementation details",
+  "limit": 5,
+  "channel": "claude-code",
+  "agentId": "assistant"
+}
+```
+
+**Response:**
+```json
+{
+  "memories": [
+    {
+      "id": "mem_123",
+      "title": "API key hashing strategy",
+      "content": "Keys are hashed with SHA256 before storage...",
+      "store": "semantic",
+      "category": "decision",
+      "relevance": 0.89,
+      "createdAt": 1681234567890
+    }
+  ]
+}
+```
+
+**Optional request fields:**
+
+- `channel` — channel/scope context, including peer-scoped or shared-main values
+- `agentId` — agent identifier used when resolving knowledge-base visibility for mixed private/shared deployments
+
+<Note>
+**Peer-first fallback (new in 0.7.15).** If `channel` is omitted on a peer-facing call, recall fails-closed on any knowledge base with a concrete peer scope. Previously the guard silently upgraded unscoped callers to management-level visibility. Always pass the peer channel (e.g. `peer-coach:511172388`) from a peer session.
+</Note>
+
+**Behavior notes:**
+
+- the live MCP recall path performs one bounded durable-memory vector lookup
+- identical repeated HTTP recall requests can reuse the short-lived query embedding cache
+- recent messages without durable extraction remain eligible through bounded lexical fallback
+- KBs, assets, and research collections are not searched implicitly; call their dedicated endpoints/tools
+
+### Message Search
+
+#### `POST /api/mcp/search-messages`
+
+Semantic + keyword search over raw message transcripts, optionally bounded to a
+time window and paged. Use it for questions like "what did *X* say *last month*
+about *Y*": pass the topic as `query`, the peer as `channel`, and the window via
+`fromMs`/`toMs` (or ISO `startDate`/`endDate`).
+
+**Request:**
+```json
+{
+  "query": "rate limit",
+  "channel": "claude-code",
+  "limit": 50,
+  "offset": 0,
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-30"
+}
+```
+
+**Parameters:**
+- `query` (required) — search text.
+- `channel` / `sessionKey` — exact scope. On a multi-client (peer) account, always pass the peer channel — search is channel-isolated and never crosses clients.
+- `limit` — 1–**100** (default 10).
+- `offset` — skip N ranked results for pagination.
+- **Time window** — `fromMs`/`toMs` (epoch ms) or `startDate`/`endDate` (ISO date/datetime); `sinceMs`, `before`, `after` are accepted aliases. A plausible seconds-precision value is auto-upscaled to ms.
+
+**Response:**
+```json
+{
+  "messages": [ { "role": "user", "content": "...", "timestamp": 1681234567890, "channel": "claude-code", "score": 3 } ],
+  "turns": [ { "timestamp": 1681234567890, "messages": [ /* ... */ ] } ],
+  "pagination": { "limit": 50, "offset": 0, "returned": 50, "hasMore": true, "nextOffset": 50 },
+  "window": { "fromMs": 1780272000000, "toMs": 1782777600000 }
+}
+```
+
+Page with `offset: nextOffset` while `pagination.hasMore` is `true`. A short page
+means you have reached the end — do not assert a window is empty from one page.
+
+#### `POST /api/mcp/recent-messages`
+
+Fetch the most recent messages in time order without vector-search cost. Accepts
+the same channel scope and time window (`fromMs`/`toMs` or `startDate`/`endDate`)
+as `search-messages`; `order` may be `"chronological"` (default) or `"newest"`.
+
+**Request:**
+```json
+{
+  "limit": 20,
+  "channel": "claude-code",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-30"
+}
+```
+
+**Response:**
+```json
+{
+  "messages": [
+    { "timestamp": 1681234567890, "role": "user", "text": "..." }
+  ]
+}
+```
+
+### Memory Management
+
+#### `POST /api/mcp/capture`
+
+Store a new memory (typically called after AI response completes).
+
+**Request:**
+```json
+{
+  "title": "Decided to use Convex for state management",
+  "content": "Convex mutations provide automatic retries and transactional guarantees...",
+  "store": "semantic",
+  "category": "decision",
+  "channel": "claude-code"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "mem_456",
+  "embedding": [0.12, -0.45, ...],
+  "createdAt": 1681234567890
+}
+```
+
+#### `POST /api/mcp/checkpoint`
+
+Mark a session milestone.
+
+**Request:**
+```json
+{
+  "label": "Completed authentication module",
+  "description": "Implemented API key creation, validation, and rate limiting. Next: write tests."
+}
+```
+
+**Response:**
+```json
+{
+  "id": "ckpt_789",
+  "timestamp": 1681234567890
+}
+```
+
+#### Memory by ID: visibility scope
+
+`POST /api/mcp/memory`, `/api/mcp/edit`, `/api/mcp/update`, `/api/mcp/supersede`
+(and its `/api/mcp/supercede` alias), `/api/mcp/forget` and `/api/mcp/trace`
+address one memory by its ID. They apply the **same fail-closed visibility as
+recall**, including for unscoped requests: a caller can only read or change by
+ID what a recall with the same scope and `agentId` would have surfaced.
+
+- An **unscoped** request (no channel scope) reaches only channel-less
+  non-knowledge-base memories. A memory stored on a peer or group channel
+  returns `404` unless you pass its exact channel.
+- Knowledge-base chunks are gated by the KB's agent allow-list through the
+  recall engine's resolution, so pass the same `agentId` you send on recall.
+  A per-peer (channel-bearing) chunk also needs its exact channel; a
+  channel-less chunk is visible to every allowed agent without a channel.
+- A denied request returns the same `404` body as a missing ID and performs no
+  mutation and no access-count bump.
+
+Scope fields per route:
+
+| Route | Visibility scope | Stored channel |
+|---|---|---|
+| `memory`, `forget`, `trace` | `channel` | not applicable |
+| `edit`, `update` | `scopeChannel` when present, else `channel` | `channel` (only when present) re-homes the memory |
+| `supersede` / `supercede` | `scopeChannel` when present, else `channel` | `channel` sets the successor's channel; default is the old memory's channel |
+
+First-party clients forward their session scope as `scopeChannel` on the write
+routes, so forwarding a scope never re-homes a memory. Send `channel` on a write
+route only when you deliberately want to move the memory.
+
+#### `POST /api/mcp/memory`
+
+Read one memory by ID.
+
+**Request:**
+```json
+{
+  "memoryId": "mem_123",
+  "channel": "peer-coach:511172388",
+  "agentId": "coach"
+}
+```
+
+**Response:** `{ "memory": { "id": "mem_123", "title": "...", "content": "...", "channel": "peer-coach:511172388", ... } }`, or `404 { "error": "Memory not found" }` when the ID is missing or not visible in that scope.
+
+#### `POST /api/mcp/update` and `POST /api/mcp/edit`
+
+Change fields of a memory in place. Both routes share one handler; they differ
+only in the audit action they record.
+
+**Request:**
+```json
+{
+  "memoryId": "mem_123",
+  "title": "Corrected title",
+  "scopeChannel": "peer-coach:511172388",
+  "agentId": "coach"
+}
+```
+
+`scopeChannel` is the visibility scope and leaves the stored channel untouched.
+Include `channel` only to re-home the memory to that channel. When
+`scopeChannel` is absent, `channel` is both the scope and the new stored
+channel, which keeps older scoped callers working.
+
+#### `POST /api/mcp/supersede`
+
+Archive a memory and create its successor in one step.
+
+**Request:**
+```json
+{
+  "oldMemoryId": "mem_123",
+  "title": "Replacement title",
+  "content": "Replacement content",
+  "scopeChannel": "peer-coach:511172388",
+  "agentId": "coach"
+}
+```
+
+The old memory must be visible in `scopeChannel` (or `channel` when
+`scopeChannel` is absent). The successor keeps the old memory's channel unless
+`channel` is given.
+
+#### `POST /api/mcp/forget`
+
+Archive (default) or permanently delete a memory by ID.
+
+**Request:**
+```json
+{
+  "memoryId": "mem_123",
+  "permanent": false,
+  "channel": "peer-coach:511172388",
+  "agentId": "coach"
+}
+```
+
+#### `POST /api/mcp/trace`
+
+Retrieve the original conversation context for a memory.
+
+**Request:**
+```json
+{
+  "memoryId": "mem_123",
+  "channel": "peer-coach:511172388",
+  "agentId": "coach"
+}
+```
+
+**Response:**
+```json
+{
+  "memory": { "id": "mem_123", "title": "...", "content": "..." },
+  "sourceConversation": [
+    { "role": "user", "text": "How should we handle auth?" },
+    { "role": "assistant", "text": "We should hash keys before storage..." }
+  ],
+  "contextBefore": [...],
+  "contextAfter": [...]
+}
+```
+
+### System
+
+#### `GET /api/mcp/stats`
+
+Memory store health and usage.
+
+**Response:**
+```json
+{
+  "memoryCount": {
+    "byStore": { "semantic": 124, "episodic": 89, "procedural": 34 },
+    "byCategory": { "decision": 45, "lesson": 38, "fact": 125 }
+  },
+  "ttlStatus": {
+    "free_tier_expires_in_days": 7,
+    "messages_stored": 543
+  },
+  "usage": {
+    "tier": "pro",
+    "memory_limit": 5000,
+    "memories_used": 247,
+    "percent_used": 4.94
+  }
+}
+```
+
+## Usage Pattern: Full Turn
+
+Typical agentic flow:
+
+1. **Session start:** `POST /api/mcp/wake` → prime context
+2. **Before work:** `POST /api/mcp/recall` with relevant query → semantic context
+3. **After response:** `POST /api/mcp/capture` with extracted memory
+4. **Optional:** `POST /api/mcp/checkpoint` if turning point reached
+
+For debugging:
+
+- Add `debugRecallOutput=true` query param to recall endpoints to get verbose output including all search results, filtering, and prompt injections
+- Use `POST /api/mcp/trace` to understand memory provenance
+
+## Common mistakes
+
+- assuming the endpoint list is the whole behavior without reading the surrounding logic in `mcp.ts`
+- mixing HTTP endpoints and MCP tool names without explaining the relationship
+- ignoring auth/rate-limit behavior when describing the API surface
+
+## Source of truth
+
+Primary files behind this page:
+
+- `convex/crystal/mcp.ts`
+- `packages/mcp-server/README.md`
+- `mcp-server/README.md`

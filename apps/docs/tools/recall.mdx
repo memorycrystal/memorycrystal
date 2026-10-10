@@ -1,0 +1,297 @@
+---
+title: Recall tools
+description: The bounded tools and backend flows that search durable memories and recent unextracted messages.
+---
+
+
+Recall tools help the AI look backward and bring the right memory back.
+
+## What this means in practice
+
+Recall-oriented flows include:
+
+- semantic recall — find memories by semantic similarity
+- recent-message continuity — access recent conversation context
+- topic scans — broad topic understanding across memories
+- decision archaeology — trace past decisions and reasoning
+- preflight retrieval — gather context before an action
+
+## crystal_recall — Semantic memory search
+
+The primary semantic recall tool. It performs one bounded vector lookup over durable LTM, applies optional store/category/tag/mode filters, and may add lexical matches from recent unextracted messages.
+
+Recall is deterministic, scope-aware, and bounded. The backend ranks with strength, confidence, category/mode fit, scope, recency, and lexical evidence. It does not implicitly query knowledge bases, assets, or research collections; use their dedicated tools when those corpora are relevant.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | Yes | The search query. Embedded and matched against memory embeddings. |
+| `mode` | string | No | Recall mode preset: `general` (default), `decision`, `project`, `people`, `workflow`, or `conversation`. Each mode prioritizes different memory categories. |
+| `stores` | array | No | Filter by memory store: `sensory`, `episodic`, `semantic`, `procedural`, `prospective`. |
+| `categories` | array | No | Filter by category: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `workflow`, `conversation`. |
+| `tags` | array | No | Filter by tags. Returns memories matching any tag. |
+| `limit` | number | No | Max results to return. Range: 1–20. |
+| `includeArchived` | boolean | No | Include archived memories in results. Default: `false`. |
+| `messageLimit` | integer | No | Maximum short-term message matches. Range: 0–10; default: 3. Set to 0 to disable the message lane. |
+| `turnId` | string | No | Current capture turn id. The matching user prompt is excluded from message results. |
+| `excludeRecentMessagesMs` | integer | No | Widen own-prompt echo suppression in milliseconds. The default window is 120 seconds; the backend caps it at 24 hours. |
+| `channel` | string | No | Scope to a specific channel. |
+| `agentId` | string | No | Agent identifier for scoped KB visibility and opt-in memory-layer policy lookup. |
+| `agentPool` | enum | No | `account`, `layer`, or `agent`. MCP `crystal_recall` and Hermes plugin recall (0.10.3+) default to `layer`; the backend defaults to `account`. Without a policy, all values keep the account pool. |
+| `projectId` | string | No | Project store ID for repo-scoped recall. |
+| `repoSlug` | string | No | Repository slug used to resolve a project store automatically. |
+
+With a `channel` or `sessionKey`, the message lane searches only that channel and session. The message lane requires API-key authentication; the stdio JWT `crystal/recall:recallMemories` path validates and ignores these controls and does not return `messageMatches` or `retrieval`.
+
+For OpenClaw/plugin-backed sessions, `agentId` is threaded automatically when available so the backend can resolve shared vs peer-scoped knowledge-base access correctly.
+
+For coding agents, pass either `projectId` or `repoSlug` whenever the working repository is known. That keeps one repository's recall from being muddied by unrelated repositories, while still allowing account-wide recall when no project scope is appropriate.
+
+### Opt-in agent recall layers (shipped dark)
+
+This release creates no policies. An operator must explicitly opt in each agent. A policy starts with the agent's own stamped memories and the shared overlay; unstamped legacy rows are excluded unless admitted by a configured channel prefix. No stamps are backfilled.
+
+A layer activates only when the received `agentPool` is `layer` or `agent` and the received `agentId` normalizes to a non-empty policy key. The policy is read once per request. If that read fails, recall uses the account pool and reports a recoverable `agent_layer_unavailable` degradation without policy ids or stamps. The backend's `effectiveAgentId` fallback (`main`) never activates a layer. MCP servers send a resolved id: explicit argument, then `MEMORY_CRYSTAL_AGENT_ID` or `CRYSTAL_AGENT_ID`, then the channel prefix. Thus which policy activates depends on that server's environment and channel.
+
+- `account`: today's account pool, with no policy lookup.
+- `layer`: the agent's stamp, configured extra stamps or channel prefixes, plus the shared overlay if `includeShared` is true.
+- `agent`: the same layer without the shared overlay.
+
+The overlay includes person-category rows, the `visibility:shared` tag (case-insensitive), and metadata `visibility: "shared"`. Stamps use the existing normalization and lowercase comparison; prefixes are trimmed, lowercased and matched against the lowercased channel. Visibility and project rules still apply first. If a row fails both project and agent filters, its drop is counted only under project. The recent lane silently filters before its final slice, as it does for project scope; vector, lexical and engine filters report agent drops in `diagnostics.suppressions.agentLayer`. Like `crossProject`, the counter counts drops per lane, not unique rows across the recall: two rows dropped by both the vector and lexical lanes count as four suppressions. Only active layers add that counter and `diagnostics.scope.agentLayer` (`active` and `mode`); policy stamps and prefixes are not exposed there.
+
+This is **relevance control, not security**: `agentId` is caller-asserted. Messages, asset contexts and memory-by-id routes remain unchanged. KB rows are exempt from the agent filter; KB visibility remains controlled by the KB's `agentIds`. Normal recall does not add a KB search lane.
+
+Preflight, topic scans (`crystal_what_do_i_know`) and decision archaeology (`crystal_why_did_we`, including its fallback) never send `agentPool`. OpenClaw hooks and tools also keep the backend's default account pool. The Hermes plugin (0.10.3+) sends `agentPool` with every recall request that carries an `agentId`: automatic recall, explicit recall and its `crystal_recall` tool. The value is `MEMORY_CRYSTAL_AGENT_POOL` (`layer`, `agent` or `account`, trimmed and case-insensitive); unset or any other value sends `layer`. Without an `agentId` it sends no `agentPool`. Its wake, log, turn and capture requests, and its preflight, topic-scan and decision-archaeology tools, never send `agentPool`. Only agents with a policy see different results; set `MEMORY_CRYSTAL_AGENT_POOL=account` to opt out.
+
+Policies are managed only through internal operator functions in `crystal/agentRecallPolicies`:
+
+```ts
+setAgentRecallPolicy({
+  userId: "synthetic-account", agentId: "agent-a",
+  extraStamps: ["agent-b"], extraChannelPrefixes: ["synthetic-work:"],
+  includeShared: true,
+})
+getAgentRecallPolicy({ userId: "synthetic-account", agentId: "agent-a" })
+clearAgentRecallPolicy({ userId: "synthetic-account", agentId: "agent-a" })
+```
+
+`setAgentRecallPolicy` upserts. Omitted lists default to empty on create and retain their prior values on update; `includeShared` defaults to true on create and retains its prior value on update. Each list accepts at most 20 entries and is normalized and deduplicated. Prefixes must be non-empty and at most 200 characters after trimming. Invalid values throw `ConvexError`. There is no policy MCP tool, HTTP route or UI. Changes and clears take effect on the next recall; account deletion removes policies too.
+
+A small layer can return fewer than the requested limit. Its first vector and lexical candidate windows widen by at most four times, within existing normal caps (vector 100, lexical at most 200, with smaller lane-specific caps). Cost budgets apply after widening and can reduce or disable lanes. There is no index-level stamp filter, so eligible rows outside these windows remain undiscovered. Refill is off by default: it requires `RECALL_FILTER_REFILL` or `MC_AGENT_LAYER_REFILL` (the latter applies only to active layers); both accept `1`, `true`, `on`, or `yes`, ignoring surrounding whitespace and case. Refill can improve fill at increased read cost; it cannot guarantee a full result set. Opt in with this expected underfill in mind, use extra prefixes for relevant legacy rows, or request `agentPool: "account"` to recover the broader pool.
+
+Unknown HTTP `agentPool` values return 400 with `{ "error": "invalid agentPool" }`. The recall action uses a literal-union argument validator and rejects unknown values through Convex argument validation.
+
+### Returns
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "mem_abc123",
+      "store": "semantic",
+      "category": "decision",
+      "title": "Chose Convex over Supabase",
+      "content": "Using Convex for backend because mutations are transactional...",
+      "strength": 0.92,
+      "confidence": 0.95,
+      "tags": ["backend", "architecture"],
+      "score": 0.89,
+      "sourceRole": "canonical_reference",
+      "scope": "repo:memorycrystal"
+    }
+  ],
+  "messageMatches": [
+    {
+      "messageId": "message-synthetic-1",
+      "role": "user",
+      "content": "Synthetic message excerpt",
+      "channel": "team-chat:synthetic-peer",
+      "sessionKey": "session-synthetic",
+      "timestamp": 1,
+      "score": 0.5
+    }
+  ],
+  "retrieval": {
+    "messageMatches": 1,
+    "messageMatchesAvailable": 2,
+    "messageScan": { "cap": 1000, "exhausted": false }
+  },
+  "injectionBlock": "⚠️ Memory Crystal — Informational Context Only\n..."
+}
+```
+
+`retrieval.earlyReturn: true` appears only when a decisive identifier query is answered from the lexical lane without embedding and vector search.
+
+The MCP servers return each bounded match in `messageMatches`. `retrieval.messageMatches` is the returned count; `retrieval.messageMatchesAvailable` is a lower bound capped at `messageLimit + 1`, and `retrieval.messageScan` describes how much of the message window was scanned. `cap` is the per-lane visible budget: 1,000 unless the request is project-scoped; 100 by default for project-scoped requests, operator-tunable up to 1,000 and always at least 100 below the raw cap. Self-hosted operators tune it with the `RECALL_PROJECT_LANE_RAW_CAP` (default 200, at most 1,500) and `RECALL_PROJECT_LANE_VISIBLE_CAP` (default 100, at most 1,000) Convex environment variables; raise the raw cap together with the visible cap, because the visible cap always stays at least 100 below it.
+
+### Examples
+
+**Basic semantic search:**
+
+```json
+{
+  "query": "authentication strategy"
+}
+```
+
+**Search with mode (find decisions):**
+
+```json
+{
+  "query": "deployment process",
+  "mode": "decision"
+}
+```
+
+**Filter by store and category:**
+
+```json
+{
+  "query": "API design patterns",
+  "stores": ["semantic", "procedural"],
+  "categories": ["rule", "workflow"],
+  "limit": 5
+}
+```
+
+**Find memories tagged with specific topics:**
+
+```json
+{
+  "query": "user preferences",
+  "tags": ["user-model", "personalization"]
+}
+```
+
+## When to use vs alternatives
+
+### crystal_recall (semantic similarity)
+
+**Use when:** You want to find memories related to a topic by semantic meaning. Best for open-ended exploration and context building.
+
+**Example:** "What have I learned about database architecture?"
+
+Pass `agentId` for client/agent-specific recall and `projectId`/`repoSlug` for repo-specific coding sessions.
+
+### crystal_search_messages (exact transcript match)
+
+**Use when:** You need to find exact messages or phrasing from recent conversations. Better for recent continuity than long-term patterns.
+
+**Example:** "Find the exact conversation where we discussed X."
+
+**Tool:** `crystal_search_messages`
+
+### crystal_what_do_i_know (broad topic scan)
+
+**Use when:** You want a comprehensive overview of everything about a topic without specifying a query. Returns facts, decisions, lessons, workflows, and goals all at once.
+
+**Example:** "What do I know about Memory Crystal architecture?"
+
+**Tool:** `crystal_what_do_i_know`
+
+### crystal_recent (time-ordered continuity)
+
+**Use when:** You need the most recent messages in order, not by relevance. Useful for session continuity and understanding what just happened.
+
+**Example:** "What did we just discuss?"
+
+**Tool:** `crystal_recent`
+
+### Decision guide
+
+| Scenario | Tool |
+|----------|------|
+| I need context on a specific topic | **`crystal_recall`** |
+| I want a comprehensive overview of a topic | `crystal_what_do_i_know` |
+| I remember the exact phrasing but not the context | `crystal_search_messages` |
+| I need the last N messages chronologically | `crystal_recent` |
+| I want to trace why a decision was made | `crystal_why_did_we` |
+| I want to find related decisions | `crystal_recall` with `mode=decision` |
+
+## Recall modes explained
+
+| Mode | Prioritizes | Best for |
+|------|-------------|----------|
+| `general` | All memory types equally | Open-ended queries |
+| `decision` | Decisions and lessons from semantic store | Past reasoning and choices |
+| `project` | Goals, workflows, facts | Project status and procedures |
+| `people` | Person memories and relationships | User/teammate context |
+| `workflow` | Procedural rules and patterns | How-to and best practices |
+| `conversation` | Recent conversational context | Session continuity |
+
+## Error handling
+
+| Error | Cause | Resolution |
+|-------|-------|-----------|
+| Embedding service unavailable | The embedding backend is unreachable. | Retry; check service health. |
+| Memory Crystal recall degraded | Same as above. | Retry later. |
+| Invalid store value | Store is not one of the five valid types. | Use: `sensory`, `episodic`, `semantic`, `procedural`, `prospective`. |
+| Invalid category value | Category is not a valid memory category. | Use a valid category from the schema. |
+| Invalid mode | Mode is not a recognized recall mode. | Use: `general`, `decision`, `project`, `people`, `workflow`, `conversation`. |
+| Empty results | No memories matched the query/filters. | Try a broader query or remove filters. |
+
+## Confidence and scoring
+
+Recall results include semantic and memory-quality scores:
+
+- **`score`** — semantic similarity (0–1), where 1 is a perfect semantic match
+- **`confidence`** — the system's confidence in the memory itself (varies by age, access count, strength)
+- **`scope`** — optional tenant, peer, channel, or project scope used for visibility and ranking
+
+Results marked `[HIGH CONFIDENCE]` (≥0.8) should be referenced in your response, especially for factual queries.
+
+## How it actually works
+
+Key repo surfaces:
+
+- `convex/crystal/recall.ts` — main recall query logic
+- `convex/crystal/recallRanking.ts` — ranking and scoring algorithm
+- `convex/crystal/messages.ts` — message search and retrieval
+- `convex/crystal/mcp.ts` — tool registration and HTTP routing
+- `mcp-server/src/tools/recall.ts` — MCP tool definition
+
+These files define how Memory Crystal embeds queries, ranks durable-memory candidates, adds bounded lexical evidence from recent unextracted messages, and returns recall results.
+
+### Shared vs peer-scoped recall
+
+The shipped recall path supports both:
+
+- **peer/client sessions** like `peer-coach:511172388`
+- **shared/open sessions** like `peer-team:main`
+
+Important rule:
+
+- private client memories stay peer-scoped
+- shared training KBs can be exposed through `scope: "...:main"` plus `peerScopePolicy: "permissive"` when you intentionally query them with `crystal_query_knowledge_base`
+
+## Non-Latin lexical scoring
+
+Message scoring currently treats non-Latin particles and stop words as informative
+terms. There are no per-script stop-word lists, so common terms can contribute to
+lexical overlap and affect ranking.
+
+## Common mistakes
+
+- Treating recall as a single feature instead of a family of related retrieval flows
+- Assuming vector search alone explains the final ranking (it's combined with strength, recency, and scope)
+- Treating knowledge-base lookups and recall as interchangeable. KB lookup is the explicit path for a named reference corpus; recall searches conversational durable memory and recent lexical evidence.
+- Ignoring the role of recent-message and scope-aware filtering
+- Not using modes to guide recall toward specific memory types
+- Forgetting that `crystal_recent` and `crystal_search_messages` serve different purposes than semantic recall
+
+## Source of truth
+
+Primary files behind this page:
+
+- `mcp-server/src/tools/recall.ts` — tool definition
+- `convex/crystal/recall.ts`
+- `convex/crystal/recallRanking.ts`
+- `convex/crystal/messages.ts`
+- `convex/crystal/mcp.ts`
+
+## Notes
+
+### Peer-first fallback (new in 0.7.15)
+
+When `channel` is omitted on a peer-facing call, recall now fails-closed on any knowledge base with a concrete peer scope instead of silently upgrading to management-level visibility. If you're integrating recall from a peer session and expect KB results, always pass the peer channel (e.g. `peer-coach:511172388`). Omit `channel` only when you intend a deliberately unscoped (management) read.

@@ -1,0 +1,503 @@
+name: Publish Self-Hosted Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Optional release tag to build (vX.Y.Z). Leave empty to build the selected ref as sha-<short>."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*.*.*"
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "mcp-server/**"
+      - "**/Dockerfile*"
+      - "apps/web/.dockerignore"
+      - "mcp-server/.dockerignore"
+      # Changes to this pipeline build every platform on a pull request too.
+      - ".github/workflows/publish-selfhosted-images.yml"
+      - ".github/scripts/**"
+
+# Workflow default is read-only. build and merge raise packages, and merge
+# raises id-token for cosign keyless signing.
+permissions:
+  contents: read
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Repository guard: only run publish-capable events in the
+  # memorycrystal/ org. The cosign certificate-identity-regexp in
+  # bootstrap.sh is: ^https://github\.com/memorycrystal/.+$
+  # The job-level `if` skips the whole pipeline cleanly on the
+  # private repo (no red X per release tag); the in-step check
+  # stays as belt-and-braces if the condition ever drifts.
+  # ──────────────────────────────────────────────────────────────
+  repo-guard:
+    if: startsWith(github.repository, 'memorycrystal/') || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Verify repository org
+        run: |
+          repo="${{ github.repository }}"
+          event="${{ github.event_name }}"
+          if [[ "$repo" != memorycrystal/* && "$event" != "pull_request" ]]; then
+            echo "::error::This workflow must run in a memorycrystal/ repository for publish-capable events."
+            echo "::error::Current repository: $repo"
+            echo "::error::The cosign certificate-identity-regexp requires the workflow URL to match ^https://github\\.com/memorycrystal/.+$"
+            exit 1
+          fi
+          echo "Repository guard passed for $event in $repo"
+
+  meta:
+    needs: repo-guard
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      checkout_ref: ${{ steps.dispatch_ref.outputs.checkout_ref }}
+      version: ${{ steps.version.outputs.version }}
+      float_latest: ${{ steps.latest.outputs.float_latest }}
+    steps:
+      - name: Validate dispatch ref
+        id: dispatch_ref
+        env:
+          DISPATCH_REF: ${{ inputs.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          ref="${DISPATCH_REF:-}"
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" && -n "${ref}" ]]; then
+            if [[ ! "${ref}" =~ ^v[0123456789]+\.[0123456789]+\.[0123456789]+$ ]]; then
+              echo "::error::dispatch ref does not match ^v[0123456789]+\\.[0123456789]+\\.[0123456789]+$"
+              exit 1
+            fi
+            printf 'checkout_ref=%s\n' "${ref}" >> "${GITHUB_OUTPUT}"
+            printf 'version=%s\n' "${ref#v}" >> "${GITHUB_OUTPUT}"
+            printf 'float_latest=true\n' >> "${GITHUB_OUTPUT}"
+          else
+            printf 'checkout_ref=\n' >> "${GITHUB_OUTPUT}"
+            printf 'version=\n' >> "${GITHUB_OUTPUT}"
+            printf 'float_latest=\n' >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Compute version tag
+        id: version
+        env:
+          DISPATCH_VERSION: ${{ steps.dispatch_ref.outputs.version }}
+        run: |
+          if [[ -n "${DISPATCH_VERSION}" ]]; then
+            VERSION="${DISPATCH_VERSION}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            VERSION="pr-${{ github.event.pull_request.number }}"
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Strip leading 'v' from the tag name
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            # workflow_dispatch without ref: use short SHA
+            VERSION="sha-$(echo '${{ github.sha }}' | head -c 8)"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Computed version: ${VERSION}"
+
+      - name: Determine whether to float :latest
+        id: latest
+        env:
+          DISPATCH_FLOAT: ${{ steps.dispatch_ref.outputs.float_latest }}
+        run: |
+          # A validated dispatch ref already matches the stable semver rule.
+          # Tag pushes keep the same rule. Every other event leaves :latest alone.
+          if [[ "${DISPATCH_FLOAT}" == "true" ]]; then
+            echo "float_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            ref_name="${{ github.ref_name }}"
+            if [[ "${{ github.event_name }}" != "pull_request" && \
+                  "${{ github.ref_type }}" == "tag" && \
+                  "$ref_name" =~ ^v[0123456789]+\.[0123456789]+\.[0123456789]+$ ]]; then
+              echo "float_latest=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "float_latest=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # One native build per platform. runs-on is the matrix runner, so the
+  # public mirror rewrites those labels inside the matrix values.
+  build:
+    needs: meta
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mcp
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: amd64
+            dockerfile: mcp-server/Dockerfile
+            context: .
+            size_limit_mb: 80
+          - image: mcp
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+            dockerfile: mcp-server/Dockerfile
+            context: .
+            size_limit_mb: 80
+    steps:
+      - name: Checkout dispatch tag
+        if: needs.meta.outputs.checkout_ref != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.meta.outputs.checkout_ref }}
+
+      - name: Checkout
+        if: needs.meta.outputs.checkout_ref == ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_KEY: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${OWNER}" =~ ^[a-z0-9][a-z0-9-]{0,38}$ ]]; then
+            echo "::error::repository owner is not a lowercase GHCR name"
+            exit 1
+          fi
+          if [[ ! "${IMAGE_KEY}" =~ ^[a-z0-9][a-z0-9._-]{0,127}$ ]]; then
+            echo "::error::image key is not a lowercase GHCR path"
+            exit 1
+          fi
+          printf 'name=ghcr.io/%s/%s\n' "${OWNER}" "${IMAGE_KEY}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build (PR — no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          push: false
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ needs.meta.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }},mode=max
+
+      - name: Build and push by digest
+        id: build
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }},mode=max
+
+      - name: Export digest
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST_DIR: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::build digest is not sha256 and 64 lowercase hex characters"
+            exit 1
+          fi
+          mkdir -p "${DIGEST_DIR}"
+          : > "${DIGEST_DIR}/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [meta, build]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: mcp
+            size_limit_mb: 80
+            platform_count: 2
+    steps:
+      # The workflow's own commit, not the dispatched tag: the merge job needs
+      # only .github/scripts, and an older release tag may predate it.
+      - name: Checkout workflow scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: digests-${{ matrix.image }}-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_KEY: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${OWNER}" =~ ^[a-z0-9][a-z0-9-]{0,38}$ ]]; then
+            echo "::error::repository owner is not a lowercase GHCR name"
+            exit 1
+          fi
+          if [[ ! "${IMAGE_KEY}" =~ ^[a-z0-9][a-z0-9._-]{0,127}$ ]]; then
+            echo "::error::image key is not a lowercase GHCR path"
+            exit 1
+          fi
+          printf 'name=ghcr.io/%s/%s\n' "${OWNER}" "${IMAGE_KEY}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create image index
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          FLOAT_LATEST: ${{ needs.meta.outputs.float_latest }}
+          PLATFORM_COUNT: ${{ matrix.platform_count }}
+          DIGEST_DIR: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+            echo "::error::image name is not a ghcr.io path"
+            exit 1
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9A-Za-z_][0-9A-Za-z_.-]{0,127}$ ]]; then
+            echo "::error::version is not a docker tag"
+            exit 1
+          fi
+          if [[ "${FLOAT_LATEST}" != "true" && "${FLOAT_LATEST}" != "false" ]]; then
+            echo "::error::float_latest is not true or false"
+            exit 1
+          fi
+          case "${PLATFORM_COUNT:-}" in
+            ''|*[!0123456789]*|0*)
+              echo "::error::platform count is not a positive integer"
+              exit 1
+              ;;
+          esac
+          if [[ ! -d "${DIGEST_DIR}" ]]; then
+            echo "::error::digest directory is missing"
+            exit 1
+          fi
+          shopt -s nullglob
+          bases=()
+          for path in "${DIGEST_DIR}"/*; do
+            base="$(basename -- "${path}")"
+            if [[ ! "${base}" =~ ^[0-9a-f]{64}$ || ! -f "${path}" ]]; then
+              echo "::error::digest file name is not 64 lowercase hex characters"
+              exit 1
+            fi
+            bases+=("${base}")
+          done
+          if [[ ${#bases[@]} -ne ${PLATFORM_COUNT} ]]; then
+            echo "::error::expected ${PLATFORM_COUNT} platform digests, found ${#bases[@]}"
+            exit 1
+          fi
+          mapfile -t sorted < <(printf '%s\n' "${bases[@]}" | sort)
+          args=(docker buildx imagetools create -t "${IMAGE}:${VERSION}")
+          if [[ "${FLOAT_LATEST}" == "true" ]]; then
+            args+=(-t "${IMAGE}:latest")
+          fi
+          for base in "${sorted[@]}"; do
+            args+=("${IMAGE}@sha256:${base}")
+          done
+          "${args[@]}"
+
+      - name: Read index digest
+        id: index
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+            echo "::error::image name is not a ghcr.io path"
+            exit 1
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9A-Za-z_][0-9A-Za-z_.-]{0,127}$ ]]; then
+            echo "::error::version is not a docker tag"
+            exit 1
+          fi
+          inspect="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}")"
+          digest="$(printf '%s\n' "${inspect}" | awk '/^Digest:[[:space:]]/ { sub(/^Digest:[[:space:]]+/, ""); print; exit }')"
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::index digest is not sha256 and 64 lowercase hex characters"
+            exit 1
+          fi
+          printf 'digest=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
+
+      # ── Cosign keyless signing ──────────────────────────────
+      # Requires id-token: write (set on this job).
+      # The signing certificate identity will be:
+      #   https://github.com/memorycrystal/<repo>/.github/workflows/publish-selfhosted-images.yml@refs/tags/<tag>
+      # which matches the bootstrap.sh regexp: ^https://github\.com/memorycrystal/.+$
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: "v2.2.4"
+
+      - name: Sign image with cosign (keyless OIDC)
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+            echo "::error::image name is not a ghcr.io path"
+            exit 1
+          fi
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::index digest is not sha256 and 64 lowercase hex characters"
+            exit 1
+          fi
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+          echo "Signed: ${IMAGE}@${DIGEST}"
+
+      # ── SBOM attestation ───────────────────────────────────
+      - name: Generate SBOM with syft
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.image.outputs.name }}@${{ steps.index.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.image }}.spdx.json
+          upload-release-assets: false
+
+      - name: Attach SBOM as cosign attestation
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.name }}
+          PREDICATE: sbom-${{ matrix.image }}.spdx.json
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+            echo "::error::image name is not a ghcr.io path"
+            exit 1
+          fi
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::index digest is not sha256 and 64 lowercase hex characters"
+            exit 1
+          fi
+          if [[ ! "${PREDICATE}" =~ ^sbom-[a-z0-9._-]+\.spdx\.json$ ]]; then
+            echo "::error::SBOM predicate path is not a sbom file name"
+            exit 1
+          fi
+          cosign attest --yes \
+            --predicate "${PREDICATE}" \
+            --type spdx \
+            "${IMAGE}@${DIGEST}"
+
+      # After signing, so a size failure never leaves an unsigned index.
+      - name: Check compressed image size by digest
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.index.outputs.digest }}
+          SIZE_LIMIT_MB: ${{ matrix.size_limit_mb }}
+        run: python3 .github/scripts/image-compressed-size.py
+
+      # ── Job summary ────────────────────────────────────────
+      - name: Write job summary
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.name }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          IMAGE_KEY: ${{ matrix.image }}
+          PLATFORM_COUNT: ${{ matrix.platform_count }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${IMAGE}" =~ ^ghcr\.io/[a-z0-9._/-]+$ ]]; then
+            echo "::error::image name is not a ghcr.io path"
+            exit 1
+          fi
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::index digest is not sha256 and 64 lowercase hex characters"
+            exit 1
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9A-Za-z_][0-9A-Za-z_.-]{0,127}$ ]]; then
+            echo "::error::version is not a docker tag"
+            exit 1
+          fi
+          if [[ ! "${IMAGE_KEY}" =~ ^[a-z0-9][a-z0-9._-]{0,127}$ ]]; then
+            echo "::error::image key is not a lowercase name"
+            exit 1
+          fi
+          if [[ "${PLATFORM_COUNT:-}" != "2" ]]; then
+            echo "::error::summary platform list does not match the platform count"
+            exit 1
+          fi
+          REKOR_URL="https://search.sigstore.dev/?hash=${DIGEST}"
+          cat >> "$GITHUB_STEP_SUMMARY" <<SUMMARY
+          ## ${IMAGE_KEY} image published
+
+          | Field | Value |
+          |-------|-------|
+          | Image | \`${IMAGE}:${VERSION}\` |
+          | Digest | \`${DIGEST}\` |
+          | Platforms | \`linux/amd64\`, \`linux/arm64\` |
+          | Sigstore Rekor entry | [View in Rekor search](${REKOR_URL}) |
+
+          ### Verify locally
+          \`\`\`bash
+          cosign verify \\
+            --certificate-identity-regexp '^https://github\\.com/memorycrystal/.+$' \\
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\
+            ${IMAGE}@${DIGEST}
+          \`\`\`
+          SUMMARY

@@ -1,0 +1,73 @@
+---
+title: Automatic turn capture
+description: How v0.9.0 persists completed conversations once without per-turn inference.
+---
+
+Memory Crystal can retain a completed user/assistant turn automatically. This
+capture path is separate from the explicit `crystal_remember` tool.
+
+## Lean v0.9.0 contract
+
+For first-party integrations, completed-turn capture:
+
+1. sends one user/assistant pair to `POST /api/mcp/turn`
+2. uses a stable turn identifier so a retry is idempotent
+3. stores the scoped transcript for lexical recent-message recall
+4. performs no embedding, extraction, summarization, graph, association, or
+   generative-model work in the turn request
+
+The legacy `POST /api/mcp/log` endpoint remains available for manual or older
+single-message clients. A current integration must not also log one side of a
+turn that it already sent through `/api/mcp/turn`.
+
+## Durable memory
+
+Turn capture does not claim that every sentence belongs in long-term memory.
+Durable memories come from:
+
+- an explicit `crystal_remember`, `crystal_update`, or `crystal_supersede` call
+- bounded grounded distillation at a session boundary or the indexed nightly
+  fallback, using the account owner's configured OpenRouter key
+
+Distillation keeps source-message attribution and scope, deduplicates
+conservatively, and marks a transcript window extracted only after a successful
+or terminal decision. Undistilled transcript rows are protected from expiry.
+
+## Recall before distillation
+
+Recent unextracted turns remain available to `crystal_recall` through bounded
+lexical and chronological retrieval. Raw messages do not carry vectors in
+v0.9.0.
+
+## Explicit writes
+
+Use `crystal_remember` when a fact, decision, lesson, rule, workflow, or goal is
+important enough to save immediately. The explicit write is embedded in the
+authoritative long-term-memory vector index and remains independent from turn
+capture.
+
+## Operational notes
+
+- Capture remains enabled independently from recall injection.
+- Automatic recall injection is off by default. Use the tools deliberately, or
+  explicitly set `MEMORY_CRYSTAL_INJECT_RECALL=true` on a supported host.
+- Owner, channel, project, agent, and peer scope are preserved on both transcript
+  capture and later distillation.
+- Capture writes the declared or explicit agent id onto each new memory. Extraction
+  writes a label only when every source message carries the same one, and stores
+  the first source's label in source-message order. A source that is unstamped,
+  malformed, or a different agent leaves the memory unstamped; a missing source
+  stops the write when the extraction holds a claim on its sources, as every
+  production extraction does. Supersede
+  copies the predecessor's stamp and does not write the request agent id. Update
+  never adds, changes, or removes a stamp. Existing rows are not backfilled.
+- A missing or revoked owner key must leave extraction visible and unprocessed;
+  it must not fall back to a company-funded model key.
+
+## Source of truth
+
+- `convex/crystal/turnCapture.ts` — idempotent completed-turn persistence
+- `convex/crystal/reflectionCycle.ts` — bounded grounded distillation
+- `convex/crystal/ltmExtraction.ts` — extraction markers and durable writes
+- `plugin/capture-hook.js` — OpenClaw completed-turn client
+- `integrations/hermes/crystal-memory/__init__.py` — Hermes completed-turn client

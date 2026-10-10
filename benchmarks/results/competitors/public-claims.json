@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "researched_at": "2026-05-24",
+  "claims": [
+    {
+      "system": "Mem0",
+      "status": "public_claim",
+      "claim": "Mem0 docs report LoCoMo 91.6, LongMemEval 93.4, BEAM 1M 64.1, and BEAM 10M 48.6 with under 7,000 tokens per retrieval call.",
+      "benchmark": "LoCoMo / LongMemEval / BEAM",
+      "value": "LoCoMo 91.6; LongMemEval 93.4; BEAM 1M 64.1; BEAM 10M 48.6",
+      "source_type": "vendor documentation",
+      "source_url": "https://docs.mem0.ai/core-concepts/memory-evaluation",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Public claim only; not reproduced by the Memory Crystal harness."
+    },
+    {
+      "system": "Mem0",
+      "status": "public_claim",
+      "claim": "Mem0 research page headline reports 92.5 on LoCoMo, 94.4 on LongMemEval, and 64.1/48.6 on BEAM 1M/10M.",
+      "benchmark": "LoCoMo / LongMemEval / BEAM",
+      "value": "LoCoMo 92.5; LongMemEval 94.4; BEAM 1M/10M 64.1/48.6",
+      "source_type": "vendor research page",
+      "source_url": "https://mem0.ai/research",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Public claim only; cite exact page date because Mem0 benchmark pages have changed over time."
+    },
+    {
+      "system": "Zep",
+      "status": "public_claim",
+      "claim": "Zep paper reports DMR performance of 94.8% versus MemGPT at 93.4%.",
+      "benchmark": "Deep Memory Retrieval",
+      "value": "94.8%",
+      "source_type": "paper",
+      "source_url": "https://arxiv.org/abs/2501.13956",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Public claim only; DMR is not the same benchmark as LoCoMo, LongMemEval, or BEAM."
+    },
+    {
+      "system": "Zep",
+      "status": "public_claim",
+      "claim": "Public Zep-related benchmark discussions report LongMemEval-S overall accuracy around 71.2% with GPT-4o and note methodology disputes around LoCoMo comparisons.",
+      "benchmark": "LongMemEval-S",
+      "value": "71.2%",
+      "source_type": "public research/blog claim",
+      "source_url": "https://blog.getzep.com/state-of-the-art-agent-memory/",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Public claim only; Memory Crystal should not compare directly until the same harness is run."
+    },
+    {
+      "system": "Letta",
+      "status": "public_claim",
+      "claim": "Letta reports a filesystem-based Letta agent using GPT-4o-mini achieves 74.0% accuracy on LoCoMo.",
+      "benchmark": "LoCoMo",
+      "value": "74.0%",
+      "source_type": "vendor research blog",
+      "source_url": "https://www.letta.com/blog/benchmarking-ai-agent-memory",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Useful baseline showing LoCoMo can reward retrieval/tool setup; not a direct service-vs-service reproduction."
+    },
+    {
+      "system": "Letta",
+      "status": "public_claim",
+      "claim": "Letta Leaderboard / Context-Bench evaluates model and context-management behavior inside Letta rather than memory-service recall alone.",
+      "benchmark": "Context-Bench",
+      "value": "Adjacent benchmark; no direct Memory Crystal comparison",
+      "source_type": "vendor benchmark page",
+      "source_url": "https://leaderboard.letta.com/",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Mention as adjacent, not a Memory Crystal competitor score."
+    },
+    {
+      "system": "Pinecone Assistant",
+      "status": "public_claim",
+      "claim": "Pinecone Assistant exposes evaluation metrics for correctness, completeness, and alignment of RAG/assistant responses.",
+      "benchmark": "Assistant evaluation API",
+      "value": "No comparable public LoCoMo / LongMemEval / BEAM score found",
+      "source_type": "vendor API documentation",
+      "source_url": "https://docs.pinecone.io/reference/api/latest/assistant/metrics_alignment",
+      "source_accessed_at": "2026-05-24",
+      "notes": "Do not imply underperformance; category is assistant/RAG evaluation rather than persistent personal memory."
+    }
+  ]
+}
