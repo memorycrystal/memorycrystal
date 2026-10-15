@@ -1,0 +1,32 @@
+---
+title: Memory Stores
+description: The five store types Memory Crystal uses and why each one exists.
+---
+
+Not every memory belongs in the same bucket. A rule, a fact, and a future plan are different kinds of content, so Memory Crystal stores them in different stores.
+
+## The five stores
+
+| Store | What belongs there |
+| --- | --- |
+| `sensory` | Observations and signals |
+| `episodic` | Events and experiences |
+| `semantic` | Facts and knowledge |
+| `procedural` | How-to memory and workflows |
+| `prospective` | Future intentions and plans |
+
+Examples:
+
+- “the user sounds frustrated about the deploy” → sensory
+- “We shipped v2 on March 15” → episodic
+- “The API uses Convex for the backend” → semantic
+- “Deploy with the project deploy command” → procedural
+- “Need to add billing webhooks next sprint” → prospective
+
+## Stores are not retention
+
+The store is a label on the memory. It does not decide how long the memory lasts. Raw sensory content is kept until you delete it. Other durable memories can be archived by overage Forgetting or by the optional stale archive. Those rules are on [How Memory Works](/concepts/how-memory-works).
+
+Categories (`decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `skill`, `workflow`, `conversation`) are a second label. A mode preset may prefer some stores and categories. That preference is not a hard filter unless you pass explicit filters.
+
+Recall does not rank every store equally for every question. A workflow question prefers procedural memories. A people question prefers person facts. You can override that with `stores` and `categories` on the recall call.

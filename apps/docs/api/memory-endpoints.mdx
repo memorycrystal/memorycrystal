@@ -1,0 +1,249 @@
+---
+title: Memory endpoints
+description: Call the memory HTTP API and distinguish it from MCP output.
+---
+
+Use `https://convex.memorycrystal.ai` as the hosted base URL. Send a Bearer API key and `Content-Type: application/json` for JSON requests. Account ownership comes from authentication, not a request-body `userId`.
+
+Start with [authentication](/api/authentication). Separate references cover [knowledge bases](/api/knowledge-base-endpoints), [assets](/api/assets), [research](/tools/research), and [MCP setup](/integrations/mcp-server). HTTP JSON below describes the handlers; hosted and stdio MCP may reshape it.
+
+## Endpoint map
+
+Paths in this table are relative to `/api/mcp`.
+
+| Method and path | Request | Raw response |
+| --- | --- | --- |
+| POST `/recall` | Required `query`; [recall filters and bounds](/tools/recall) | `memories`, `assetContexts`, `messageMatches`, `degraded`, `retrieval`, `diagnostics`; optional degradation/promotion details |
+| POST `/memory` | `memoryId`; optional channel, agentId, projectId, repoSlug | `memory` with untruncated resolved recall text |
+| POST `/search-messages` | `query`; limit default 10/max 100, offset max 10,000, channel/session/time filters | `messages`, `turns`, `pagination`, `window`; possible degradation |
+| POST `/recent-messages` | Limit default 20/max 100; channel/session/time filters; order | `order`, `messages`, `turns` |
+| POST `/capture` | Title, content, store, category; [write options](/tools/remember) | `ok`, `id`, `relatedExisting`; applicable advisories |
+| POST `/update` | `memoryId` and supported changes | `success`, `memoryId`; possible contradiction advisory |
+| POST `/supersede` | `oldMemoryId`, successor title/content, optional replacement fields | `success`, `action`, `oldMemoryId`, `newMemoryId`; possible contradiction advisory |
+| POST `/forget` | `memoryId`, optional permanent, channel, agentId | `memoryId`, `title`, `action`, `success` |
+| POST `/checkpoint` | Create/list mode and [checkpoint options](/tools/checkpoint) | Creation IDs/counts/allowance or bounded checkpoint list |
+| GET or POST `/wake` | Optional channel, agentId | `briefing`, `recentMessages`, `recentTurns`, `recentMemories`, `lastCheckpoint` |
+| POST `/trace` | `memoryId`, optional channel, agentId | `memory`, `snapshot`; top-level reason when unavailable |
+| GET or POST `/stats` | Optional channel, which does not scope counts | `total`, `archived`, `byStore`, `apiKeyLabel`, `account`, `userId`, `email` |
+| GET or POST `/health` | No required body | Authenticated liveness, checks, readiness, build identity |
+| POST `/turn` | Completed turn fields below | Capture status and deduplication result |
+| POST `/session` | Required `sessionKey`; optional sinceMs, recentLimit | `summary`, `messages`, `turns` |
+
+## Retrieval
+
+```bash
+curl -X POST https://convex.memorycrystal.ai/api/mcp/recall \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"backup procedures","limit":12,"messageLimit":3}'
+```
+
+Recall memory entries use `memoryId` and ranking metadata. Read `retrieval` and `diagnostics` for returned counts, message scan coverage, filters, and timing; there is no supported `debugRecallOutput=true` query switch. The [recall page](/tools/recall) explains bounded and degraded retrieval.
+
+Transcript search is lexical, not vector search. Recent messages default to chronological order; `order: "newest"` is supported. Message records use `content`, not a universal `text` field, and grouped turns are separate. For search, follow `pagination.nextOffset` while `hasMore` is true within the offset bound. The HTTP window fields are `fromMs` and `toMs`.
+
+Use `scopeToSession: true` with a `sessionKey` when you want session-restricted durable recall. Omitting scope does not expose all private transcripts. IDs hidden by visibility checks return 404.
+
+## Writes and continuity
+
+```json
+{"title":"Backup verification rule","content":"Verify a backup before replacement.","store":"procedural","category":"rule"}
+```
+
+Send this to `/capture` for a durable memory. It schedules embedding/salience work; it does not return an embedding vector or creation metadata as a universal response.
+
+[Update](/tools/update) corrects a record in place. [Supersede](/tools/supersede) atomically archives and links a predecessor to its successor. `scopeChannel` authorizes the old scope; `channel` changes stored scope. Both reject protected placeholder writes with 409 `redacted_content_write` unless deliberately overridden.
+
+Checkpoint creation requires an explicit user request. Its result contains `ok`, `id`, `checkpointId`, `memoryCount`, `allowance`, `retainedCount`, `snapshotCap`, `snapshotByteLimit`, and `tier`. It is a bounded backup, not a full export.
+
+Trace returns a source snapshot with `messages`, `messageCount`, `omittedCount`, `createdAt`, and `reason`. Above 20 messages, it returns the first ten and last ten. An unavailable snapshot is null with a reason; it is not a complete transcript guarantee.
+
+## Completed turns and sessions
+
+`/turn` requires `sessionKey`, `channel`, `turnId`, and nonempty `assistantMessage`; send `userMessage` when available. Optional platform, agent, metadata, and project/repository fields preserve attribution. Retrying the same account/turn ID is idempotent. No embedding or durable extraction runs in the turn request; [distillation is separate](/tools/capture).
+
+`/session` accepts `recentLimit` (default 12, clamped 1–50; `limit` is an alias) and optional `sinceMs`. It returns a summary plus the selected recent messages and grouped turns.
+
+## Export
+
+GET `/api/memories` exports the authenticated owner's active memories, newest first. It is an owner export, not a scoped recall endpoint.
+
+| Query parameter | Behavior |
+| --- | --- |
+| `pageSize` or `limit` | 1–200; pass explicitly because an omitted value currently clamps to 1 |
+| `cursor` | Previous response's pagination cursor |
+| `store`, `category` | Optional exact filters |
+| `createdAfter`, `createdBefore` | Epoch-millisecond bounds; aliases `since`, `until` |
+
+The response is `memories` plus `pagination` containing `pageSize`, `cursor`, and `isDone`. Continue until `isDone`; preserve the same filters across pages.
+
+Raw messages remain until deletion on every tier. See [rate limits](/api/rate-limits) for route-specific responses and [errors](/api/error-reference) for validation and visibility failures.
+
+## Request and response examples
+
+The following examples show raw HTTP JSON. Replace placeholder IDs and scope values with your own returned values. Larger response examples show selected fields; the endpoint map lists the additional envelope fields.
+
+### POST /api/mcp/recall
+
+Request body:
+
+```json
+{
+  "query": "How should I verify backups?",
+  "limit": 3,
+  "messageLimit": 0
+}
+```
+
+HTTP response (selected fields):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+### POST /api/mcp/capture
+
+Request body:
+
+```json
+{
+  "title": "Backup verification rule",
+  "content": "Verify a backup before replacing the previous copy.",
+  "store": "procedural",
+  "category": "rule"
+}
+```
+
+HTTP response:
+
+```json
+{
+  "ok": true,
+  "id": "<memory-id>",
+  "relatedExisting": []
+}
+```
+
+### POST /api/mcp/search-messages
+
+Request body:
+
+```json
+{
+  "query": "backup",
+  "limit": 10,
+  "offset": 0,
+  "sessionKey": "<session-key>"
+}
+```
+
+HTTP response:
+
+```json
+{
+  "messages": [],
+  "turns": [],
+  "pagination": {
+    "limit": 10,
+    "offset": 0,
+    "returned": 0,
+    "hasMore": false,
+    "nextOffset": null
+  },
+  "window": {
+    "fromMs": null,
+    "toMs": null
+  }
+}
+```
+
+### POST /api/mcp/turn
+
+Request body:
+
+```json
+{
+  "sessionKey": "<session-key>",
+  "channel": "<channel>",
+  "turnId": "<turn-id>",
+  "userMessage": "Has the backup been verified?",
+  "assistantMessage": "The backup verification completed successfully."
+}
+```
+
+HTTP response:
+
+```json
+{
+  "ok": true,
+  "deduped": false,
+  "turnId": "<turn-id>",
+  "sessionKey": "<session-key>",
+  "channel": "<channel>",
+  "messages": [
+    {
+      "role": "user",
+      "id": "<user-message-id>",
+      "inserted": true
+    },
+    {
+      "role": "assistant",
+      "id": "<assistant-message-id>",
+      "inserted": true
+    }
+  ],
+  "extraction": {
+    "scheduled": false,
+    "mode": "async",
+    "reason": "distillation_owns_extraction"
+  }
+}
+```
+
+### POST /api/mcp/recent-messages
+
+Request body:
+
+```json
+{
+  "sessionKey": "<session-key>",
+  "limit": 5,
+  "order": "newest"
+}
+```
+
+HTTP response:
+
+```json
+{
+  "order": "newest",
+  "messages": [],
+  "turns": []
+}
+```
+## Full-turn workflow
+
+1. Call `/wake` at session start if you need an opening briefing.
+2. Call `/recall` with the current question and intended scope; query named KBs separately.
+3. After the assistant completes a response, send the transcript pair to `/turn` using a stable turn ID.
+4. Save an explicit durable outcome through `/capture` when needed. Do not equate this with transcript capture.
+5. Create a checkpoint only when the user requests a backup.
+
+## Errors and common mistakes
+
+On reads, check both HTTP status and retrieval diagnostics. On writes, save the returned ID before looking for the record through recall. Do not blindly retry a durable capture after a timeout: it is not the idempotent completed-turn endpoint. Investigate whether it was saved first.
+
+For ID-based reads or writes, preserve the relevant identity and visibility scope. Use `scopeChannel` on update/supersede to authorize the existing record without moving it; use `channel` only for an intended move. A 404 can conceal a scope mismatch. Follow [Retry-After handling](/api/rate-limits) on 429 responses.

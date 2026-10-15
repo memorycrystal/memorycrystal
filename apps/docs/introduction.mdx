@@ -1,0 +1,72 @@
+---
+title: Introduction
+description: Memory Crystal is a persistent memory layer that helps AI agents remember context, decisions, and workflows across sessions.
+---
+
+Current release: **v0.10.1** (OpenClaw plugin, MCP servers, and web app). The Hermes plugin is **0.10.3**. Local-backend archives, installer archive defaults, and self-hosted image tags stay on **0.10.0**. See the [changelog](/changelog) for what shipped, and the [uninstall guide](/help/uninstall) when you need to disconnect a client.
+
+Memory Crystal keeps context, decisions, and working rules across sessions so you do not restate them every time you start a chat.
+
+## What you can store
+
+- architecture and project conventions you already chose
+- commands and workflows the project uses
+- who owns what
+- what failed before
+- reference docs you want an agent to query on purpose
+
+It ships as:
+
+- an **OpenClaw plugin**
+- a **hosted Streamable HTTP MCP server** for compatible clients
+- a **stdio MCP server** that shares the same tool contracts and adds tools the hosted server does not expose
+- a **Convex Cloud backend**
+- a **web dashboard**
+
+## Hosted endpoints
+
+| Surface | URL |
+| --- | --- |
+| Hosted backend and API base | `https://convex.memorycrystal.ai` |
+| Hosted MCP | `https://api.memorycrystal.ai/mcp` |
+| Dashboard | [memorycrystal.ai/dashboard](https://memorycrystal.ai/dashboard) |
+
+The hosted backend runs on Convex Cloud. A self-hosted install points both clients at the Convex site you operate: the API base is your site URL, and MCP uses `<site>/api/mcp`.
+
+## Capture and recall
+
+1. **Capture** records each completed turn once, without a model call on that turn. You can turn automatic capture off independently.
+2. **Recall** returns a bounded set of eligible memories and recent messages through tools, or through host injection when you explicitly enable it. Injection is off by default, and Grok cannot inject.
+
+On the hosted service and by default when self-hosting, raw messages and raw sensory content stay until you delete them. Durable memories follow a separate lifecycle: distillation, overage-only Forgetting, and an optional stale archive. See [How Memory Works](/concepts/how-memory-works), [Usage and allowances](/help/usage-and-allowances), and [Pricing](/pricing).
+
+## MCP servers
+
+Both MCP packages are at 0.10.1 and use the shared tool contract.
+
+- `packages/mcp-server/` is the current Streamable HTTP server used by hosted clients.
+- `mcp-server/` is the stdio server. It is still versioned and shipped. It exposes tools that hosted HTTP MCP does not, so the two surfaces are not the same tool list. Use it when a client needs local stdio rather than the hosted HTTP endpoint.
+
+## Install
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+`/crystal` redirects to `/install.sh`. It is the same installer, not a second one.
+
+Next:
+
+- [Quick Start](/quickstart)
+- [Installation](/installation)
+- [How Memory Works](/concepts/how-memory-works)
+- [Support Tiers](/concepts/support-tiers)
+- [Tools Overview](/tools/overview)
+
+## Client guides
+
+- [OpenClaw](/integrations/openclaw-plugin) and [Hermes Agent](/integrations/hermes-agent): native plugin setup.
+- [Claude Code](/integrations/claude-code), [Codex CLI and Desktop](/integrations/codex-cli), [Cursor](/integrations/cursor), and [Grok Build](/integrations/grok): client configuration and hook capabilities.
+- [Claude Desktop](/integrations/claude-desktop), [Factory Droid](/integrations/factory-droid), and [OpenCode](/integrations/opencode): MCP setup.
+- [MCP server](/integrations/mcp-server): other compatible clients.
+- [Buzz](/integrations/buzz): install into the CLI it runs.

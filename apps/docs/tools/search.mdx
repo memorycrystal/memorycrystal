@@ -1,0 +1,131 @@
+---
+title: Search messages
+description: Search retained transcript wording with time windows and pagination.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_search_messages` performs lexical transcript search without embedding the query. Use [recall](/tools/recall) for durable context and [recent](/tools/recent) for recency.
+
+## When to use
+
+Use lexical search when you remember a word or phrase from a conversation. Use [recall](/tools/recall) for related durable knowledge, [recent](/tools/recent) to read the latest messages without a query, or [why did we](/tools/reasoning/why-did-we) to look for recorded reasons.
+
+| Parameter | Behavior |
+| --- | --- |
+| `query` | Required nonempty text |
+| `limit` | Default 10; integer 1–100 |
+| `offset` | Default 0; backend clamps to 0–10,000 |
+| `channel` | Conversation or peer scope |
+| `sessionKey` | Exact session filter |
+| `fromMs`, `sinceMs` | Lower epoch-millisecond bound; `fromMs` takes precedence |
+| `toMs` | Upper epoch-millisecond bound |
+| `startDate`, `endDate` | ISO date or datetime alternatives |
+
+Use explicit UTC timestamps when you need an unambiguous date window.
+
+## Responses by surface
+
+| Surface | Returned JSON |
+| --- | --- |
+| Raw HTTP: `POST /api/mcp/search-messages` | `messages`, `turns`, `pagination`, `window`; optional degradation details |
+| Stdio MCP | `query`, `results`, `turns`, `limit`, `channel`, `sessionKey`, `sinceMs`, `pagination`, `window`; absent optional fields can be omitted |
+| Hosted MCP | `messages`, with content cut to 300 characters; pagination and window metadata are omitted |
+
+HTTP pagination contains `limit`, `offset`, `returned`, `hasMore`, and `nextOffset`. Follow `nextOffset` while `hasMore` is true, within the offset bound. A scoped full page can report more until a subsequent short page confirms the end. Use HTTP or stdio when you need pagination metadata; the hosted response cannot prove completeness.
+
+If retrieval degrades, HTTP can report that keyword search was skipped and recent messages were searched instead. Bounded candidate scans and visibility can also limit results.
+
+## Scope and validation
+
+Omitting `channel` and `sessionKey` applies bounded unscoped visibility, not unrestricted access to private transcripts. Channels partition one account; separate accounts provide the security boundary.
+
+MCP schemas validate numeric limits and field types. Raw HTTP clamps numeric limits and accepts additional time aliases. Do not assume the same malformed input behaves identically across transports.
+
+Raw messages remain until you delete them on every tier. Expired TTL stamps do not currently remove messages from search.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Find wording
+
+Request:
+
+```json
+{
+  "query": "backup verification",
+  "limit": 10
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "messages": [
+    {
+      "messageId": "<message-id>",
+      "channel": "<channel>",
+      "sessionKey": "<session-key>",
+      "role": "assistant",
+      "content": "The backup verification completed successfully.",
+      "timestamp": 1791936000000,
+      "score": 6,
+      "subjects": ["backup", "verification"],
+      "relevance": 1
+    }
+  ]
+}
+```
+
+`score` is the lexical match score; `relevance` is the normalized ranking signal. When a result matches subject labels, it also includes `subjects`, for example `"subjects": ["backup"]`. Scores are not confidence percentages.
+
+### Search one session in a time window
+
+Request:
+
+```json
+{
+  "query": "backup",
+  "sessionKey": "<session-key>",
+  "startDate": "2026-10-01T00:00:00Z",
+  "endDate": "2026-10-14T23:59:59Z",
+  "limit": 100,
+  "offset": 0
+}
+```
+
+Raw HTTP response:
+
+```json
+{
+  "messages": [],
+  "turns": [],
+  "pagination": {
+    "limit": 100,
+    "offset": 0,
+    "returned": 0,
+    "hasMore": false,
+    "nextOffset": null
+  },
+  "window": {
+    "fromMs": 1790812800000,
+    "toMs": 1792022399000
+  }
+}
+```
+
+## Scope and time windows
+
+Pass a channel to target its conversation scope, and a `sessionKey` for a specific session. Search each intended scope explicitly when investigating multiple conversations; omitting scope is not an unrestricted cross-conversation search.
+
+Use `Date.now() - 7 * 24 * 60 * 60 * 1000` for a rolling seven-day lower bound in JavaScript. Milliseconds are required, not Unix seconds. For calendar windows use ISO timestamps with a timezone. Keep the same query, scope, and window while paging.
+
+## How results are found
+
+Search uses bounded text-index candidates and can fall back to recent-message candidates. It does not embed the query. Results preserve transcript wording, subject to redaction and transport excerpt limits. Read `turns` on raw HTTP when paired conversation context helps.
+
+## Errors and common mistakes
+
+Do not assume the first full page is the complete result set. Follow pagination on HTTP or stdio, and respect the 10,000 offset bound. Check dates and scope before broadening a query. Hosted MCP omits pagination metadata, so use HTTP or stdio for a paged investigation. Empty or reduced-search results are not proof of absence.

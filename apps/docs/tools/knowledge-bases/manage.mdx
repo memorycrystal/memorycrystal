@@ -1,0 +1,159 @@
+---
+title: Manage knowledge bases
+description: Create bases, control access, enumerate chunks, and manage their lifecycle.
+---
+
+Knowledge base management tools create reference corpora, control who can retrieve them, enumerate their chunks, and remove contents while retaining settings.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+Use these tools to prepare a corpus, grant retrieval access, or inspect all its chunks. Use [import](/tools/knowledge-bases/import) to add material and [query](/tools/knowledge-bases/query) for relevant excerpts. Enumeration and emptying are owner management actions, not semantic search.
+
+## Create
+
+`crystal_create_knowledge_base` takes required `name` and optional `description`, `scope`, `sourceType`, `sourceRole`, `agentId`, `agentIds`, `channel`, and `peerScopePolicy` (`strict` or `permissive`). Use an explicit `agentIds` array to define access.
+
+The returned `knowledgeBaseId` identifies the new base. An empty allow-list closes access; configure it before querying.
+
+| Create parameter | Requirement and meaning |
+| --- | --- |
+| `name` | Required string |
+| `description`, `sourceType`, `sourceRole` | Optional descriptive strings |
+| `scope`, `channel` | Optional scope context |
+| `agentId` | Optional identity context |
+| `agentIds` | Optional allow-list; empty closes retrieval |
+| `peerScopePolicy` | Optional `strict` or `permissive` |
+
+## Access
+
+`crystal_set_knowledge_base_access` accepts `knowledgeBaseId` or exact `knowledgeBaseName` and an `action`:
+
+| Action | Arguments and effect |
+| --- | --- |
+| `add` | Add `agentId`; identity can be derived from configured context or `channel` |
+| `remove` | Remove `agentId` |
+| `set` | Replace access with `agentIds`; `[]` closes the base |
+| `open` | Explicitly open access to every identity in the account |
+
+These settings affect within-account retrieval. They are not a separate-account security boundary.
+
+## Enumerate and empty
+
+| Tool | Parameters | Result |
+| --- | --- | --- |
+| `crystal_list_knowledge_base_memories` | ID or name, `limit` 1–200 (intended default 100), optional `cursor` | `knowledgeBaseId`, `memories`, `continueCursor`, `isDone` |
+| `crystal_empty_knowledge_base` | ID or name | Deletes chunks while preserving the KB ID and settings |
+
+Pass `limit: 100` explicitly: the current HTTP enumeration handler treats an omitted limit as 1. Follow `continueCursor` until `isDone` is true. Query results are not a substitute for enumeration.
+
+Emptying is destructive; obtain explicit user approval first. It returns `knowledgeBaseId`, `deletedMemories`, `activeDeletedMemories`, and `kept: true`. An interrupted operation can have already deleted some chunks.
+
+## Archive, restore, and delete
+
+There is no dedicated MCP archive/restore/delete-KB tool. Use the [HTTP lifecycle endpoints](/api/knowledge-base-endpoints) or dashboard.
+
+The compatibility HTTP DELETE deactivates the KB and archives a bounded chunk set; it is not permanent deletion. PATCH with `isActive: true` reactivates the KB row but does not automatically restore archived chunks. The asynchronous lifecycle `archive` and `delete` operations are distinct; permanent deletion removes data and is not a restore path. Emptying retains the base's settings so you can reimport into the same ID.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Create a closed corpus
+
+Request:
+
+```json
+{
+  "name": "Reference manual",
+  "description": "Reusable reference material",
+  "agentIds": []
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>"
+}
+```
+
+### Grant access to an identity
+
+Call `crystal_set_knowledge_base_access`:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "action": "set",
+  "agentIds": ["<agent-id>"]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "updated": true,
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "access": {
+    "mode": "restricted",
+    "agentIds": ["<agent-id>"]
+  }
+}
+```
+
+### Enumerate chunks
+
+Request:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "limit": 100
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "memories": [],
+  "continueCursor": "<cursor>",
+  "isDone": true
+}
+```
+
+### Empty a corpus after approval
+
+Request:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>"
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "deletedMemories": 12,
+  "activeDeletedMemories": 12,
+  "kept": true
+}
+```
+
+## Practical sequence
+
+Create the base, configure access, import chunks, and query with the intended identity. Keep the returned ID for updates. To refresh a source, prefer stable-key imports; empty the whole base only when you intend to remove all its chunks.
+
+For paged enumeration, send `continueCursor` as `cursor` on the next request, preserving the base ID and limit. Stop when `isDone` is true, even if a cursor is present.
+
+## Errors and common mistakes
+
+An empty allow-list closes retrieval; it does not mean open access. An inactive row must be reactivated before querying, and row reactivation alone does not restore archived chunks. Emptying is destructive and can partially complete before an interruption. Do not use a query limit as an enumeration cursor.

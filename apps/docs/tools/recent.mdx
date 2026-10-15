@@ -1,0 +1,101 @@
+---
+title: Recent messages
+description: Read the newest retained messages in a bounded window.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Call `crystal_recent` for recent transcript context.
+
+## When to use
+
+Use recent messages to resume a conversation or inspect what was just captured. Use [search](/tools/search) for particular wording and [wake](/tools/wake) for a briefing that also includes durable context.
+
+| Parameter | Behavior |
+| --- | --- |
+| `limit` | Default 20; integer 1–100 |
+| `channel`, `sessionKey` | Optional conversation and exact-session filters |
+| `sinceMs`, `fromMs`, `toMs` | Epoch-millisecond window; `fromMs` takes precedence over `sinceMs` |
+| `startDate`, `endDate` | ISO date or datetime window alternatives |
+| `order` | `chronological` (default) or `newest` |
+
+There is no automatic current-session restriction: pass `sessionKey`. Without scope, the backend reads a bounded set of visible messages rather than every private conversation.
+
+| Surface | Response |
+| --- | --- |
+| Raw HTTP: `POST /api/mcp/recent-messages` | `order`, shaped `messages`, and grouped `turns` |
+| Hosted MCP | `messages` with content limited to 300 characters |
+| Stdio MCP | Formatted text plus JSON `messages` and `query`; JSON retains full redacted message text |
+
+MCP rejects invalid limits. Raw HTTP clamps them. The stdio handler ignores nonnumeric epoch-time fields; hosted schema validation rejects wrong types. Supply numeric milliseconds or ISO date strings in their designated fields.
+
+Raw messages remain until deletion on all tiers. Use [search](/tools/search) when wording matters more than recency.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Read the newest messages
+
+Request:
+
+```json
+{
+  "limit": 5,
+  "order": "newest"
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "messages": [
+    {
+      "messageId": "<message-id>",
+      "channel": "<channel>",
+      "sessionKey": "<session-key>",
+      "role": "assistant",
+      "content": "The backup verification completed successfully.",
+      "timestamp": 1791936000000
+    }
+  ]
+}
+```
+
+### Read one session chronologically
+
+Request:
+
+```json
+{
+  "sessionKey": "<session-key>",
+  "limit": 20,
+  "order": "chronological"
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "messages": [
+    {
+      "messageId": "<message-id>",
+      "channel": "<channel>",
+      "sessionKey": "<session-key>",
+      "role": "assistant",
+      "content": "The backup verification completed successfully.",
+      "timestamp": 1791936000000
+    }
+  ]
+}
+```
+
+## Order and scope
+
+Chronological order makes a selected window easier to read as a conversation; `newest` puts the latest item first. The limit bounds the selected messages, not the entire history. Supply the session key explicitly when continuity must stay within one session.
+
+## Errors and common mistakes
+
+Do not pass epoch seconds as milliseconds. Use ISO dates in `startDate`/`endDate`, not in numeric fields. Missing messages may be outside the selected window or visibility scope. For full redacted text rather than hosted excerpts, use raw HTTP or stdio.

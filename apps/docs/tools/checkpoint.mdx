@@ -1,0 +1,102 @@
+---
+title: Create a checkpoint
+description: Make a bounded manual backup of durable memories.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Call `crystal_checkpoint` to create a backup **only when the user explicitly asks for a checkpoint or backup**. A milestone alone is not a request.
+
+## When to use
+
+Create a checkpoint when the user asks for a backup of durable memories. Use [remember](/tools/remember) for a single fact and [wake](/tools/wake) to resume work without creating a backup.
+
+| Parameter | Behavior |
+| --- | --- |
+| `mode` | `create` (default) or `list` |
+| `label`, `description` | Backup label and optional detail; HTTP creation requires a nonempty label |
+| `memoryIds` | Optional selected IDs |
+| `channel`, `sessionKey` | Optional scope; `sessionId` is a compatibility alias for `sessionKey` |
+| `tags` | Stored on creation; listing does not filter by tags |
+| `limit` | Listing bound, 1–100; HTTP default 20 |
+| `createdBy`, `semanticSummary` | Accepted but ignored by this backend path |
+
+## Backup limits
+
+| Tier | Retained checkpoints | Maximum memory entries per snapshot |
+| --- | --- | --- |
+| Free | 1 | 50 |
+| Starter / Pro | 5 | 200 |
+| Ultra | 10 | 500 |
+| Unlimited | 20 | 1,000 |
+
+Conversation snapshots are automatic provenance records, separate from requested checkpoints and their allowance. Retained allowances are Free 1, Starter/Pro 5, Ultra 10, Unlimited 20. Checkpoint creation uses bounded reads and writes; it does not run LLM summarization, embeddings, vector search, graph enrichment.
+
+Snapshots also have a byte bound. They are not unlimited account exports.
+
+`POST /api/mcp/checkpoint` creation returns `ok`, `id`, `checkpointId`, `memoryCount`, `allowance`, `retainedCount`, `snapshotCap`, `snapshotByteLimit`, and `tier`. Stdio adds presentation fields. Listing returns `checkpoints` and allowance information, bounded by limit and channel/session selection; it does not provide cursor pagination.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Create a requested backup
+
+Request:
+
+```json
+{
+  "mode": "create",
+  "label": "Before the restore exercise",
+  "memoryIds": [
+    "<memory-id>"
+  ]
+}
+```
+
+raw HTTP / Hosted MCP response:
+
+```json
+{
+  "ok": true,
+  "id": "<checkpoint-id>",
+  "checkpointId": "<checkpoint-id>",
+  "memoryCount": 1,
+  "allowance": 1,
+  "retainedCount": 1,
+  "snapshotCap": 50,
+  "snapshotByteLimit": 750000,
+  "tier": "free"
+}
+```
+
+### List retained backups
+
+Request:
+
+```json
+{
+  "mode": "list",
+  "limit": 20
+}
+```
+
+raw HTTP / Hosted MCP response:
+
+```json
+{
+  "checkpoints": [],
+  "allowance": 1,
+  "retainedCount": 0,
+  "snapshotCap": 50,
+  "tier": "free"
+}
+```
+
+## Select the backup contents
+
+Use `memoryIds` for a selected set or channel/session scope for a narrower snapshot. Check `memoryCount` rather than assuming every account record was copied. The snapshot byte cap is 750,000 bytes; large memory bodies can reach it before the entry cap. Listing does not create a new checkpoint.
+
+## Errors and common mistakes
+
+A missing creation label returns 400. A reached checkpoint allowance returns 403; inspect existing checkpoints before requesting another. Tags are stored on creation but cannot filter the list. Do not treat a snapshot as an unlimited export or create one merely because a session ended.

@@ -1,0 +1,88 @@
+---
+title: Update a memory
+description: Correct or enrich an existing memory in place.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_update` keeps the memory ID. Use [supersede](/tools/supersede) when a successor should replace a stale record.
+
+## When to use
+
+Use an in-place update to fix a typo, enrich a fact, or replace tags while preserving the ID. Use [supersede](/tools/supersede) when the old guidance should remain linked as history, and [remember](/tools/remember) for a new independent fact.
+
+| Parameter | Behavior |
+| --- | --- |
+| `memoryId` | Required existing ID |
+| `title`, `content`, `metadata` | Optional replacement strings |
+| `tags`, `actionTriggers` | Optional replacement string arrays |
+| `store`, `category` | Optional [allowed values](/tools/overview) |
+| `confidence`, `strength`, `arousal` | Optional numbers from 0 to 1 |
+| `valence` | Optional number from −1 to 1 |
+| `scopeChannel` | Scope used to authorize access to the existing memory |
+| `channel` | New stored channel; rehomes the memory |
+| `agentId` | KB visibility identity; does not rewrite the stored identity stamp |
+| `allowRedactedContent` | Set true only to deliberately replace secret-bearing fields with placeholders |
+
+When you omit `scopeChannel`, visibility falls back to `channel`. To move a scoped memory, supply its old scope in `scopeChannel` and its destination in `channel`.
+
+`POST /api/mcp/update` rejects requests without supported changes with 400. Title and content are not automatically trimmed; tags are trimmed and empty tags removed, but duplicates are retained. Editing does not update `lastAccessedAt`. Text changes can refresh derived retrieval data.
+
+Agent reads redact secrets. Writing a redaction placeholder over a field that stores a secret returns HTTP 409 with `error: "redacted_content_write"`, plus `fields` and `message`, unless you explicitly set `allowRedactedContent: true`. This applies to title, content, metadata, tags, and action triggers. Missing or hidden records return 404.
+
+A successful response contains `success` and `memoryId`, with applicable contradiction advisory fields.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Correct the procedure
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "content": "Verify the backup and record the verification date."
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "success": true,
+  "memoryId": "<memory-id>"
+}
+```
+
+### Replace tags
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "tags": [
+    "backup",
+    "verified"
+  ]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "success": true,
+  "memoryId": "<memory-id>"
+}
+```
+
+## Replacement semantics
+
+Only supplied fields change. Arrays replace the existing arrays; they are not appended. Read the existing record with [get memory](/tools/get-memory) if you need to preserve other tags, then send the complete intended array. Metadata is a string, not an arbitrary JSON object.
+
+## Errors and common mistakes
+
+Send at least one supported change. Use the old visibility scope in `scopeChannel` when moving a record; `channel` is the destination. Do not copy redacted text back over a secret-bearing field. A 404 can mean the record is hidden in the supplied scope, not deleted.

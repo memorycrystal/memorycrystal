@@ -1,0 +1,133 @@
+---
+title: Plugin Options
+description: OpenClaw plugin settings, the public installer's defaults, and how agent scope policies resolve.
+---
+
+These settings live on the OpenClaw plugin (`plugin/openclaw.plugin.json`). The public installer and `scripts/crystal-enable.sh` write different defaults for local storage. Read the row that matches the command you ran.
+
+## Options
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `apiKey` | none | Bearer token for hosted HTTP calls. |
+| `convexUrl` | `https://convex.memorycrystal.ai` | Backend base URL. |
+| `defaultRecallMode` | `general` | Default mode for recall. Also `decision`, `project`, `people`, `workflow`, `conversation`. |
+| `defaultRecallLimit` | `4` | Results per recall query. Range 1–20. This is not `maxMemories`. |
+| `maxMemories` | `12` | Memories requested for the injected block. Hard cap 20. `MEMORY_CRYSTAL_MAX_MEMORIES` wins. |
+| `previewChars` | `800` | Characters of each memory in the injected block. Cap 2000. Full text stays on `crystal_recall`. `MEMORY_CRYSTAL_PREVIEW_CHARS` wins. |
+| `MEMORY_CRYSTAL_INJECT_RECALL` (environment) | off | Automatic pre-response recall. Use `1` or `true`. The runtime also reads `injectRecall`, but the strict plugin schema does not declare that config key; use the environment switch. |
+| `captureTurns` | `true` | Post each completed turn once. `MEMORY_CRYSTAL_CAPTURE_TURNS` wins. |
+| `turnCapture` | `true` | Earlier name for `captureTurns`. `captureTurns` wins when both are set. |
+| `enableTriggers` | `false` | Append a guardrail note to a tool result when an action-trigger memory matches. Does not block the call. |
+| `actionTriggers` | `[]` | A non-empty list turns guardrails on, same as `enableTriggers: true`. The lookup still covers every tool call. |
+| `channelScope` | unset | Prefix for scoped channels. See below. |
+| `agentScopePolicies` | unset | Per-agent `peer` or `shared` policy. Overrides `channelScope` for that agent. |
+| `localStoreEnabled` | `false` in the schema | Optional local SQLite store for summaries. |
+| `contextEngineMode` | `reduced` | `full`, `reduced`, or `hook-only`. `full` is explicit opt-in. |
+| `localSummaryInjection` | `false` | Inject local summaries into the prompt. |
+| `localSummaryMaxTokens` | `2000` | Budget for those summaries. Range 0–8000. |
+| `openaiApiKey` | unset | Used only for explicit local compaction. The plugin does not read an ambient `OPENAI_API_KEY`. |
+| `compactRecall` | documented only | The backend reads `MEMORY_CRYSTAL_COMPACT_RECALL`. Setting this in plugin config does nothing. |
+| `debugRecallOutput` | `false` | Inject the full recall payload for debugging. |
+
+`defaultRecallLimit` (4) is the plugin's own recall fan-in. `maxMemories` (12) is the injection block size. Hosted `crystal_recall` still defaults to 12 when a caller omits `limit`.
+
+## Two installers, two local-store defaults
+
+The public installer (`install-openclaw-plugin.sh`) runs for a cloud backend from the universal Bash installer. When `contextEngineMode`, `localStoreEnabled`, and `dbPath` are all unset, it writes:
+
+```json
+{
+  "localStoreEnabled": false,
+  "contextEngineMode": "reduced"
+}
+```
+
+SQLite is not turned on. Compaction stays an explicit opt-in. If you already set any of those three fields, the public installer keeps your values.
+
+`scripts/crystal-enable.sh` is the older enabler used from a source checkout. When `better-sqlite3` loads, it independently sets `localStoreEnabled` to `true` if that field is not a boolean, and `contextEngineMode` to `full` if no valid mode is set. An explicit `dbPath` alone does not prevent those choices. When SQLite is missing and the fields are unset, it removes `contextEngineMode` and leaves the schema default (`reduced`).
+
+## Agent scope
+
+Policies partition visibility inside one account. They do not create a separate tenant. Use a separate Memory Crystal account when two customers must not share data. See [Scoping](/concepts/scoping).
+
+| Situation | Channel used |
+| --- | --- |
+| No `channelScope` and no matching policy | Unscoped. |
+| Matching policy with `mode: "peer"` | `{scope}:{peerId}` |
+| Matching policy with `mode: "shared"`, and the session has an agent id | `{scope}:main-{agentId}` |
+| Shared mode with no agent id | `{scope}:main` (legacy bucket) |
+| `channelScope` set, agent id present, no matching policy | Shared mode on that prefix. Not peer mode. |
+
+For an identified agent without a matching policy, `channelScope` defaults to shared mode. A session scope set by `crystal_set_scope` takes precedence. If a direct session has no agent identity but matches a prefix with a direct-peer policy, the runtime fails closed rather than falling into the shared bucket.
+
+Peer ids derived from direct-session keys accept letters, digits, and `_.@-`, length 2–128. `main`, `default`, and `unknown` are reserved and rejected. Numeric-only ids are allowed when they match that pattern.
+
+Example, with placeholders:
+
+```json
+{
+  "channelScope": "scope-prefix",
+  "agentScopePolicies": [
+    {
+      "agentId": "agent-a",
+      "scope": "scope-prefix",
+      "mode": "peer"
+    },
+    {
+      "agentId": "agent-b",
+      "scope": "scope-prefix",
+      "mode": "shared"
+    }
+  ]
+}
+```
+
+`agent-a` is per-peer. `agent-b` shares one bucket across its chats. Any other agent id on this prefix uses shared mode.
+
+### OpenClaw session keys
+
+`acceptOpenclawSessionKey` defaults to `false`. Set it on a `mode: "peer"` policy when the peer id is only present in the session key. The runtime then accepts:
+
+- `agent:<agentId>:<channel>:<account>:direct:<peerId>` when the session agent id equals the policy
+- `<provider>:<peerId>` when the provider name matches `^[A-Za-z][A-Za-z0-9_-]{1,40}$`
+
+Memory search results are filtered to the exact channel before they are shown.
+
+## Commands from a source checkout
+
+```bash
+npm run crystal:enable -- --dry-run
+npm run crystal:doctor
+```
+
+`npm run crystal:doctor` runs `scripts/crystal-doctor.sh`. Installed OpenClaw uses `openclaw crystal_status` and `openclaw crystal_doctor` instead.
+
+### Direct-session example
+
+A peer policy can resolve a session key such as:
+
+```text
+agent:agent-a:provider:account-placeholder:direct:peer-placeholder
+```
+
+Enable that derivation explicitly:
+
+```json
+{
+  "agentScopePolicies": [
+    {
+      "agentId": "agent-a",
+      "scope": "scope-prefix",
+      "mode": "peer",
+      "acceptOpenclawSessionKey": true
+    }
+  ]
+}
+```
+
+## Troubleshooting
+
+Use the native plugin schema rather than the compatibility hook manifest when configuring OpenClaw. Use `enableTriggers` or `actionTriggers`; a non-empty list enables checks for every tool call, not only the listed names.
+
+If scoped recall returns nothing, check the resolved agent identity, policy, and peer id. If local summaries are missing, check `localStoreEnabled`, `localSummaryInjection`, and which installer set them. `full` mode is an explicit choice with the public installer. It permits local compaction at the host session boundary; `reduced` keeps lean turn capture, and `hook-only` uses lifecycle hooks and tools.

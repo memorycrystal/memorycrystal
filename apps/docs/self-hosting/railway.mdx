@@ -1,0 +1,67 @@
+---
+title: Railway
+description: Optional Railway deployment of the web app and the MCP bridge. Neither service is the Convex backend.
+---
+
+Use this when you want to run the Memory Crystal web app or the Streamable HTTP MCP bridge on Railway yourself. The hosted Memory Crystal service is separate: it runs on Convex Cloud at `https://convex.memorycrystal.ai`.
+
+Three processes stay separate:
+
+| Service | What it is | Railway config in this repo |
+| --- | --- | --- |
+| Web app | Next.js dashboard under `apps/web` | Root `railway.toml` |
+| MCP bridge | `packages/mcp-server`, Streamable HTTP, port 3100 | `packages/mcp-server/railway.toml` |
+| Convex backend | Data plane | Not in either Railway file. Run local-first or your own Convex deployment. |
+
+If Railway uses the repo root, it builds the web app. Point a second service at the MCP package when you want the bridge.
+
+## MCP bridge service
+
+Set the service root yourself; `packages/mcp-server/railway.toml` does not set it. The file builds with `npm install && npm run build`, starts `node dist/index.js`, and health-checks `GET /health` with a 120 second timeout.
+
+In the Railway service settings:
+
+| Setting | Value |
+| --- | --- |
+| Root directory | `/packages/mcp-server` |
+| Config file | `/packages/mcp-server/railway.toml` |
+| Port | `3100` |
+
+With that root, the start command is the package's own start (`node dist/index.js`), which is what the toml runs. Do not also set the workspace command `npm run start --workspace packages/mcp-server` on a service whose root is already `/packages/mcp-server`. Use the workspace command only when the service root is the repository root.
+
+Set `MEMORY_CRYSTAL_API_URL` to your Convex HTTP base, for example `https://convex.memorycrystal.ai` when the bridge should call the hosted backend.
+
+## Authentication
+
+`/mcp` rejects requests that omit `Authorization: Bearer <api-key>`. The bridge forwards that token to the Convex backend. `MEMORY_CRYSTAL_API_KEY` in the Railway service does not authenticate callers.
+
+`GET /health` returns JSON with `ok: true`, the server name, and the configured API URL. It does not check that embeddings or vector search are ready. A successful health check only means the process is listening.
+
+## After deploy
+
+1. `GET /health` returns `ok: true`.
+2. A client can open `POST /mcp` with a bearer token and list tools.
+3. The token is a key for the backend in `MEMORY_CRYSTAL_API_URL`.
+
+Client variables are in [Environment Variables](/configuration/environment-variables). The bridge's place among the other MCP paths is in [MCP Server](/integrations/mcp-server).
+
+## Web app deployment
+
+Create a separate service rooted at the repository root and use its `railway.toml`. It builds the `memorycrystal-app` workspace under `apps/web` and starts the standalone Next.js server after copying public and static assets. Configure the app for your own backend and authentication; deploying the app does not provision Convex.
+
+For the bridge, the equivalent package-local commands are:
+
+```bash
+cd packages/mcp-server
+npm install
+npm run build
+MEMORY_CRYSTAL_API_URL=https://convex.memorycrystal.ai npm start
+```
+
+Use your own backend URL when operating your own data plane. A request check for your deployed bridge is:
+
+```bash
+curl -fsS https://your-mcp-host.example/health
+```
+
+If the service starts the dashboard instead of MCP, check the root directory and config file. If `/health` succeeds but tools fail, check the inbound Bearer token and backend URL. The bridge also accepts `MCP_ALLOWED_HOSTS` as a comma-separated list for custom request hostnames; Railway public/private domains are included automatically.

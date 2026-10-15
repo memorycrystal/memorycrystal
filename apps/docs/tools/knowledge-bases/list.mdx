@@ -1,0 +1,91 @@
+---
+title: List knowledge bases
+description: Discover visible bases or inspect your management inventory.
+---
+
+`crystal_list_knowledge_bases` discovers reference corpora and returns their IDs, counts, activity state, and available access metadata.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+List bases before selecting a corpus by name or ID. Use [query](/tools/knowledge-bases/query) to search its contents and [manage](/tools/knowledge-bases/manage) to enumerate chunks or change access.
+
+| Parameter | Behavior |
+| --- | --- |
+| `includeInactive` | Default false |
+| `agentId` | Explicit resolved identity for scoped visibility |
+| `scope` | Forwarded as channel context; not an exact KB-row scope filter |
+| `channel` | MCP fallback for `scope` when omitted |
+
+`crystal_list_knowledge_bases` uses GET `/api/knowledge-bases`. The response contains `knowledgeBases`. Rows use `_id`, `isActive`, `memoryCount`, `totalChars`, `createdAt`, and `updatedAt`, alongside name, description, and available access/source metadata such as `agentIds`, `scope`, and `sourceRole`.
+
+Scoped listing applies identity visibility. A fully unscoped list is an owner management inventory, not proof that every listed base is available in a scoped query. Channel context helps resolve identity; it does not select KBs by source application. Project filters and a fixed enumeration of channel types are not supported by this schema.
+
+An empty scoped result can mean an identity mismatch. Check the [access settings](/tools/knowledge-bases/manage) and use the same explicit identity for [querying](/tools/knowledge-bases/query).
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Discover visible active bases
+
+Request:
+
+```json
+{
+  "agentId": "<agent-id>",
+  "includeInactive": false
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "knowledgeBases": [
+    {
+      "_id": "<knowledge-base-id>",
+      "name": "Reference manual",
+      "isActive": true,
+      "memoryCount": 12,
+      "totalChars": 6400,
+      "createdAt": 1791936000000,
+      "updatedAt": 1791936000000
+    }
+  ]
+}
+```
+
+### Inspect inactive bases in the owner inventory
+
+Request:
+
+```json
+{
+  "includeInactive": true
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "knowledgeBases": [
+    {
+      "_id": "<knowledge-base-id>",
+      "name": "Reference manual",
+      "isActive": false,
+      "memoryCount": 0
+    }
+  ]
+}
+```
+
+## Use the returned IDs
+
+Pass the row’s `_id` as `knowledgeBaseId` to query/import tools. `includeInactive` changes listing, not query eligibility: inactive bases still cannot be used like active reference corpora. Scope is conversation context, not a filter for which application imported the KB.
+
+## Errors and common mistakes
+
+An empty list is not necessarily an empty account. Verify the resolved `agentId` and allow-list. An unscoped owner inventory can include bases a scoped caller cannot query. Do not expect project filters or a list of all channel names.

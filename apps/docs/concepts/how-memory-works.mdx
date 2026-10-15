@@ -1,0 +1,130 @@
+---
+title: How Memory Works
+description: Capture, distillation, recall, Forgetting, and the optional stale archive.
+---
+
+This is the lifecycle. Other pages describe one piece of it. They do not define a second lifecycle.
+
+## Flow
+
+1. A completed turn is captured once into short-term messages. You can turn that off. On OpenClaw, `captureTurns` defaults to on, and `MEMORY_CRYSTAL_CAPTURE_TURNS` overrides it.
+2. Distillation reads eligible turns and writes durable memories.
+3. Recall returns a bounded set. It does not always run a vector lookup. An identifier shortcut or a missing embedding provider skips vector work and still returns lexical matches. The response says when retrieval was degraded or took the shortcut.
+4. Recent unextracted messages can contribute lexical evidence, inside a bounded message lane.
+5. Ranking and scope filters pick the result set.
+6. Knowledge bases, assets, and research are queried only through their own tools.
+
+Tool-mode recall is the default, so an ordinary turn does not pay a read on its own. Context injection uses the same bounded path and stays off by default. Set `MEMORY_CRYSTAL_INJECT_RECALL=1` or `true`, or set `injectRecall: true` in config. A non-empty environment variable takes precedence over config. Grok cannot inject.
+
+## What is kept
+
+| Data | Policy |
+| --- | --- |
+| Raw messages | Kept until you delete them (hosted and default self-hosted behavior) |
+| Raw sensory content | Kept until you delete them (hosted and default self-hosted behavior) |
+| Durable non-KB memories | Kept until you delete them, Forgetting archives an overage, or the stale archive archives an eligible row |
+| Knowledge-base chunks | Kept with the base. They are outside the memory allowance. Emptying a base deletes the chunks and keeps the row. |
+| Archived memories | Removed from vector and lexical recall. The row remains. Restore puts it back. |
+
+On the hosted service and by default when self-hosting, raw messages and raw sensory content stay until you delete them. Self-hosters who set `CRYSTAL_RETENTION_READY=1` enable age-based expiry jobs; retention then follows the tier’s expiry policy.
+
+## Distillation
+
+Distillation is its own job. It is not Forgetting and it is not the stale archive.
+
+| Job | Schedule |
+| --- | --- |
+| Nightly indexed distillation | 03:00 UTC |
+| Distillation queue processing | every minute |
+
+## Forgetting
+
+Forgetting archives memories only when the account is over its non-KB allowance.
+
+- It counts active memories that are not knowledge-base chunks.
+- Unlimited has no allowance, so Forgetting archives nothing for that entitlement.
+- It protects memories from the last 24 hours.
+- It archives the overage, lowest memory value first. It does not delete the row.
+- Enforcement is off unless `CRYSTAL_FORGETTING_ENFORCEMENT=1`. A dry run reports what would be archived and writes nothing.
+
+## Stale archive
+
+The stale archive is archive-only and restorable. It does not delete memories.
+
+`CRYSTAL_STALE_ARCHIVE` controls it:
+
+| Value | Behavior |
+| --- | --- |
+| unset, or any value other than `dry_run` or `on` | Off. The scheduled check returns without archiving. This is the default. |
+| `dry_run` | Counts eligible rows and archives nothing. |
+| `on` | Archives eligible rows. |
+
+The check is scheduled at 05:30 UTC. It only acts when the mode is `dry_run` or `on`.
+
+On the hosted service the stale archive is being enabled in October 2026 after a trial.
+
+A memory is eligible when all of these hold:
+
+- active, not in a knowledge base, not sensory, and auto-extracted
+- not a rule, a decision, or a memory about a person
+- strength below 0.85
+- not core, and no `core` tag (any case)
+- created, last accessed, and last recalled (when that timestamp exists) at least 90 days ago
+
+These are automatically extracted memories that have been unused and not recalled for 90 days. Older conversation memories also qualify when they have a recorded extraction or links to their source messages. Confidence is not part of the rule; core memories and memories with strength of 0.85 or higher are protected.
+
+Archived rows leave recall. They are not purged by the archived-memory purge. Checkpoints keep their own copies.
+
+Restore exists for these rows. It clears the archive flag, resets the access clock, and schedules embedding with the account's OpenRouter key. Without that key, the restored memory stays available to lexical recall until an embedding succeeds. There is no public MCP tool that restores stale-archived memories. Restore is an operator action on the account.
+
+## Choose the right read tool
+
+Use `crystal_recall` for a decision or fact distilled from past conversations:
+
+```json
+{
+  "query": "Why did we choose PostgreSQL for the application?",
+  "mode": "decision",
+  "limit": 5,
+  "messageLimit": 3
+}
+```
+
+Read the returned memories and message matches. If a memory is flagged `truncated`, use `crystal_get_memory` for its full text.
+
+Use `crystal_recent` to catch up on the latest conversation, without a search query:
+
+```json
+{
+  "limit": 20,
+  "order": "chronological"
+}
+```
+
+Use `crystal_search_messages` when you need original wording rather than a distilled memory:
+
+```json
+{
+  "query": "PostgreSQL",
+  "startDate": "2026-10-01T00:00:00Z",
+  "endDate": "2026-10-14T23:59:59Z",
+  "limit": 20,
+  "offset": 0
+}
+```
+
+Follow `pagination.nextOffset` while `pagination.hasMore` is true before concluding the window has no more matches. Keep the same channel or session scope across requests when you need a particular conversation. See [Recall](/tools/recall), [Recent messages](/tools/recent), and [Search](/tools/search).
+
+## OpenClaw loop
+
+1. The user sends a message and the model replies.
+2. The plugin records the completed turn once, unless capture is disabled.
+3. The agent calls Memory Crystal tools when prior context matters.
+4. If you set `MEMORY_CRYSTAL_INJECT_RECALL=true`, the plugin may prepend bounded context before the model call.
+
+## Related
+
+- [Memory Layers](/concepts/memory-layers)
+- [Context Engine](/concepts/context-engine)
+- [Usage and allowances](/help/usage-and-allowances)
+- [Scoping and access](/concepts/scoping)

@@ -1,0 +1,86 @@
+---
+title: Rate limits
+description: Understand request windows and route-specific throttling.
+---
+
+Protected API routes use fixed 60-second request windows. The applicable capacity policy determines the per-key request limit.
+
+| Tier or policy | Requests per window |
+| --- | --- |
+| Free | 60 |
+| Starter / Pro | 600 |
+| Ultra | 2,000 |
+| Unlimited | Unmetered |
+| Self-hosted unmetered policy | Unmetered |
+
+The request limiter counts one request per call, not weighted endpoint credits or one unit per imported KB chunk. Parallel calls still count individually. Storage allowances and retrieval cost protection are separate mechanisms.
+
+## Route scope
+
+Memory routes share a key bucket. Recall and transcript search also apply an account envelope. KB root requests use their key quota; KB query item requests additionally apply the account envelope. Other KB item routes use the key quota. The account envelope defaults to four times the tier request limit where applied, so separate keys do not necessarily avoid account throttling.
+
+An exhausted fixed window rejects requests. There is no 90% request-warning band or promised burst above the window limit.
+
+## Handle 429
+
+The shared limiter returns:
+
+```json
+{"error":"Rate limit exceeded."}
+```
+
+| Header | Meaning |
+| --- | --- |
+| `Retry-After` | Seconds to wait |
+| `X-RateLimit-Limit` | Applicable window limit |
+| `X-RateLimit-Remaining` | Remaining requests |
+| `X-RateLimit-Scope` | `key` or `account` |
+
+These headers are not guaranteed on successful responses. `X-RateLimit-Reset` and a `retryAfterMs` body field are not part of this contract.
+
+There are route-specific exceptions. Turn capture uses the shared quota but its 429 body and limit header still report a fixed 60 requests/minute, with `Retry-After: 60` and no scope header. Memory export uses a separate key bucket and returns an older 60-requests/minute error string without the shared headers. Device status polling has its own 10-polls/minute device-code limiter and `retry_after` body field. Do not infer your plan's quota from those older error strings.
+
+Honor `Retry-After` when provided and avoid immediate repeated retries. If you cache reads, include account authentication identity, scope, filters, and an expiry in the cache key and policy. Query-only caching can mix contexts.
+
+`/api/mcp/stats` reports memory counts, not rate-limit usage. Contact [support](mailto:hello@memorycrystal.ai) for account-specific questions.
+
+## Retry a read after throttling
+
+This JavaScript example retries a recall read at most three times after the first attempt. It waits at least the supplied Retry-After seconds and adds a small random delay so simultaneous clients do not all retry together. When a route omits the header, it uses a conservative 60-second wait.
+
+```javascript
+async function recallWithRetry(baseUrl, apiKey, query) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/mcp/recall`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, limit: 5 }),
+    });
+    if (response.status !== 429 || attempt === 3) {
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      return body;
+    }
+    const raw = response.headers.get("Retry-After");
+    const seconds = raw === null ? NaN : Number(raw);
+    const delay = Number.isFinite(seconds) && seconds >= 0 ? seconds : 60;
+    await response.text();
+    await new Promise(resolve => setTimeout(resolve, delay * 1000 + Math.random() * 250));
+  }
+}
+```
+
+Do not apply blind retries to non-idempotent writes after an uncertain network result. Completed turns have their own stable turn-ID deduplication; ordinary durable capture does not have that same contract.
+
+## Keep request volume predictable
+
+Reuse a recent read only when account, scope, filters, and freshness requirements match. Choose recent messages when you need continuity, and recall when you need relevance. There is no batch-recall array parameter: send the supported single-query body.
+
+Coordinate clients that share a key and record 429 frequency without logging credentials. Separate keys help identify clients but do not bypass the account envelope. KB import counts as one request for the request limiter; its chunk processing and storage admission are separate constraints.
+
+## Errors and common mistakes
+
+Do not infer remaining quota from `/stats`, or expect rate headers on every successful request. Do not plan bursts above the fixed-window allowance. If sustained usage exceeds your tier, review your request pattern and the [pricing](/pricing) options or contact support.

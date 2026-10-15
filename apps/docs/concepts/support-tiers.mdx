@@ -1,0 +1,68 @@
+---
+title: Integration Contract and Support Tiers
+description: One Integration Contract for every platform, with a Support Tier taken from harness capability.
+---
+
+Memory Crystal uses one Integration Contract. The Support Tier is the part of that contract the host can actually honour.
+
+## Integration Contract
+
+1. Credentials registered
+2. Native memory provider active, when the host can run one
+3. Explicit tool surface registered
+4. Discipline layer delivered, by context injection or a managed block
+5. Declared agent identity set
+6. A verification pass that checks only the layers that install claimed
+
+## Support tiers
+
+Tiers come from the platform table (`tier`, and `hooks.inject`). Do not treat a host as Full if it cannot inject context.
+
+| Tier | What the host can do | Hosts |
+| --- | --- | --- |
+| Full | Tools, automatic capture, and context injection. Injection stays off until you opt in. | Claude Code, Codex CLI, Codex Desktop, Cursor, OpenClaw, Hermes Agent |
+| Capture | Tools and automatic capture. The host cannot inject hook output, so recall is a tool call. | Grok Build |
+| Tools | Tool surface only. Capture and recall are deliberate tool calls. | Claude Desktop, OpenCode, Factory Droid, generic MCP |
+| Hosted | Runs other agents. Install Memory Crystal into the CLI it is running. | Buzz |
+
+Context injection is the line between Full and Capture. Grok has hooks, and those hooks capture, but passive events ignore stdout. That is a harness limit.
+
+Injection is opt-in on every host that can do it. Set `MEMORY_CRYSTAL_INJECT_RECALL=1` or `true`, or set `injectRecall: true` in config. A non-empty environment variable takes precedence over config. Grok ignores that setting.
+
+## Capability and publication
+
+Publication (which hosts are listed as official) is separate from the tier.
+
+| Host | Tier | Official list |
+| --- | --- | --- |
+| Claude Code | Full | yes |
+| Codex CLI | Full | yes (listed as Codex) |
+| Codex Desktop | Full | no. Same config and tier as Codex CLI. |
+| Cursor | Full | no. The platform row is Full, and the installer configures it. |
+| OpenClaw | Full | yes |
+| Hermes Agent | Full | yes |
+| Grok Build | Capture | yes |
+| Buzz | Hosted | yes |
+| Claude Desktop, OpenCode, Factory Droid | Tools | no. Installable as generic MCP or by their target ids. |
+
+Cursor's absence from the official list is a publication difference. It is not evidence that Cursor is unsupported.
+
+## What the installer actually writes
+
+Codex CLI and Codex Desktop share `~/.codex/config.toml` and `~/.codex/hooks.json` (`CODEX_HOME` overrides the directory). Either target writes that shared config.
+
+Shared hooks are a Bash install. Native PowerShell writes MCP config and skills, then skips hooks for every row whose `hooks.shells` is `bash`. A PowerShell install of a Full host does not give you capture or injection. Hermes is Bash-only. OpenClaw's native plugin path is Bash-only. Cursor's local plugin directory is staged by Bash; PowerShell still writes Cursor's MCP entry and skills.
+
+Grok's hooks capture and do not inject, on both installers, once the Bash hook layer is present.
+
+## Buzz
+
+Install into the CLI Buzz is running. Channel memory is not available, and channel isolation is not enforced. See [Buzz](/integrations/buzz).
+
+## Client guides
+
+- [OpenClaw](/integrations/openclaw-plugin) and [Hermes Agent](/integrations/hermes-agent): native plugin setup.
+- [Claude Code](/integrations/claude-code), [Codex CLI and Desktop](/integrations/codex-cli), [Cursor](/integrations/cursor), and [Grok Build](/integrations/grok): client configuration and hook capabilities.
+- [Claude Desktop](/integrations/claude-desktop), [Factory Droid](/integrations/factory-droid), and [OpenCode](/integrations/opencode): MCP setup.
+- [MCP server](/integrations/mcp-server): other compatible clients.
+- [Buzz](/integrations/buzz): install into the CLI it runs.

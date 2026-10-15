@@ -1,0 +1,4 @@
+packages:
+  - "apps/*"
+  - "mcp-server"
+  - "infra/cloudflare/worker"

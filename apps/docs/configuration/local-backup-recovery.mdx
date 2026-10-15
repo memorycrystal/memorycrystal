@@ -1,0 +1,66 @@
+---
+title: Local Backup and Recovery
+description: Backup and restore commands for a local Docker Convex data plane, and the platform limits of those scripts.
+---
+
+These commands operate on the local Docker data plane from [Local-First Setup](/configuration/local-first). They do not back up the hosted service.
+
+The scripts ship inside the local-backend artifact and in a repository checkout at `scripts/convex-local-backup.sh` and `scripts/convex-local-restore.sh`.
+
+<Warning>
+Both scripts measure file size with BSD `stat -f %z`. That flag works on macOS. GNU `stat` uses `-f` for filesystem information, so `stat -f %z` does not produce the byte count these scripts require and can fail. Do not treat a Linux run as supported until the scripts are changed. The artifact `bin/rollback` command only stops the backend. It does not restore a backup.
+</Warning>
+
+## Requirements
+
+Use a repository checkout for these commands: backup records `git rev-parse HEAD`, but the packaged artifact does not include Git metadata. Having the scripts in the artifact is not enough for a standalone backup recipe.
+
+The scripts call `docker`, `curl`, `jq`, `sqlite3`, `shasum`, `tar`, `gzip`, and `git`. The local backend container must already be running. Embedded mode also needs `db.sqlite3` in the volume. Postgres mode needs the compose Postgres profile (`CRYSTAL_LOCAL_STORAGE_MODE=postgres` or `--storage=postgres` at install).
+
+Backup and restore canaries call the local research HTTP API with the token in `~/.memorycrystal/local-auth.json`. The account must already have at least one research collection. A fresh volume with no collection fails the canary before a backup is published.
+
+## Backup
+
+From the repository checkout used for your local backend:
+
+```bash
+bash scripts/convex-local-backup.sh
+```
+
+The default destination is `~/.memorycrystal/backups/<UTC timestamp>`. Pass another directory as the first argument. The destination must not already exist.
+
+```bash
+bash scripts/convex-local-backup.sh "$HOME/.memorycrystal/backups/manual-1"
+```
+
+What the script does:
+
+1. Refuses to run unless the backend container is up.
+2. Stops the backend, archives the Convex data volume to `convex-data.tar.gz`, and starts the backend again.
+3. In Postgres mode, also writes `postgres.dump`.
+4. Checks the archive paths, and in embedded mode runs SQLite `quick_check` and `integrity_check`.
+5. In embedded mode, boots the extracted backup in an isolated container and compares research-collection counters with the live backend. In Postgres mode, checks `pg_restore --list`, restores into a temporary database, and drops it; it does not boot a second backend for that check.
+6. Publishes the directory only after those checks pass. A failure deletes the staging directory.
+
+`CRYSTAL_LOCAL_STORAGE_MODE` must be `embedded` or `postgres`. It defaults to `embedded`.
+
+## Restore
+
+Restore replaces the live volume. You must confirm it:
+
+```bash
+CRYSTAL_CONFIRM_DESTRUCTIVE_RESTORE='restore local convex' \
+  bash scripts/convex-local-restore.sh "$HOME/.memorycrystal/backups/manual-1"
+```
+
+Any other confirmation value fails before the live volume is touched. The backup directory must contain `manifest.json` with schema version 2, `completionState` `complete`, `validationState` `validated`, and `atomicCompletion` true. The script checks each file's SHA-256 and byte size against that manifest.
+
+Before it copies the candidate onto the live volume, it writes a pre-restore snapshot under `~/.memorycrystal/recovery-reports/pre-restore-<timestamp>/`. If activation fails, it attempts to restore that snapshot automatically. Some recovery commands suppress errors, so verify backend health and your data afterward; automatic rollback is not a guarantee of recovery. Set `CRYSTAL_RECOVERY_REPORT_DIR` to put reports somewhere else.
+
+In embedded mode, the isolated check boots the candidate and compares its counters to the manifest. Postgres mode runs `pg_restore --list` and a restore into a throwaway database, then drops that database.
+
+## What rollback is not
+
+`bin/rollback` and `bin/down` in the local-backend artifact run the shutdown script. They stop containers. They do not copy a backup back, and `bin/upgrade` does not install a newer artifact. Download the artifact you want and run its `bin/install`.
+
+A restore that fails closed leaves the failure report at `~/.memorycrystal/recovery-reports/restore-<timestamp>.json` and, when activation had started, attempts to roll the volume back to the pre-restore snapshot. Inspect the report and run diagnostics before resuming writes.

@@ -1,0 +1,105 @@
+---
+title: Query a knowledge base
+description: Retrieve bounded matches from one named reference corpus.
+---
+
+`crystal_query_knowledge_base` retrieves bounded matches from a selected reference corpus while applying identity and chunk visibility.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+Query a KB when the answer should come from a specific manual or corpus. Use [recall](/tools/recall) for conversational memories and [enumeration](/tools/knowledge-bases/manage) when you need every chunk rather than relevant matches.
+
+| Parameter | Behavior |
+| --- | --- |
+| `knowledgeBaseId` or `knowledgeBaseName` | ID or exact name; use one to select the base |
+| `query` | Required search text |
+| `limit` | Default 8; integer 1–20 |
+| `agentId`, `channel` | Explicit identity and chunk-visibility context |
+
+`crystal_query_knowledge_base` maps to `POST /api/knowledge-bases/{id}/query`. Normal results contain `knowledgeBase`, `memories`, `retrieval`, and optional `degradation`. An access-denied retrieval can return the KB with an empty `memories` array without retrieval diagnostics. Results are bounded, not a full corpus enumeration.
+
+The KB row must be active and visible to the resolved identity. Channel-bearing chunks have additional visibility checks; channel-less reference chunks are shared within that visible base. Direct queries can derive identity from channel or limited allow-list fallbacks; the primary-identity fallback is limited to permissive KBs. Always pass the identity you intend instead of depending on inference.
+
+Empty results can reflect access, bounded candidates, or degraded retrieval, not just similarity. The HTTP handler does not forward `threshold`. To enumerate every chunk, use [manage tools](/tools/knowledge-bases/manage).
+
+Create material through [create](/tools/knowledge-bases/manage) and [import](/tools/knowledge-bases/import). Broad recall does not implicitly query every base.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Find a reference procedure
+
+Request:
+
+```json
+{
+  "knowledgeBaseName": "Reference manual",
+  "query": "How should I verify backups?",
+  "agentId": "<agent-id>",
+  "limit": 8
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "knowledgeBase": {
+    "_id": "<knowledge-base-id>",
+    "name": "Reference manual"
+  },
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "retrieval": {
+    "resultCount": 1
+  }
+}
+```
+
+### Query a known ID
+
+Request:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "query": "weekly verification",
+  "agentId": "<agent-id>",
+  "limit": 3
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "knowledgeBase": {
+    "_id": "<knowledge-base-id>",
+    "name": "Reference manual"
+  },
+  "memories": [],
+  "retrieval": {
+    "resultCount": 0
+  }
+}
+```
+
+## Scope and interpretation
+
+First list bases using the same identity, then query the selected ID. Check both KB access and chunk visibility if the base appears but results are empty. `sourceRole` describes reference material; it does not make broad recall automatically search or prioritize every KB.
+
+Queries can combine vector and non-vector retrieval. If vector work is unavailable or reduced, inspect `degradation` to understand the returned evidence. Use source metadata and full memory reads when an excerpt is insufficient.
+
+## Errors and common mistakes
+
+Use the exact name or returned ID, not a guessed alias. The MCP schema has no `threshold`, project, or repository filter. A successful empty response can be a visibility result; repeatedly increasing the limit will not grant access. Do not use ranked query hits as a complete inventory.
