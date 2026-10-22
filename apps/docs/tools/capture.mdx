@@ -1,0 +1,90 @@
+---
+title: Automatic turn capture
+description: Retain completed turns independently of durable memory writes.
+---
+
+Supported integrations send completed user/assistant turns to `POST /api/mcp/turn`. The request persists transcript rows without per-turn embedding, extraction, summarization, or graph work.
+
+## When to use
+
+Use completed-turn capture to retain verbatim conversation history through a supported integration. Use [remember](/tools/remember) when you explicitly want a durable fact now, and [recent](/tools/recent) to verify transcript continuity.
+
+| Field | Behavior |
+| --- | --- |
+| `sessionKey`, `channel`, `turnId` | Required session, scope, and stable turn identifier |
+| `assistantMessage` | Required completed assistant text |
+| `userMessage` | User-side text when available |
+| `platform`, `agentId`, `metadata` | Host and identity attribution |
+| `projectId`, `repoSlug` | Project context |
+
+Reusing a `turnId` within the same account is idempotent. A duplicate returns `ok: true` and `deduped: true`; concurrent retries do not create duplicate transcript rows. Avoid also logging the same messages through `/api/mcp/log`.
+
+Capture can be disabled independently of recall and tools. In the OpenClaw integration, `captureTurns` and `MEMORY_CRYSTAL_CAPTURE_TURNS` take precedence over the older capture settings. Automatic recall injection is off by default; `MEMORY_CRYSTAL_INJECT_RECALL=true` enables it only on hosts that support injection.
+
+Durable memories come from deliberate [remember](/tools/remember), [update](/tools/update), or [supersede](/tools/supersede) calls, and separate bounded distillation at session boundaries or the nightly fallback. Distillation uses the account owner's configured OpenRouter key. Raw transcript retention is until deletion on every tier.
+
+`POST /api/mcp/capture` creates a deliberate durable memory; it is not the completed-turn endpoint. See [the lifecycle overview](/concepts/how-memory-works).
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Capture a completed turn
+
+Request:
+
+```json
+{
+  "sessionKey": "<session-key>",
+  "channel": "<channel>",
+  "turnId": "<turn-id>",
+  "userMessage": "Has the backup been verified?",
+  "assistantMessage": "The backup verification completed successfully."
+}
+```
+
+raw HTTP POST /api/mcp/turn response (selected fields; other fields omitted):
+
+```json
+{
+  "ok": true,
+  "deduped": false,
+  "turnId": "<turn-id>",
+  "sessionKey": "<session-key>",
+  "channel": "<channel>"
+}
+```
+
+### Retry the same completed turn
+
+Request:
+
+```json
+{
+  "sessionKey": "<session-key>",
+  "channel": "<channel>",
+  "turnId": "<turn-id>",
+  "userMessage": "Has the backup been verified?",
+  "assistantMessage": "The backup verification completed successfully."
+}
+```
+
+raw HTTP POST /api/mcp/turn response (selected fields; other fields omitted):
+
+```json
+{
+  "ok": true,
+  "deduped": true,
+  "turnId": "<turn-id>"
+}
+```
+
+## Verify capture and later recall
+
+Finish a normal conversation turn, then inspect recent messages using its session key. Transcript recall can find those messages before distillation produces durable memories. Distillation is separate background work; a successful capture response does not promise a new durable fact.
+
+Keep the same turn ID when retrying a delivery, and use a different ID for a different turn. Do not reuse one ID for the whole session.
+
+## Errors and common mistakes
+
+Missing session, channel, turn ID, or nonempty assistant text returns 400. A duplicate is a successful no-op, not an instruction to generate a new ID. If automatic capture is absent, check the integration’s capture setting and hook wiring. Recall injection and capture are independent settings.

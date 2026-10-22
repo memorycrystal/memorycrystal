@@ -1,0 +1,242 @@
+---
+title: Installation
+description: Choose the universal installer, local-first mode, or a single-client install path.
+---
+
+Installation connects Memory Crystal to your AI client and chooses where the data lives.
+
+## Agent Instructions
+
+Paste this prompt into your agent to install and verify Memory Crystal. Automatic recall injection remains opt-in even on Full hosts.
+
+<Accordion title="Copy Agent Instructions">
+
+```text
+Set up Memory Crystal (persistent memory) on this machine, then use it in every session from now on.
+
+STEP 1 - INSTALL
+Detect this harness and pass --targets with the matching id: claude-code, claude-desktop, codex-cli, codex-desktop, cursor, opencode, factory-droid, hermes, openclaw, grok, generic-mcp.
+macOS / Linux / WSL:  curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets <id>
+Windows PowerShell:   iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets <id>
+hermes is bash-only. Follow sign-in and backend prompts. Never hand-edit harness config (MCP, hooks, plugins). If the installer says to reload or restart this app, do that before verifying. Grok is Capture tier: tools and automatic capture, no automatic recall. Passive events ignore stdout, so the harness cannot inject context. Buzz is Hosted: install into the CLI Buzz is running, not into Buzz. Channel memory is not available. Docs: https://docs.memorycrystal.ai/installation
+
+STEP 2 - VERIFY (after any required reload/restart)
+Read Support Tier from the installer line "Support Tier: <id> = full|capture|tools". That is the harness tier, not billing. whoami.account.tier is billing (free/pro). whoami email or name is account identity.
+Use ~/.memory-crystal/config.json (apiKey, convexUrl, agentId). Hosted default convexUrl: https://convex.memorycrystal.ai. GET {convexUrl}/api/mcp/whoami with Authorization: Bearer <apiKey>.
+Assert only layers the installer claimed or wrote. If output says hooks, Managed Block, or instructions.md were skipped (tools-tier, PowerShell, or no agentsFile), skip those layers and do not fail. Capture-tier and skipped-hooks installs must not fail for missing automatic recall.
+Report pass/fail per layer, including the whoami email or name:
+- credentials: whoami returns email or name. Missing key or 401 = FAIL credentials (name that layer).
+- tools: crystal_stats or crystal_status responds.
+- hooks/plugin: only if the installer wrote hooks or a plugin. Tools-tier and PowerShell hook skips: skip; do not fail.
+- discipline: only if the installer wrote a Managed Block or instructions.md. If skipped, skip; do not fail.
+- identity: config.json agentId is non-empty.
+- automatic recall: only if Support Tier is full AND hooks were written. Do not assert on capture-tier, tools-tier, or skipped-hooks installs.
+If a claimed layer fails, re-run the installer and stop. Do not patch config by hand.
+
+STEP 3 - USE MEMORY CRYSTAL — ASYMMETRIC CONTRACT, EVERY SESSION, NOT OPTIONAL.
+- **Recall (read):** call crystal_recall (crystal_what_do_i_know for broad topics) when the task depends on past work, decisions, people, projects, or preferences. Never answer from vague recollection. Skip self-contained requests.
+- Need exact past wording, quotes, commands, or code? crystal_search_messages.
+- **Remember (write):** after learning any durable fact, decision, preference, lesson, or goal: save it with crystal_remember immediately, without being asked. Correct existing memories with crystal_update; replace outdated ones with crystal_supersede.
+- BEFORE config changes, deletions, or external sends: crystal_preflight for the rules and lessons that apply.
+- Reference material lives in knowledge bases: crystal_list_knowledge_bases to discover them, crystal_query_knowledge_base with the KB name for targeted lookups.
+- Before changing something you did not build: use crystal_why_did_we to recover the recorded rationale.
+- At major milestones, or when the user asks for a backup: crystal_checkpoint.
+Only skip recall tools for greetings, small talk, or questions fully answered inside the current conversation.
+```
+
+</Accordion>
+
+## Primary installer
+
+`https://memorycrystal.ai/crystal` redirects to `/install.sh`. It is not a separate installer.
+
+Bash (macOS, Linux, WSL, Git Bash):
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+Native Windows PowerShell:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -UseBasicParsing | iex
+```
+
+An interactive run detects clients and asks before it changes each one. `--targets` selects clients explicitly and skips that prompt. `--yes` accepts the default for each prompt and implies `--non-interactive`. `--non-interactive` fails if a required value (such as an API key) is missing. `--dry-run` prints the plan and writes nothing.
+
+Every config edit is backed up first. JSON and TOML are validated before and after the write, and a failed validation restores the backup. API keys, bearer tokens, and device codes are redacted from logs.
+
+## Targets
+
+Bash targets: `claude-code`, `claude-desktop`, `codex-cli`, `codex-desktop`, `opencode`, `factory-droid`, `hermes`, `openclaw`, `cursor`, `grok`, `generic-mcp`.
+
+PowerShell accepts that list except `hermes`. Shared hooks are installed only by Bash. PowerShell logs that it skipped them when the platform row sets `hooks.shells` to `bash`. Skills can still be copied. The Managed Block and `instructions.md` are not written by PowerShell.
+
+| Client | Bash | PowerShell | After install |
+| --- | --- | --- | --- |
+| OpenClaw | `--targets openclaw` | Generic MCP guidance. Use Bash for the native plugin. | `openclaw plugins info crystal-memory` |
+| Hermes Agent | `--targets hermes` | Not supported | `/plugins`, then `/reload-mcp` |
+| Claude Code | `--targets claude-code` | `-Targets claude-code` (MCP only; hooks need Bash) | Reopen and confirm MCP tools |
+| Claude Desktop | `--targets claude-desktop` | `-Targets claude-desktop` | Restart. HTTP server entry in the desktop config. |
+| Codex CLI | `--targets codex-cli` | `-Targets codex-cli` (MCP only; hooks need Bash) | `codex mcp list` |
+| Codex Desktop | `--targets codex-desktop` | `-Targets codex-desktop` writes the shared Codex config. Hooks need Bash. | Restart, or Settings → MCP → Reload |
+| OpenCode | `--targets opencode` | `-Targets opencode` | Restart OpenCode |
+| Factory Droid | `--targets factory-droid` | `-Targets factory-droid` | `droid mcp list` |
+| Cursor | `--targets cursor` | `-Targets cursor` writes MCP and skills. Hooks and the local plugin need Bash. | Reload the window |
+| Grok Build | `--targets grok` | `-Targets grok` (MCP and skills; hooks need Bash) | `grok inspect`. Capture tier: no injection. |
+| Generic MCP | `--targets generic-mcp` | `-Targets generic-mcp` | Snippet at `~/.memorycrystal/mcp-config.json` |
+
+<Note>
+Codex CLI and Codex Desktop share `~/.codex/config.toml` (`CODEX_HOME` overrides the directory). Configuring either target writes that file, so both surfaces pick up the MCP server. Uninstalling either target removes that shared block.
+</Note>
+
+## Install one client
+
+Choose one command for the client you want to configure. Hermes and the native OpenClaw plugin need Bash. PowerShell configures MCP and skills where supported; it skips Bash-only hooks. Factory Droid is a Tools-tier installer target.
+
+<AccordionGroup>
+
+<Accordion title="OpenClaw">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets openclaw
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets openclaw
+```
+
+The PowerShell target provides generic MCP guidance. Use Bash for the native plugin.
+
+</Accordion>
+
+<Accordion title="Hermes Agent">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets hermes
+```
+
+</Accordion>
+
+<Accordion title="Claude Code">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-code
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets claude-code
+```
+
+</Accordion>
+
+<Accordion title="Codex CLI">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets codex-cli
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets codex-cli
+```
+
+</Accordion>
+
+<Accordion title="Factory Droid">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets factory-droid
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets factory-droid
+```
+
+</Accordion>
+
+<Accordion title="Grok Build">
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets grok
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets grok
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+## Official platforms and other hosts
+
+| Client | Support tier | Publication |
+| --- | --- | --- |
+| Claude Code | Full | Official |
+| Codex CLI and Codex Desktop | Full | Codex is official. Desktop shares the Codex config and is not in the official list. |
+| Cursor | Full | Installer target. Not in the official publication list. |
+| OpenClaw | Full | Official |
+| Hermes Agent | Full | Official |
+| Grok Build | Capture | Official |
+| Buzz | Hosted | Official. Install into the CLI Buzz is running. |
+| Claude Desktop, OpenCode, Factory Droid, generic MCP | Tools | Generic MCP path |
+
+The tier comes from `hooks.inject` and `tier` in the platform table. Cursor is Full in that table. It is absent from the separate official-publication list. That is a publication difference, not a missing installer. See [Support Tiers](/concepts/support-tiers).
+
+## Agent identity
+
+Every install writes a non-empty `agentId` to `~/.memory-crystal/config.json`. The value is the platform slug (`claude-code`, `codex`, `grok`, `openclaw`, `hermes`, `cursor`, and the other rows). Codex CLI and Codex Desktop both use `codex`.
+
+Hooks resolve identity in this order:
+
+1. `agentId` or `agent_id` on the hook input
+2. `MEMORY_CRYSTAL_AGENT_ID`
+3. the host identity from `--host` or host detection
+4. `agentId` in `~/.memory-crystal/config.json`
+
+Clearing `agentId` in the shared config does not remove an identity the host hook still passes. A pre-existing user-set `agentId` is not overwritten on re-run.
+
+A knowledge base whose allow-list does not include that slug is hidden from the agent. The installer prints a reach report in the same run (counts and names, never contents). Add the slug on the dashboard ([Knowledge](https://memorycrystal.ai/knowledge) → Agents) or call `crystal_set_knowledge_base_access` with `action=add`. See [Scoping and access](/concepts/scoping).
+
+## Backends
+
+| Backend | MCP URL | API base | Notes |
+| --- | --- | --- | --- |
+| Cloud | `https://api.memorycrystal.ai/mcp` | `https://convex.memorycrystal.ai` | Default. Convex Cloud. |
+| Local Docker Convex | `http://127.0.0.1:3211/api/mcp` | `http://127.0.0.1:3211` | Data stays on this machine. Hosted auth still runs against `https://convex.memorycrystal.ai`. Dashboard: `http://127.0.0.1:6791`. |
+| External self-hosted | `<site>/api/mcp` | the Convex site URL you pass | Your deployment and auth policy. |
+
+Read [Local-First Setup](/configuration/local-first) before local mode. Self-hosting guides: [Self-Hosting](/configuration/self-hosting), [Railway](/self-hosting/railway), [Environment variables](/configuration/environment-variables).
+
+A supplied API key is validated with `GET /api/mcp/auth` before any client config is written. Browser device sign-in runs only when no key is set and the shell is interactive.
+
+## Single-client scripts
+
+These remain for a focused install:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+OpenClaw and Hermes use the primary installer.
+
+## After install
+
+- Confirm tools with `crystal_wake`, `crystal_remember`, and `crystal_recall`.
+- Keep the printed backup path until the client works.
+- Skills are instructions. They do not enable capture or injection. See [Skill Suite](/skills).
+
+## Client guides
+
+- [OpenClaw](/integrations/openclaw-plugin) and [Hermes Agent](/integrations/hermes-agent): native plugin setup.
+- [Claude Code](/integrations/claude-code), [Codex CLI and Desktop](/integrations/codex-cli), [Cursor](/integrations/cursor), and [Grok Build](/integrations/grok): client configuration and hook capabilities.
+- [Claude Desktop](/integrations/claude-desktop), [Factory Droid](/integrations/factory-droid), and [OpenCode](/integrations/opencode): MCP setup.
+- [MCP server](/integrations/mcp-server): other compatible clients.
+- [Buzz](/integrations/buzz): install into the CLI it runs.

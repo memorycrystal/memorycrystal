@@ -1,0 +1,66 @@
+---
+title: FAQ
+description: Support tiers, allowances, retention, and lifecycle mail.
+---
+
+## Which clients are supported?
+
+The [support tier](/concepts/support-tiers) is what the host can do. It is separate from whether that host is on the official publication list.
+
+| Question | Answer |
+| --- | --- |
+| Claude Code | Full. Tools, capture, and optional injection. Injection is off by default; see the opt-in settings below. |
+| Codex CLI and Codex Desktop | Full, through the shared Codex config. Same injection default. Desktop is installable and is not on the official publication list. |
+| Cursor | Full in the platform table, with the same injection default. Not on the official publication list. |
+| Grok | Capture. Tools, automatic capture, and skills. Grok cannot inject. Call `crystal_recall` or `crystal_what_do_i_know`. |
+| Claude Desktop, OpenCode, Factory Droid | Tools. Capture and recall are tool calls. The installer writes them. They are not on the official publication list. |
+| OpenClaw, Hermes | Full, with native plugins. Injection off until you opt in. |
+| Buzz | Hosted. Install Memory Crystal into the CLI Buzz runs. See [Buzz](/integrations/buzz). |
+
+Claude Desktop uses the installer's HTTP MCP entry. You do not need a local stdio package for that client.
+
+A Full or Capture install does not turn injection on. Set `MEMORY_CRYSTAL_INJECT_RECALL=1` or `true`, or set `injectRecall: true` in config. A non-empty environment variable takes precedence over config. Capture on those hosts runs when capture is enabled. Skills are instructions. Their presence does not enable capture or injection.
+
+## Where are the servers?
+
+| Surface | URL |
+| --- | --- |
+| Hosted backend and API base | `https://convex.memorycrystal.ai` |
+| Hosted MCP | `https://api.memorycrystal.ai/mcp` |
+| Dashboard | [memorycrystal.ai/dashboard](https://memorycrystal.ai/dashboard) |
+
+The hosted backend runs on Convex Cloud. The stdio MCP package is still shipped at 0.10.1 and exposes tools the hosted HTTP server does not. The two lists are not the same.
+
+## What counts toward the allowance?
+
+Active memories that are not knowledge-base chunks. Archived rows and knowledge-base chunks are outside that count. The dashboard's active-memory total can still include chunks. See [Usage and allowances](/help/usage-and-allowances) and [Pricing](/pricing).
+
+Unlimited is a backend entitlement, not a self-serve checkout plan.
+
+## How long is data kept?
+
+See [How Memory Works](/concepts/how-memory-works) for hosted and self-hosted retention, distillation, overage-only Forgetting, and the optional restorable stale archive.
+
+## Will I get email?
+
+Trial reminders, a trial-expired note, onboarding, usage warnings at 80% and 95%, and a re-engagement note. Each has its own cap. Usage warnings skip Unlimited. See [Lifecycle emails](/help/lifecycle-emails).
+
+## Does a channel or agent id isolate my data?
+
+No. They filter what one account returns. Another holder of the same account's API key can request a different scope. Parties who must not see each other's data need separate accounts. See [Scoping and access](/concepts/scoping).
+
+## Client guides
+
+- [OpenClaw](/integrations/openclaw-plugin) and [Hermes Agent](/integrations/hermes-agent): native plugin setup.
+- [Claude Code](/integrations/claude-code), [Codex CLI and Desktop](/integrations/codex-cli), [Cursor](/integrations/cursor), and [Grok Build](/integrations/grok): client configuration and hook capabilities.
+- [Claude Desktop](/integrations/claude-desktop), [Factory Droid](/integrations/factory-droid), and [OpenCode](/integrations/opencode): MCP setup.
+- [MCP server](/integrations/mcp-server): other compatible clients.
+- [Buzz](/integrations/buzz): install into the CLI it runs.
+
+## Common mistakes
+
+- **Installing skills and expecting automatic capture:** skills are instructions; capture needs the host’s hooks or native plugin.
+- **Enabling injection on Grok:** Grok cannot inject context. Call recall tools yourself.
+- **Expecting PowerShell to install Bash hooks:** rerun the Bash installer for those hooks. See [Installation](/installation).
+- **Treating channels or agent ids as account security:** use separate accounts and API keys when data must remain private between users.
+- **Assuming missing memories were deleted:** check [scoping](/concepts/scoping) and query knowledge bases explicitly before changing your data.

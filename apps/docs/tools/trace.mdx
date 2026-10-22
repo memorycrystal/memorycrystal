@@ -1,0 +1,96 @@
+---
+title: Trace a memory
+description: Inspect a bounded source conversation snapshot.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_trace` reads a linked source snapshot, when one is available.
+
+## When to use
+
+Use trace to inspect the captured context behind a memory. Use [get memory](/tools/get-memory) to read the memory itself and [search messages](/tools/search) to investigate wording outside the linked snapshot.
+
+| Parameter | Behavior |
+| --- | --- |
+| `memoryId` | Required memory ID |
+| `channel`, `agentId` | Visibility context; private snapshots require matching request scope |
+
+Raw `POST /api/mcp/trace` returns `memory` and `snapshot`. The memory contains title, content, store, and category. A snapshot contains `messages`, `messageCount`, `omittedCount`, `createdAt`, and `reason`.
+
+Snapshots longer than 20 messages return the first ten and last ten. `messageCount` describes the source snapshot and `omittedCount` reports the omitted middle. This is not a full-conversation export.
+
+A memory without a linked or accessible snapshot returns `snapshot: null` and a top-level `reason`. Direct writes need not have a conversation snapshot. Missing or hidden memories return 404.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Inspect a source snapshot
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>"
+}
+```
+
+Raw HTTP response:
+
+```json
+{
+  "memory": {
+    "title": "Backup verification rule",
+    "content": "Verify a backup before replacing the previous copy.",
+    "store": "procedural",
+    "category": "rule"
+  },
+  "snapshot": {
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "The backup verification completed successfully.",
+        "timestamp": 1791936000000
+      }
+    ],
+    "messageCount": 1,
+    "omittedCount": 0,
+    "createdAt": 1791936000000,
+    "reason": "manual"
+  }
+}
+```
+
+### A direct write without a snapshot
+
+Request:
+
+```json
+{
+  "memoryId": "<direct-write-id>"
+}
+```
+
+Raw HTTP response:
+
+```json
+{
+  "memory": {
+    "title": "Backup verification rule",
+    "content": "Verify a backup before replacing the previous copy.",
+    "store": "procedural",
+    "category": "rule"
+  },
+  "snapshot": null,
+  "reason": "This memory was written directly via API (source: \"external\") and has no associated conversation snapshot."
+}
+```
+
+## Interpret provenance
+
+A snapshot explains where a memory came from; it does not prove the memory is correct. Compare the wording and timestamps. If `omittedCount` is positive, the middle of the snapshot is missing from this response. Use transcript search if you need to investigate further.
+
+## Errors and common mistakes
+
+A null snapshot is a supported result, not necessarily a failed capture. Direct writes may have no snapshot, and a linked snapshot may be missing or hidden. For a private snapshot, pass matching scope. Do not expect an extraction model field or a full-conversation export.

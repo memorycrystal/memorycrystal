@@ -1,0 +1,111 @@
+---
+title: Import knowledge
+description: Append reference chunks or replace them by stable key.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Create a KB with [manage tools](/tools/knowledge-bases/manage), then call `crystal_import_knowledge`.
+
+## When to use
+
+Use import for a reusable manual or other reference corpus split into meaningful chunks. Use [remember](/tools/remember) for an individual personal fact, and [query](/tools/knowledge-bases/query) to check the imported material.
+
+| Parameter | Behavior |
+| --- | --- |
+| `knowledgeBaseId` or `knowledgeBaseName` | Target ID or exact name |
+| `chunks` | Array of chunks with required `content` |
+| `chunks[].dedupeKey` | Optional stable upsert key within the KB |
+| `chunks[].metadata` | Optional object with `title`, `sourceUrl`, `chunkIndex`, `totalChunks`, `sourceType` |
+| `description`, `sourceType`, `sourceRole`, `agentIds`, `scope` | Optional metadata used by stdio when creating a missing named base |
+
+A repeated stable `dedupeKey` replaces that chunk. Keyless chunks append; there is no automatic content-hash deduplication promise. Stdio can create a missing named KB. Hosted import only resolves an existing KB, so create it first.
+
+The standard import loop inserts or updates each chunk, then awaits embedding and salience work before advancing. A thrown error can interrupt the import after earlier chunks were saved. Use stable keys for repeatable imports and inspect the result; do not assume every failure is skipped.
+
+The response contains `knowledgeBaseId`, `importedCount` (new chunks), `updatedCount` (replacements), `memoryIds`, `memoryCount`, and `totalChars`. Direct HTTP uses `POST /api/knowledge-bases/{id}/import` and returns 201 on success.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Import a repeatable section
+
+Request:
+
+```json
+{
+  "knowledgeBaseName": "Reference manual",
+  "chunks": [
+    {
+      "content": "Verify backups before replacement.",
+      "dedupeKey": "manual/backups",
+      "metadata": {
+        "title": "Backups"
+      }
+    }
+  ]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "importedCount": 1,
+  "updatedCount": 0,
+  "memoryIds": [
+    "<chunk-id>"
+  ],
+  "memoryCount": 1,
+  "totalChars": 34
+}
+```
+
+### Update that section
+
+Request:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "chunks": [
+    {
+      "content": "Verify backups weekly.",
+      "dedupeKey": "manual/backups",
+      "metadata": {
+        "title": "Backups"
+      }
+    }
+  ]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "importedCount": 0,
+  "updatedCount": 1,
+  "memoryIds": [
+    "<chunk-id>"
+  ],
+  "memoryCount": 1,
+  "totalChars": 22
+}
+```
+
+## Prepare and verify an import
+
+1. Create or select the intended KB and verify its access settings.
+2. Split the document into sections that make sense independently. Include source metadata when it helps identify the original text.
+3. Use a stable key for each section when you plan to refresh the material. Keep keys unique within the KB.
+4. Inspect imported and updated counts, then query a known passage with the intended identity.
+
+Changing a key appends a different chunk; it does not remove the previous section. Import is not a whole-corpus synchronization or automatic deletion of missing sections.
+
+## Errors and common mistakes
+
+Create the base first on hosted MCP. Do not send `kb_id` or assume a title is required on every chunk. Use stable keys before retrying an interrupted import, since earlier chunks may already exist. Review content-screening or provider errors before retrying.

@@ -1,0 +1,101 @@
+/* Memory Crystal design system overrides */
+/* border-radius: 0 everywhere — no exceptions */
+
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+/* Surface colors matching the main site */
+:root {
+  --mc-void: #1C272F;
+  --mc-surface: #1E2F3D;
+  --mc-elevated: #213A4D;
+  --mc-accent: #2180D6;
+  --mc-accent-hover: #4CC1E9;
+  --mc-text-primary: #E8F0F8;
+  --mc-text-secondary: #7A9AB5;
+  --mc-border: rgba(255, 255, 255, 0.07);
+}
+
+/* Make the Mintlify header logo read closer to the main site */
+.nav-logo {
+  height: 2.125rem !important;
+  width: auto !important;
+}
+
+@media (min-width: 1024px) {
+  .nav-logo {
+    height: 2.25rem !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Widen content column from Mintlify default 696px → 1080px.
+   Mintlify's Tailwind classes on the content container are:
+     .lg:max-w-[696px]
+     .lg:ml-[max(0px,calc(50vw-348px-14rem))]
+   The margin-left uses 348px = 696/2 to keep content visually
+   centered between sidebar (14rem) and TOC. For 1080px width,
+   half is 540px → new margin-left uses 540px.
+   ───────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .lg\:max-w-\[696px\] {
+    max-width: 1080px !important;
+  }
+  .lg\:ml-\[max\(0px\,calc\(50vw-348px-14rem\)\)\] {
+    margin-left: max(0px, calc(50vw - 540px - 14rem)) !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Parameter tables still benefit from tighter padding even at
+   1080px — keeps 5-column layout readable without row-wrapping.
+   ───────────────────────────────────────────────────────────── */
+.prose table,
+article table,
+.mdx-content table {
+  font-size: 0.875rem !important;
+  width: 100% !important;
+  table-layout: auto !important;
+}
+
+.prose table th,
+.prose table td,
+article table th,
+article table td,
+.mdx-content table th,
+.mdx-content table td {
+  padding: 0.5rem 0.625rem !important;
+  line-height: 1.45 !important;
+  vertical-align: top !important;
+}
+
+/* First column (Parameter names) — compact + monospace */
+.prose table td:first-child,
+.prose table th:first-child,
+article table td:first-child,
+article table th:first-child {
+  white-space: nowrap !important;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace) !important;
+}
+
+/* Description column wraps */
+.prose table td:last-child,
+.prose table th:last-child,
+article table td:last-child,
+article table th:last-child {
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+/* Inline code inside tables — tighter, wrap-friendly */
+.prose table code,
+article table code,
+.mdx-content table code {
+  font-size: 0.8125rem !important;
+  padding: 0.125rem 0.3125rem !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}

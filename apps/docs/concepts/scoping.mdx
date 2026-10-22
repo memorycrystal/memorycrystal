@@ -1,0 +1,68 @@
+---
+title: Scoping and access
+description: What an agent can see inside one account, and what requires a separate account.
+---
+
+Everything in one Memory Crystal account belongs to that account. Agent, channel, session, and project settings change what a request returns. They do not create a separate account, and they are not a security boundary between tenants.
+
+If two parties must not be able to read each other's data, give them separate Memory Crystal accounts and API keys.
+
+## Account
+
+An API key authenticates as one user. Reads and writes use that user's rows. A memory id from another account is not found. Hiding a row inside the account (a knowledge base the agent is not on, a channel the request did not name) also returns not found, so a caller cannot tell "missing" from "not visible."
+
+## Agent identity
+
+`agentId` is a string you declare, usually the platform slug the installer writes (`claude-code`, `codex`, `cursor`, and the others). Hooks resolve it in this order: hook input, `MEMORY_CRYSTAL_AGENT_ID`, the known host identity, then `~/.memory-crystal/config.json`.
+
+Knowledge-base **row** access uses that id:
+
+| Allow-list | Who sees the base |
+| --- | --- |
+| unset, or contains `*` | Any caller, including one with no `agentId` |
+| a list of slugs | Callers whose `agentId` is on the list |
+| a list that does not include this agent | Hidden from that agent |
+
+An inactive base is hidden from everyone. Listing bases with no `agentId` and no channel is the management list: the filter is off, so you can see bases this agent cannot query. Pass `agentId` or `channel` and the filter turns on.
+
+Add a slug with `crystal_set_knowledge_base_access` (`action=add`) or in the dashboard under Knowledge → Agents.
+
+## Chunks are stricter than the row
+
+Seeing the knowledge base does not mean seeing every chunk.
+
+- A chunk with no channel is shared with everyone who can see the base.
+- A chunk with a channel uses the channel rules below. A request with no channel does not receive it; a scoped request may also see chunks in its bare prefix or suffix scope, except for group and numeric-peer channels.
+
+## Channel
+
+A channel is a scope string on a memory or a request, often `platform:workspace` from the hook. It partitions non-KB memories inside the account.
+
+| Request | What you get |
+| --- | --- |
+| No channel | Channel-less memories only. Channel-scoped memories stay hidden. |
+| Channel containing a colon | Exact channel plus memories whose channel is the bare prefix or bare suffix. Those are broader scopes. Channel-less memories are excluded. |
+| Group or numeric peer channel | Exact match only; no prefix, suffix, or channel-less memories. |
+| Bare channel (no colon) | Exact channel plus channel-less memories. |
+| Peer-capable bare scope | No non-KB memories: the request cannot identify a peer, so it fails closed. |
+
+If your memories seem to have disappeared, check the request channel: a scoped channel hides global (channel-less) memories, while an ordinary bare channel includes them. Keep the same intended scope when saving and reading.
+
+Knowledge-base row checks ignore the channel. Chunk checks do not.
+
+## Session and project
+
+| Scope | What it limits |
+| --- | --- |
+| `sessionKey` | Transcript-aware recall. With session scoping, memories and messages from another session are dropped. |
+| `projectId` or `repoSlug` | Project-store scoping. A request that names a project does not return another project's rows. Message-lane budgets are smaller when the request is project-scoped. |
+
+These are filters on one account's data. They do not isolate that data from another key on the same account.
+
+## What partitioning does not do
+
+- It does not stop a person who holds the account's API key from asking without a channel or with a management list.
+- It does not stop a second agent you install on the same account from seeing channel-less memories and `*` knowledge bases.
+- It does not apply across accounts. Another account's key sees nothing here.
+
+Separate accounts are the privacy boundary.

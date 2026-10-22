@@ -1,0 +1,110 @@
+---
+title: MCP Server
+description: The hosted Streamable HTTP bridge and the stdio package expose different tool sets.
+---
+
+Memory Crystal has two MCP servers. They do not expose the same tools.
+
+| Server | Package | Default listen | Tools |
+| --- | --- | --- | --- |
+| Hosted bridge | `packages/mcp-server` (`@memorycrystal/streamable-http-mcp-server` 0.10.1) | `0.0.0.0:3100` (`HOST`, `PORT`) | 23 |
+| Stdio package | `mcp-server` (`@memorycrystal/mcp-server` 0.10.1, binary `crystal-mcp`) | stdio; HTTP only when `CRYSTAL_MCP_MODE` is not `stdio`, then `127.0.0.1:8788` | 30 |
+
+The hosted service your installer registers is `https://api.memorycrystal.ai/mcp`. It requires `Authorization: Bearer <api-key>` on `/mcp`. Setting `MEMORY_CRYSTAL_API_KEY` in the bridge process does not authenticate incoming clients. The bridge reads the caller's Bearer token and forwards it to `MEMORY_CRYSTAL_API_URL`.
+
+`GET /health` on the hosted bridge returns `{ "ok": true }` plus the server name and configured API URL. It does not check embeddings or vector readiness. The stdio package's optional HTTP listener authenticates `GET /health` and leaves `GET /healthz` unauthenticated.
+
+## Hosted tools (23)
+
+`crystal_recall`, `crystal_remember`, `crystal_update`, `crystal_supersede`, `crystal_recent`, `crystal_search_messages`, `crystal_what_do_i_know`, `crystal_why_did_we`, `crystal_forget`, `crystal_stats`, `crystal_checkpoint`, `crystal_wake`, `crystal_preflight`, `crystal_trace`, `crystal_get_memory`, `crystal_create_knowledge_base`, `crystal_list_knowledge_bases`, `crystal_list_knowledge_base_memories`, `crystal_empty_knowledge_base`, `crystal_set_knowledge_base_access`, `crystal_query_knowledge_base`, `crystal_import_knowledge`, `crystal_health`.
+
+## Stdio-only tools (7)
+
+`crystal_edit`, `crystal_research_create_collection`, `crystal_research_ingest`, `crystal_research_status`, `crystal_research_query`, `crystal_research_trace`, `crystal_research_promote`.
+
+Use the stdio package when a client must launch a local command, or when you need edit and research tools. The hosted bridge is the path the universal installer writes for HTTP clients. `crystal_edit` on stdio is a compatibility tool. See [Edit](/tools/edit).
+
+## Retrieval
+
+- `crystal_recall` is bounded durable-memory lookup. The default limit is 12. The hard maximum is 20.
+- `crystal_query_knowledge_base` is for a named knowledge base.
+- `crystal_search_messages` is exact retained wording.
+- `crystal_preflight` posts to `/api/mcp/recall` with `mode: "preflight"`. It does not send category filters. Pass `projectId` or `repoSlug` for repository work. The default limit is 10.
+- `crystal_health` reports authenticated liveness and build identity. Provider and vector readiness may be unknown. A `limit` argument is ignored.
+- Pass `agentId`, `channel`, `projectId`, or `repoSlug` when the client knows them. They partition one account. See [Scoping](/concepts/scoping).
+
+The hosted bridge resolves `agentId` as: explicit argument, then `MEMORY_CRYSTAL_AGENT_ID` or `CRYSTAL_AGENT_ID`, then the text before the first `:` in `channel`.
+
+## Run the hosted bridge yourself
+
+```bash
+MEMORY_CRYSTAL_API_URL=https://convex.memorycrystal.ai \
+npm run start --workspace packages/mcp-server
+```
+
+The process listens on port 3100. Clients still send their own key:
+
+```bash
+claude mcp add --scope user memory-crystal --transport http http://127.0.0.1:3100/mcp \
+  --header "Authorization: Bearer your-api-key"
+```
+
+```bash
+codex mcp add memory-crystal --url http://127.0.0.1:3100/mcp
+```
+
+Codex also needs the bearer header in `config.toml`. A URL alone is not enough:
+
+```toml
+[mcp_servers.memory-crystal]
+url = "http://127.0.0.1:3100/mcp"
+http_headers = { Authorization = "Bearer your-api-key" }
+```
+
+## Optional stdio HTTP listener
+
+`CRYSTAL_MCP_MODE` defaults to `stdio`. The mode is compared case-insensitively. Set `http` to open the local listener. Its authentication checks keys in a local Convex backend; a hosted API URL alone does not configure that check. For an already provisioned local backend:
+
+```bash
+CRYSTAL_MCP_MODE=http \
+CRYSTAL_MCP_HOST=127.0.0.1 \
+CRYSTAL_MCP_PORT=8788 \
+CONVEX_URL=http://127.0.0.1:3210 \
+MEMORY_CRYSTAL_API_URL=http://127.0.0.1:3211 \
+crystal-mcp
+```
+
+Clients send their provisioned local Bearer token to this listener. The backend must be configured as local and contain that key. `/healthz` only checks liveness; `/health` checks authentication. This is the stdio package in HTTP mode, on a different port, with the 30-tool set.
+
+## Which installer path uses which server
+
+The universal installer registers the hosted URL for cloud mode. Local mode points clients at the local site's `/api/mcp`. Claude Desktop, OpenCode, Factory Droid, and generic MCP are Tools-tier targets. Codex CLI and Desktop are Full tier with the Bash hook installation; native PowerShell installs MCP and skills without hooks. See [Support Tiers](/concepts/support-tiers).
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets generic-mcp
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets generic-mcp
+```
+
+Add `--backend local` or `-Backend local` for the local data plane. See [Local-First Setup](/configuration/local-first).
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.
+
+## Troubleshooting
+
+Install dependencies and build `packages/mcp-server` before running its start command from a source checkout. If `/health` fails, check `MEMORY_CRYSTAL_API_URL`, the listening host and port, and process logs. If tools fail authentication, send the caller's Bearer token rather than setting a key only on the bridge process.
+
+Use the HTTP connection for installer-configured clients, including Claude Desktop. The stdio package remains an optional compatibility path with seven extra tools; its network listener has different authentication requirements.
+
+Knowledge-base `sourceRole` values such as `voice_style`, `persona_guardrail`, `canonical_reference`, and `client_context` describe provenance and influence ranking. They do not replace agent access lists or account ownership.

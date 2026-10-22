@@ -1,0 +1,77 @@
+---
+title: Lifecycle emails
+description: When trial, onboarding, usage, and re-engagement mail is sent, and how to unsubscribe.
+---
+
+Lifecycle mail is checked daily: trial reminders at 14:00 UTC, trial expiry at 14:30 UTC, and engagement (onboarding, usage, re-engagement) at 16:00 UTC.
+
+A send is skipped when the account has no email address, or when that template is disabled. Each rule below is also capped so the same condition does not send again on the next run.
+
+From address: `noreply@memorycrystal.ai`.
+
+## Trial reminders
+
+Sent only while the subscription status is `trialing`, and only once per template during that trial.
+
+| Template | When |
+| --- | --- |
+| `trial-ending-3day` | About three days of trial left (between 2.5 and 3.5 days) |
+| `trial-ending-1day` | About one day of trial left (between 0.5 and 1.5 days) |
+
+"Once per trial" means a send on or after seven days before `trialEndsAt` covers that trial. A later trial can send again.
+
+## Trial expiry
+
+Template `trial-expired` is sent once, and only when all of these are true:
+
+- `trialEndsAt` is in the past
+- subscription status is not `active`
+- the trial ended within the last seven days
+
+Older trials are not caught up later. A send on or after `trialEndsAt` covers that trial.
+
+## Onboarding
+
+Template `onboarding-nudge`.
+
+| Rule | Value |
+| --- | --- |
+| Account age | Older than 48 hours and younger than 30 days |
+| API keys | None on the account |
+| Lifetime cap | 2 |
+| Spacing | At least 5 days between sends |
+
+An account older than 30 days is outside the window and is not caught up.
+
+## Usage warnings
+
+Usage is active memories that are not knowledge-base chunks, divided by the memory allowance. Unlimited has no allowance, so it never receives these.
+
+| Template | Threshold |
+| --- | --- |
+| `usage-warning-80` | At least 80% and under 95% |
+| `usage-warning-95` | At least 95% |
+
+Each template is sent at most once every 30 days. Crossing 95% sends the 95% template, not both, on that check.
+
+## Re-engagement
+
+Template `reengagement-7day`.
+
+| Rule | Value |
+| --- | --- |
+| Keys | At least one non-expired API key whose latest `lastUsedAt` is set |
+| Memories | Active-memory total greater than zero (this total can include knowledge-base chunks) |
+| Idle | More than 7 days and at most 60 days since that latest use |
+| Per streak | One send. A send after `lastUsedAt` already covered this idle streak. |
+| Lifetime cap | 3 |
+
+Idle longer than 60 days is not caught up.
+
+## Unsubscribe
+
+Every engagement email—onboarding nudges, both usage warnings, and re-engagement—includes an **Unsubscribe from these emails** link and supports one-click unsubscribe in your mail app.
+
+The email link opens a page that asks you to **Confirm unsubscribe**. Confirm to stop these engagement emails. You can also turn them off or back on in dashboard **Settings → Product tips and reminders by email**.
+
+Account and billing emails such as trial reminders always send; this preference does not turn them off.

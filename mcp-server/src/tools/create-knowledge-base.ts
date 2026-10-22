@@ -1,0 +1,75 @@
+import { stdioTool } from "../contract/stdioTool.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import { ConvexClient } from "../lib/convexClient.js";
+
+type CreateKnowledgeBaseInput = {
+  name: string;
+  description?: string;
+  sourceType?: string;
+  sourceRole?: string;
+  agentIds?: string[];
+  agentId?: string;
+  scope?: string;
+  channel?: string;
+  peerScopePolicy?: "strict" | "permissive";
+};
+
+export const createKnowledgeBaseTool: Tool = {
+  ...stdioTool("crystal_create_knowledge_base"),
+  name: "crystal_create_knowledge_base",
+};
+
+function parseInput(args: unknown): CreateKnowledgeBaseInput {
+  if (!args || typeof args !== "object") {
+    throw new Error("Invalid arguments");
+  }
+
+  const input = args as Record<string, unknown>;
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  if (!name) {
+    throw new Error("name is required");
+  }
+
+  return {
+    name,
+    description: typeof input.description === "string" ? input.description : undefined,
+    sourceType: typeof input.sourceType === "string" ? input.sourceType : undefined,
+    sourceRole: typeof input.sourceRole === "string" ? input.sourceRole : undefined,
+    agentIds: Array.isArray(input.agentIds)
+      ? input.agentIds.filter((value): value is string => typeof value === "string")
+      : typeof input.agentId === "string" && input.agentId.trim()
+        ? [input.agentId.trim()]
+        : undefined,
+    scope: typeof input.scope === "string" ? input.scope : undefined,
+    channel: typeof input.channel === "string" ? input.channel : undefined,
+    peerScopePolicy: input.peerScopePolicy === "strict" || input.peerScopePolicy === "permissive"
+      ? input.peerScopePolicy
+      : undefined,
+  };
+}
+
+export async function handleCreateKnowledgeBaseTool(args: unknown): Promise<CallToolResult> {
+  try {
+    const input = parseInput(args);
+    const result = await new ConvexClient().post("/api/knowledge-bases", input);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: error instanceof Error ? error.message : "Failed to create knowledge base",
+        },
+      ],
+    };
+  }
+}

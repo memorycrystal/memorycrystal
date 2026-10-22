@@ -1,0 +1,53 @@
+---
+title: Knowledge Bases
+description: How knowledge bases differ from conversational memory, and who can read them.
+---
+
+A knowledge base is reference material you import on purpose: docs, policies, runbooks, project notes. It sits beside conversational memory. Broad recall does not query it. Call `crystal_query_knowledge_base` or the query endpoint.
+
+## Allowance
+
+Chunks do not consume the memory allowance. The allowance counts active memories that are not in a knowledge base. Dashboard active totals can still include the chunks; the billable number subtracts them. See [Usage and allowances](/help/usage-and-allowances).
+
+## Access
+
+Two checks apply, and they are not the same.
+
+| Check | What it decides |
+| --- | --- |
+| Knowledge-base row | Whether this agent may use the base at all. `agentIds` is an allow-list. An unset list or one containing `*` allows any caller, including one with no `agentId`. A list of slugs allows only those agents. An empty list hides the base from every agent, including callers with no identity. An inactive base is hidden. |
+| Chunk | Channel-less chunks are shared with everyone who can see the base. A chunk that carries a channel follows the [channel visibility rules](/concepts/scoping), including the broader prefix/suffix scopes where permitted. |
+
+Listing without an `agentId` and without a channel is the management list: it does not apply the agent filter, so the dashboard can show bases the current agent cannot query. Passing either value turns the filter on.
+
+`crystal_set_knowledge_base_access` adds or removes a slug. The installer prints which bases the declared `agentId` cannot see. See [Scoping and access](/concepts/scoping).
+
+## Import, list, empty, archive, delete
+
+| Action | Result |
+| --- | --- |
+| Import with a `dedupeKey` | Upserts. The same key in the same base replaces that chunk. One key is one chunk. |
+| Import without a key | Inserts a new chunk. |
+| List chunks | Enumeration. Order is not relevance. |
+| Query | Relevance search over chunks the caller can see. |
+| Empty | Deletes the chunks and keeps the base row, with counters reset. |
+| Archive or delete the base | Marks the base inactive and archives its chunks. An inactive base is not visible to agents. |
+
+## Tools and endpoints
+
+- `crystal_list_knowledge_bases`
+- `crystal_query_knowledge_base`
+- `crystal_import_knowledge`
+- `GET /api/knowledge-bases`
+- `POST /api/knowledge-bases/:knowledgeBaseId/import`
+- `POST /api/knowledge-bases/:knowledgeBaseId/query`
+
+Hosted API base: `https://convex.memorycrystal.ai`.
+
+## Common mistakes
+
+- **Expecting broad recall to search imported docs:** use `crystal_query_knowledge_base` for the named base.
+- **Assuming a base visible in the dashboard is queryable by every agent:** pass your installed `agentId` and check the base’s allow-list.
+- **Checking only the base’s access:** chunks can also carry channels. Match the intended request scope.
+- **Reusing one `dedupeKey` for different chunks:** that replaces the existing chunk. Give each independently maintained chunk its own key.
+- **Emptying a base to hide it:** emptying deletes its chunks. Archive the base when you want to hide it and archive its contents instead.

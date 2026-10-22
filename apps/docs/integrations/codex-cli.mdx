@@ -1,0 +1,101 @@
+---
+title: Codex CLI and Desktop
+description: One install configures Codex CLI and Codex Desktop through the shared CODEX_HOME config. Hooks are Bash-only.
+---
+
+Codex CLI and Codex Desktop are both Full tier and share one configuration. `~/.codex/config.toml` and `~/.codex/hooks.json` are the same files for both. `CODEX_HOME` overrides `~/.codex` when it is set. `--targets codex-cli` and `--targets codex-desktop` write that shared config. Restart Codex Desktop, or open Settings, then MCP, then Reload, after an install.
+
+Automatic recall injection is off. Set `MEMORY_CRYSTAL_INJECT_RECALL` to `1` or `true` to turn it on. Capture still runs when the Bash installer writes hooks.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+Paste this into Codex CLI or Codex Desktop:
+
+```text
+Install Memory Crystal for Codex CLI and Codex Desktop. They share ~/.codex/config.toml (CODEX_HOME overrides that directory). Run the official installer, follow the auth and backend prompts, and do not edit Codex config unless the installer fails. Restart Codex Desktop or reload MCP. PowerShell registers MCP and installs skills; capture hooks require the Bash installer.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets codex-cli
+
+Windows PowerShell:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets codex-cli
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets codex-cli
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets codex-cli
+```
+
+In Bash, `--targets codex-desktop` writes the same MCP table, hooks file, and skills directory. In PowerShell, `-Targets codex-desktop` writes MCP and skills without hooks. Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first).
+
+## What the Bash installer writes
+
+| Piece | Path |
+| --- | --- |
+| MCP server `memory-crystal` with bearer header | `${CODEX_HOME:-~/.codex}/config.toml` |
+| Shared capture hooks (`--host codex`) | `${CODEX_HOME:-~/.codex}/hooks.json` |
+| `codex_hooks = true` unless an explicit setting already exists | same `config.toml` |
+| Skill suite | `${CODEX_HOME:-~/.codex}/skills` |
+| Managed Block | `~/.codex/AGENTS.md` |
+
+The MCP table looks like this. The header key is `http_headers`:
+
+```toml
+[mcp_servers.memory-crystal]
+url = "https://api.memorycrystal.ai/mcp"
+http_headers = { Authorization = "Bearer your-api-key" }
+```
+
+`hooks.shells` is `bash` for both Codex rows. Native PowerShell updates `config.toml` and does not install `crystal-hooks.mjs`. The shared hook file (UserPromptSubmit, Stop, and SessionStart) comes from the Bash installer only. SessionStart on Codex uses the matcher `startup|resume`. The Bash installer uses a helper to add `codex_hooks = true` to an existing `[features]` table or create the table. It preserves an existing `codex_hooks` setting. If the helper is unavailable and `[features]` exists, the shell fallback asks you to add the line yourself. Check that the effective value is `true` when capture hooks do not run.
+
+The dedicated installer remains available:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-codex-mcp.sh | bash
+```
+
+## Manual registration
+
+A URL without a bearer token does not authenticate:
+
+```bash
+codex mcp add memory-crystal --url https://api.memorycrystal.ai/mcp
+```
+
+Then set `http_headers` as in the table above. A local bridge uses `http://127.0.0.1:3100/mcp` and the same header. See [MCP Server](/integrations/mcp-server).
+
+The hosted connection exposes 23 tools. The stdio package exposes 30, including `crystal_edit` and the research tools. Codex's installer path uses the hosted 23.
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash
+```
+
+See [Uninstall](/help/uninstall).
+
+## Tool-use guidance
+
+For repository work, pass `repoSlug` or `projectId` to recall-style tools. Use `crystal_preflight` before consequential changes, `crystal_query_knowledge_base` for named references, and `crystal_search_messages` for exact prior wording.
+
+## Verify and troubleshoot
+
+Run `codex mcp list`, or restart Codex and confirm that Memory Crystal tools are available. If authentication fails, check the `http_headers` entry, API key, and selected backend. The hosted URL, local backend URL, and a bridge on port 3100 are different endpoints.
+
+If tools work but capture does not, check `hooks.json`, the `codex_hooks` feature flag, and whether you installed through Bash. When using `CODEX_HOME`, inspect that directory rather than assuming the default path. Automatic recall still requires the injection opt-in.
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.

@@ -1,0 +1,78 @@
+---
+title: Cursor
+description: Full-tier Cursor install — HTTP MCP, Bash-only capture hooks, skills, and a local plugin. Injection is off by default.
+---
+
+Cursor is Full tier. The Bash installer writes HTTP MCP, shared capture hooks, the skill suite, and a local Cursor plugin. Native PowerShell writes the MCP entry and installs skills. It does not stage the plugin or install shared hooks.
+
+Automatic recall injection is off. Set `MEMORY_CRYSTAL_INJECT_RECALL` to `1` or `true` to turn it on. Capture still runs when the Bash installer writes hooks.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+```text
+Install Memory Crystal for Cursor. Run the Bash installer so MCP, hooks, skills, and the local plugin are all written. PowerShell configures MCP and skills. Follow the auth and backend prompts. Then run Developer: Reload Window and confirm memory-crystal is connected. Recall is a tool call unless MEMORY_CRYSTAL_INJECT_RECALL=true.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets cursor
+
+Windows PowerShell (MCP and skills):
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets cursor
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets cursor
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets cursor
+```
+
+Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first).
+
+## What the Bash installer writes
+
+| Piece | Path |
+| --- | --- |
+| HTTP MCP server `memory-crystal` with bearer header | `~/.cursor/mcp.json` |
+| Shared capture hooks (`--host cursor`) | `~/.cursor/hooks.json` |
+| Skill suite | `~/.cursor/skills` |
+| Local plugin (MCP manifest, hooks, rules, skills) | `~/.cursor/plugins/local/memory-crystal` |
+
+The plugin version staged from this repo is 0.10.1. Cursor has no managed block in an agent instructions file because `agentsFile` is unset. The Bash hook installation still stages the shared `~/.memory-crystal/instructions.md` support file.
+
+`hooks.shells` is `bash`. Native PowerShell updates `mcp.json` and skips hooks and plugin staging. Use the Bash installer when you want capture.
+
+The MCP entry:
+
+```json
+{
+  "mcpServers": {
+    "memory-crystal": {
+      "type": "http",
+      "url": "https://api.memorycrystal.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+A local backend uses `http://127.0.0.1:3211/api/mcp` with the same header shape.
+
+## After install
+
+Reload the window (Developer: Reload Window) so Cursor picks up the plugin, MCP server, skills, and hooks. Confirm the `memory-crystal` server is connected before relying on tools.
+
+Hooks are host-attributed with `--host cursor`, so captures are not labelled with another host that shares `~/.memory-crystal/config.json`.
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets cursor
+```
+
+That removes the MCP entry, `~/.cursor/hooks.json` hook entries, the local plugin directory, and the Crystal skill directories. See [Uninstall](/help/uninstall).
