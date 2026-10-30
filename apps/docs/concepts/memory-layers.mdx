@@ -1,0 +1,40 @@
+---
+title: Memory Layers
+description: Short-term messages and durable memories, and how long each one lasts.
+---
+
+Memory Crystal keeps two layers.
+
+- **Short-term** is what just happened: raw messages, and raw sensory content.
+- **Long-term** is what should stay useful later: facts, rules, decisions, goals, and workflows.
+
+They solve different problems. Recent wording lives in messages. Cross-session answers live in durable memories.
+
+## What is stored
+
+| Layer | Records | Kept until |
+| --- | --- | --- |
+| Short-term messages | Completed turns | You delete them (hosted and default self-hosted behavior) |
+| Raw sensory content | Observations stored as sensory memories | You delete them (hosted and default self-hosted behavior) |
+| Durable memories | Extracted or explicitly saved memories | You delete them, you archive them, overage Forgetting archives them, or the optional stale archive archives them |
+
+On the hosted service and by default when self-hosting, raw messages and raw sensory content stay until you delete them. Self-hosters who set `CRYSTAL_RETENTION_READY=1` enable age-based expiry jobs; retention then follows the tier’s expiry policy.
+
+## How a memory moves
+
+1. **Capture** writes the turn into short-term storage. No model call runs for that write.
+2. **Distillation** reads eligible turns on a schedule and writes durable memories. That is separate from Forgetting and from the stale archive.
+3. **Forgetting** runs only when you are over the non-KB memory allowance, and only when enforcement is on. It archives the overage. It does not delete knowledge-base chunks, and it does not touch memories from the last 24 hours.
+4. **Stale archive** is optional, off by default, and archive-only. Eligible older extracted memories leave recall and stay restorable.
+
+Details, schedules, and the hosted-service note are on [How Memory Works](/concepts/how-memory-works). Allowances are on [Usage and allowances](/help/usage-and-allowances).
+
+## Stores are not layers
+
+A durable memory also has a store: sensory, episodic, semantic, procedural, or prospective. The store names the kind of content. It is not a retention policy. See [Memory Stores](/concepts/memory-stores).
+
+## Related
+
+- [Context Engine](/concepts/context-engine)
+- [Knowledge Bases](/concepts/knowledge-bases)
+- [Scoping and access](/concepts/scoping)

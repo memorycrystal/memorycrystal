@@ -1,0 +1,81 @@
+---
+title: Forget a memory
+description: Archive or permanently delete a selected memory.
+---
+
+`crystal_forget` archives one memory by default, or permanently deletes it when you explicitly request that mode.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+Archive a selected memory when you no longer want it in ordinary recall. Use [supersede](/tools/supersede) if replacement guidance exists, or [update](/tools/update) if the information only needs correction.
+
+| Parameter | Behavior |
+| --- | --- |
+| `memoryId` | Required ID |
+| `permanent` | Default false archives; true permanently deletes |
+| `channel`, `agentId` | Visibility context, including KB access |
+| `reason` | Accepted by the tool contract but not persisted by the current handler |
+
+Permanent deletion returns action `deleted`. Archiving is recoverable; permanent deletion is not. Channel scope is enforced, and missing or hidden memories return 404.
+
+This explicit operation is separate from automatic overage-only Forgetting, which counts active non-KB memories, and from stale-memory archival. The nightly stale-memory archive is archive-only and restorable, controlled by `CRYSTAL_STALE_ARCHIVE` (`off`, `dry_run`, `on`; default `off`). On the hosted service it is being enabled in October 2026 after a trial. Distillation is separate from both.
+
+See [the lifecycle overview](/concepts/how-memory-works).
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Archive recoverably
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "permanent": false
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "title": "Backup verification rule",
+  "action": "archived",
+  "success": true
+}
+```
+
+### Permanently remove a selected record
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "permanent": true
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "title": "Backup verification rule",
+  "action": "deleted",
+  "success": true
+}
+```
+
+## Choose the removal mode
+
+Leave `permanent` false for recoverable archival. Confirm the intended record and irreversible outcome before choosing true. `includeArchived: true` on [recall](/tools/recall) can help locate archived guidance; it does not restore it.
+
+## Errors and common mistakes
+
+Do not use permanent deletion as a way to hide a record temporarily. A missing or hidden ID returns 404; check account and scope before concluding it was erased. The accepted `reason` field is not a durable audit note in this handler.

@@ -1,0 +1,87 @@
+---
+title: Edit compatibility tool
+description: Use the stdio alias for in-place memory updates.
+---
+
+`crystal_edit` is available **only on stdio MCP**. Hosted MCP callers use [crystal_update](/tools/update).
+
+The edit tool uses the same update fields and behavior: required `memoryId`, at least one supported change, optional `scopeChannel` and `agentId`, and a separate stored `channel` for rehoming. It supports metadata, tags, action triggers, and all current categories, including `skill`.
+
+## When to use
+
+Use `crystal_edit` only for a stdio client that already depends on this compatibility name. Prefer [update](/tools/update) for new integrations; use [supersede](/tools/supersede) to retain a predecessor/successor relationship.
+
+The raw HTTP compatibility route is `POST /api/mcp/edit`. A request with no supported changes returns 400. Title/content are not trimmed automatically; tags are trimmed without deduplication. Editing does not refresh `lastAccessedAt`.
+
+See [update](/tools/update) for the complete parameter table and HTTP 409 `redacted_content_write` protection. Set `allowRedactedContent: true` only when writing a placeholder over a stored secret is intentional.
+
+## Parameters
+
+| Parameter | Behavior |
+| --- | --- |
+| `memoryId` | Required existing ID |
+| `title`, `content`, `metadata` | Optional replacement strings |
+| `tags`, `actionTriggers` | Optional replacement string arrays |
+| `store`, `category` | Optional current enum values |
+| `confidence`, `strength`, `arousal` | Optional numbers 0–1 |
+| `valence` | Optional number −1 to 1 |
+| `scopeChannel` | Visibility scope for the existing record |
+| `channel` | New stored channel |
+| `agentId` | Visibility identity, not a new author stamp |
+| `allowRedactedContent` | Explicit permission to write redaction placeholders over secrets |
+
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Replace tags
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "tags": [
+    "backup",
+    "verified"
+  ]
+}
+```
+
+raw HTTP compatibility route response:
+
+```json
+{
+  "success": true,
+  "memoryId": "<memory-id>"
+}
+```
+
+### Correct text
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>",
+  "content": "Verify the backup before replacing the previous copy."
+}
+```
+
+raw HTTP compatibility route response:
+
+```json
+{
+  "success": true,
+  "memoryId": "<memory-id>"
+}
+```
+
+## Replacement options
+
+Omitted fields remain unchanged; supplied arrays replace their previous values. The same ID survives the edit. When moving a record, use its old scope for authorization and its new channel as the destination.
+
+## Errors and common mistakes
+
+Hosted MCP does not register this tool name. A request with only `memoryId` has no change to apply and returns 400. Missing or hidden records return 404. Inspect 409 redaction errors instead of bypassing them automatically.

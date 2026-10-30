@@ -1,0 +1,130 @@
+---
+title: Research tools
+description: Use stdio tools or direct HTTP for structured research records.
+---
+
+The six research tools are **stdio-only**. They are not registered on hosted HTTP MCP. You can call their HTTP equivalents with a suitable Bearer API key at `https://convex.memorycrystal.ai`.
+
+## When to use
+
+Use research tools for structured collections, source records, evaluation runs, and evidence lineage. Use [remember](/tools/remember) for a single durable lesson and [KB import](/tools/knowledge-bases/import) for ordinary reference text. Research trace follows run evidence; [memory trace](/tools/trace) follows conversation snapshots.
+
+| Stdio tool | Inputs | HTTP equivalent |
+| --- | --- | --- |
+| `crystal_research_create_collection` | Required `name`, `domain`; optional description, retentionPolicy, workspaceId, agentId, channel, visibility (`private` or `scoped`) | POST `/api/research/collections` |
+| `crystal_research_ingest` | Required `operation`, `payload`; collection/job/shard IDs as required by the operation | See ingestion table below |
+| `crystal_research_status` | `jobId` or `collectionId`; job takes precedence | GET `/api/research/jobs/{id}/status` or `/api/research/collections/{id}/stats` |
+| `crystal_research_query` | Required `collectionId`, `kind` (`items`, `runs`, `semantic`); optional scope, filters, cursor, limit | POST `/api/research/query` |
+| `crystal_research_trace` | Required `runId` | GET `/api/research/trace?runId={id}` |
+| `crystal_research_promote` | Required `operation` (`promote` or `demote`), `reason`; operation-specific IDs | POST `/api/research/promote` or `/api/research/demote` |
+
+Tool results contain the HTTP result as JSON text. Research HTTP responses add `schemaVersion: "research.v1"` and `requestId`; errors can include `code` and `retryable`. Failed tool calls set MCP `isError`.
+
+## Ingestion routes
+
+| `operation` | HTTP POST path | Body |
+| --- | --- | --- |
+| `source`, `item`, `variant`, `dataset`, `run` | `/api/research/sources`, `/items`, `/variants`, `/datasets`, `/runs` (all under `/api/research`) | `collectionId` plus the singular entity field containing `payload` |
+| `create_job` | `/api/research/jobs` | `collectionId` plus payload fields |
+| `create_shard` | `/api/research/jobs/{jobId}/shards` | Payload fields |
+| `claim_shard` | `/api/research/jobs/{jobId}/claim` | Payload fields |
+| `heartbeat_shard` | `/api/research/shards/{shardId}/heartbeat` | Payload fields |
+| `complete_shard` | `/api/research/shards/{shardId}/complete` | Payload fields |
+| `set_job_state` | `/api/research/jobs/{jobId}/state` | Payload fields |
+
+Ingestion uses operation-specific structured records, not arbitrary durable-memory capture. Raw third-party code is quarantined as an artifact and is not executed by these tools.
+
+## Query and promotion
+
+Stdio query accepts `itemType`, `reviewStatus`, run `status`, `agentId`, `channel`, `cursor`, and `limit` (1–100). Semantic queries additionally accept `query`, `embedding` (3,072 numbers), and `model`. HTTP supports additional kind-specific filters; unknown fields can be rejected. Use returned cursors for bounded item/run pages. HTTP adds `nextCursor`, which is null when the page is done; otherwise pass it as `cursor` on the next request.
+
+Promotion requires `collectionId`, `itemId`, `runId`, and `datasetId`, with optional `knowledgeBaseId` and a reason. It validates the finding before publishing into a KB. Demotion uses `promotionId` and a reason. Trace returns the run's linked research evidence, rather than a conversation snapshot.
+
+Research collections are owned by the authenticated account. Scoped credentials and visibility checks can further restrict access. Collection identity and channel fields are not substitutes for separate accounts.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Create a research collection
+
+Call `crystal_research_create_collection`:
+
+```json
+{
+  "name": "Reference research",
+  "domain": "documentation",
+  "visibility": "private"
+}
+```
+
+Stdio JSON / raw HTTP 201 response:
+
+```json
+{
+  "schemaVersion": "research.v1",
+  "requestId": "<request-id>",
+  "collectionId": "<collection-id>"
+}
+```
+
+### Query collection items
+
+Request:
+
+```json
+{
+  "collectionId": "<collection-id>",
+  "kind": "items",
+  "limit": 20
+}
+```
+
+stdio JSON / Raw HTTP response:
+
+```json
+{
+  "schemaVersion": "research.v1",
+  "requestId": "<request-id>",
+  "items": [],
+  "continueCursor": "<cursor>",
+  "isDone": true,
+  "nextCursor": null
+}
+```
+
+### Check a job
+
+Request:
+
+```json
+{
+  "jobId": "<job-id>"
+}
+```
+
+raw HTTP 404 response:
+
+```json
+{
+  "schemaVersion": "research.v1",
+  "requestId": "<request-id>",
+  "error": "Research job not found",
+  "code": "research_not_found",
+  "retryable": false
+}
+```
+
+## Work through a collection
+
+1. Create a collection for the research domain and retain its ID.
+2. Ingest operation-specific source, item, dataset, and run records; save each returned ID.
+3. Query items or runs and follow the returned cursor while `isDone` is false.
+4. Trace a run to inspect its evidence before promotion.
+5. Promote a validated result with its item, run, dataset, and reason. Demote a promotion by its promotion ID when it should no longer be used.
+
+Semantic queries are a separate kind from paged item/run lookup. An embedding, when supplied, must contain 3,072 numbers. These tools do not execute third-party code.
+
+## Errors and common mistakes
+
+Hosted MCP does not advertise these names; use stdio or the documented HTTP routes. Missing operation-specific IDs are errors. Read `code` and `retryable`: correct invalid input or access before retrying, and honor Retry-After for transient throttling. A collection or job ID is not interchangeable with a run or promotion ID.

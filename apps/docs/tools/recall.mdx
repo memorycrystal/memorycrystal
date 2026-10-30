@@ -1,0 +1,184 @@
+---
+title: Recall memories
+description: Retrieve bounded durable context and transcript matches.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_recall` combines semantic and lexical retrieval. Identifier shortcuts and retrieval with reduced capabilities can avoid vector search; a vector call is not guaranteed on every request. Query named reference corpora with [KB query](/tools/knowledge-bases/query).
+
+## When to use
+
+Use recall when you need facts, lessons, or decisions relevant to a question. Start with the question you need answered, then narrow by store, category, or tags.
+
+| You need | Choose |
+| --- | --- |
+| Relevant durable context | `crystal_recall` |
+| Exact conversation wording | [Search messages](/tools/search) |
+| The newest conversation | [Recent messages](/tools/recent) |
+| An opening topic scan | [What do I know](/tools/reasoning/what-do-i-know) |
+| Evidence behind a choice | [Why did we](/tools/reasoning/why-did-we) |
+| A named manual | [KB query](/tools/knowledge-bases/query) |
+
+| Parameter | Behavior |
+| --- | --- |
+| `query` | Required nonempty search text |
+| `limit` | Default 12; integer 1–20 |
+| `mode` | `general` (default), `decision`, `project`, `people`, `workflow`, `conversation` |
+| `stores`, `categories`, `tags` | Optional arrays of filters; see [allowed values](/tools/overview) |
+| `includeArchived` | Include archived memories when true |
+| `channel`, `agentId` | Conversation scope and resolved identity |
+| `projectId`, `repoSlug` | Project context |
+| `sessionKey` | Transcript context; does not alone restrict durable recall to that session |
+| `scopeToSession` | Opt in to a session restriction when `sessionKey` is supplied |
+| `agentPool` | `account`, `layer`, or `agent`; MCP defaults to `layer`, but all use the account pool unless the service administrator configures an agent recall policy |
+| `messageLimit` | Default 3; 0 disables transcript matches; maximum 10 |
+| `turnId` | Exclude the matching captured user message within the window that excludes your just-sent message |
+| `excludeRecentMessagesMs` | Widen echo suppression (excluding your just-sent message); effective default at least 120 seconds, backend maximum 24 hours |
+
+Modes prioritize stores and categories; use explicit filters when you need exclusions. Identifier shortcuts use a default maximum of three decisive matches before falling through to broader retrieval. This is separate from `limit`.
+
+## Response
+
+Raw `POST /api/mcp/recall` returns `memories`, `assetContexts`, `messageMatches`, `degraded`, `retrieval`, and `diagnostics`, with optional `degradation` and `promotionCandidates`. Memory results use `memoryId` and ranking metadata. Scores are ranking signals, not calibrated confidence or pure cosine similarity.
+
+MCP recall bounds memory content to 600 characters and flags cut text with `truncated`. Use [get memory](/tools/get-memory) to read the full resolved recall text. Message excerpts are bounded to 200 characters and asset excerpts to 300 on the hosted surface. Read the returned diagnostics instead of assuming every retrieval stage ran.
+
+`retrieval.messageMatchesAvailable` is a lower bound capped at `messageLimit + 1`, not a total transcript count. `retrieval.messageScan` describes scan coverage. A bounded empty result cannot establish that no matching conversation exists; use [transcript search](/tools/search) for exact wording and time windows.
+
+Unscoped reads still enforce visibility. `agentPool` controls relevance, not security. Cite returned sources when explaining a past decision; citation formatting is not mechanically enforced by the API.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Find a procedure
+
+Request:
+
+```json
+{
+  "query": "How do I verify a backup?",
+  "mode": "workflow",
+  "limit": 5
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+### Require decision records
+
+Request:
+
+```json
+{
+  "query": "Why did the backup schedule change?",
+  "mode": "decision",
+  "categories": [
+    "decision"
+  ],
+  "messageLimit": 0
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Weekly backup verification",
+      "content": "Verify weekly because monthly checks left failures unnoticed.",
+      "store": "semantic",
+      "category": "decision"
+    }
+  ],
+  "messageMatches": []
+}
+```
+
+### Include archived guidance
+
+Request:
+
+```json
+{
+  "query": "backup verification",
+  "includeArchived": true,
+  "tags": [
+    "backup"
+  ],
+  "limit": 3
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ]
+}
+```
+
+## Recall modes explained
+
+Modes change ranking preferences. They do not exclude other categories; use `categories` or `stores` for that.
+
+| Mode | Preference | Typical question |
+| --- | --- | --- |
+| `general` | Broad context | What should I know about backups? |
+| `decision` | Decisions, lessons, rules | Why did the schedule change? |
+| `project` | Goals, workflows, skills, decisions, facts | What remains to be done? |
+| `people` | People, decisions, events | What preferences were recorded? |
+| `workflow` | Workflows, skills, rules, lessons | How should I verify a backup? |
+| `conversation` | Conversation and event context | What was discussed? |
+
+Use [preflight](/tools/preflight) for action-oriented checks. Supply `limit` explicitly when the result count matters across presets and transports.
+
+## Scope and recent-message exclusion
+
+Pass the same conversation scope used when saving the information. A `sessionKey` supplies context; add `scopeToSession: true` to restrict durable recall to that session. Use `projectId` or `repoSlug` for project context. Removing a channel does not grant access to every private conversation.
+
+`agentPool` is a relevance setting. If the service administrator has not configured an agent recall policy, every pool uses the account pool. It is not an access-control boundary.
+
+Echo suppression means not returning the message you just sent. Pass the current `turnId` to exclude its recent captured user message. `excludeRecentMessagesMs` widens the time window; it does not erase messages. Use `messageLimit: 0` when you only need durable memories.
+
+The stdio API-key path forwards `projectId`, `repoSlug`, `messageLimit`, `turnId`, and `excludeRecentMessagesMs` to the HTTP backend. The stdio JWT path validates and ignores these controls and does not return `messageMatches` or `retrieval`.
+
+## Confidence and scoring
+
+Stored `confidence` expresses certainty recorded with the memory. Ranking combines signals such as text matches, identifiers, strength, freshness, and vector similarity when available. A ranking score is not a probability that a claim is true. Read the source and its age before relying on it.
+
+Specific identifiers can find decisive matches without embedding the query. Other requests combine bounded lexical and vector candidates. Durable-memory lexical query analysis uses Latin letters and digits. Message scoring also recognizes Unicode words, but treats non-Latin particles and stop words as informative. There are no per-script stop-word lists, so common words can contribute to transcript matches. Do not assume equal keyword behavior for every writing system.
+
+## Errors and common mistakes
+
+An empty result is not proof that nothing was saved. Check your scope and filters, inspect retrieval diagnostics, and try transcript search for exact wording. A successful response with `degraded: true` means some retrieval work was reduced or unavailable; inspect the accompanying details.
+
+Use a nonempty query and an integer limit from 1 to 20. Do not pass `threshold` as a supported MCP parameter. If content is `truncated`, read it with [get memory](/tools/get-memory). For authentication and throttling failures, see [API errors](/api/error-reference).

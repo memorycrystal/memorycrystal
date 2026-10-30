@@ -1,0 +1,105 @@
+---
+title: Claude Desktop
+description: Tools-tier HTTP MCP for Claude Desktop. No capture hooks. Stdio is an optional compatibility path.
+---
+
+Claude Desktop is Tools tier. The universal installer writes an HTTP MCP entry with a bearer token. It does not install capture hooks, skills, or an instructions file. Recall and capture are explicit tool calls.
+
+Stdio (`crystal-mcp`) is an optional compatibility path. It is not what the installer writes, and it is not required.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+Paste this into Claude Desktop:
+
+```text
+Install Memory Crystal for Claude Desktop. Run the official installer, follow the auth and backend prompts, and do not edit Claude Desktop config unless the installer fails. Restart Claude Desktop and confirm the memory-crystal server loads. This install is tools only: no capture hooks and no automatic recall.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-desktop
+
+Windows PowerShell:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets claude-desktop
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-desktop
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets claude-desktop
+```
+
+Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first). You can also pass `--targets generic-mcp`. See [Support Tiers](/concepts/support-tiers).
+
+## Config path
+
+The installer updates `mcpServers.memory-crystal` in the file for your OS:
+
+| OS | Path |
+| --- | --- |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Linux and WSL | `${XDG_CONFIG_HOME:-$HOME/.config}/Claude/claude_desktop_config.json` |
+| Windows Bash | `${APPDATA:-$HOME/AppData/Roaming}/Claude/claude_desktop_config.json` |
+| Native PowerShell | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+The entry shape is HTTP, not a local command:
+
+```json
+{
+  "mcpServers": {
+    "memory-crystal": {
+      "type": "http",
+      "url": "https://api.memorycrystal.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+For a local backend the URL is `http://127.0.0.1:3211/api/mcp`. Restart Claude Desktop after the file changes.
+
+## Optional stdio compatibility
+
+Use this only when you want the command-launched package. Install the command first with `npm install -g @memorycrystal/mcp-server`, or build the package locally and put its executable on `PATH`. Running `npx` once does not install `crystal-mcp` globally. `CRYSTAL_MCP_MODE=stdio` is already the default. Set it when you want the mode explicit. The hosted account URL is `https://convex.memorycrystal.ai`.
+
+```json
+{
+  "mcpServers": {
+    "memory-crystal": {
+      "command": "crystal-mcp",
+      "env": {
+        "CRYSTAL_MCP_MODE": "stdio",
+        "MEMORY_CRYSTAL_API_KEY": "your-api-key",
+        "MEMORY_CRYSTAL_API_URL": "https://convex.memorycrystal.ai"
+      }
+    }
+  }
+}
+```
+
+That process exposes 30 tools, including `crystal_edit` and the research tools. The HTTP entry above exposes the 23 hosted tools. See [MCP Server](/integrations/mcp-server).
+
+## Tools
+
+Call `crystal_recall` for durable memory and `crystal_query_knowledge_base` for a named knowledge base. Call `crystal_search_messages` for exact prior wording. Pass `agentId`, `channel`, `projectId`, or `repoSlug` when you know them. They partition one account. See [Scoping](/concepts/scoping).
+
+## Troubleshooting
+
+Restart Desktop after changing its configuration. Check the OS-specific path above if the server does not appear. The installer registers HTTP; only use the command example when you deliberately choose stdio compatibility.
+
+For HTTP authentication failures, check the Bearer header and whether the API key belongs to the selected backend. For a command-not-found error, install `crystal-mcp` and confirm the desktop process can find it on `PATH`. An HTTP connection does not need that executable. Neither setup adds automatic capture hooks to Desktop.
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.

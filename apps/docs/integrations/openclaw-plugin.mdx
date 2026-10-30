@@ -1,0 +1,132 @@
+---
+title: OpenClaw Plugin
+description: Install the OpenClaw plugin for cloud backends, and what the installer does when the backend is not cloud.
+---
+
+OpenClaw is Full tier. The native plugin captures completed turns, registers tools, and can inject recall only when you opt in. The plugin requires OpenClaw 2026.6.1 or newer.
+
+Selecting a local or external backend does not install that plugin. The universal installer applies the native plugin only for the cloud backend. For every other backend, and for every native PowerShell install, it writes generic MCP guidance instead and prints that the native plugin is Bash-only.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+Paste this into OpenClaw:
+
+```text
+Install Memory Crystal for OpenClaw. Run the official installer, follow the auth and backend prompts, and do not edit OpenClaw config unless the installer fails and asks for a manual fallback. Cloud backend installs the native plugin. Local or self-hosted backend writes generic MCP config instead. After a cloud install, verify with `openclaw plugins info crystal-memory` and `openclaw crystal_status`.
+
+macOS/Linux/WSL, cloud:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets openclaw
+
+Windows PowerShell writes generic MCP config, not the native plugin:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets openclaw
+```
+
+Cloud backend, Bash:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets openclaw
+```
+
+Native Windows PowerShell:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets openclaw
+```
+
+<Warning>
+The Bash installer installs the native plugin only when the backend is cloud. `--backend local` and `--backend self-hosted` fall back to generic MCP config. The PowerShell `openclaw` target always writes that fallback.
+</Warning>
+
+## What the cloud install writes
+
+The public plugin installer stages the plugin at `~/.openclaw/extensions/crystal-memory`. It still fetches `handler.js`. Older installs can still load that file and `plugin/openclaw-hook.json`. Leave them in place.
+
+When you have not already set `contextEngineMode`, `localStoreEnabled`, or `dbPath`, the public installer writes:
+
+| Setting | Value |
+| --- | --- |
+| `localStoreEnabled` | `false` |
+| `contextEngineMode` | `reduced` |
+
+Local SQLite compaction stays an explicit opt-in. The older `scripts/crystal-enable.sh` path is different: when SQLite is available and those fields are unset, it sets `localStoreEnabled` to `true` and `contextEngineMode` to `full`.
+
+On OpenClaw 2026.8 or newer the plugin registers through `api.on`. Recall and reinforcement arrive as one `before_prompt_build` block. Older hosts keep `registerHook`. OpenClaw 2026.8+ only dispatches conversation hooks when the plugin opts in. The installer sets that flag. A hand install needs:
+
+```bash
+openclaw config set plugins.entries.crystal-memory.hooks.allowConversationAccess true
+```
+
+## Capture, injection, and compact recall
+
+`captureTurns` defaults to `true`. Each completed assistant turn is posted once. Set `captureTurns` to `false`, or `MEMORY_CRYSTAL_CAPTURE_TURNS` to `false`, `0`, `off`, or `no`, to stop that capture. Recall, tools, and guardrails keep working. The environment value wins over config. `turnCapture` is the earlier name; `captureTurns` wins when both are set.
+
+Automatic recall injection is off. Set `MEMORY_CRYSTAL_INJECT_RECALL` to `1` or `true` to turn it on. The runtime recognizes `injectRecall`, but the strict plugin schema does not declare it; prefer the environment switch. A non-empty environment value overrides config. With neither configured, injection is off.
+
+Compact recall is owned by the backend. `MEMORY_CRYSTAL_COMPACT_RECALL` is read there. Unset means compact text is used when a memory has it. The literal `false` disables it. Setting `compactRecall` in the OpenClaw config does not change the backend.
+
+Tool guardrails are off unless `enableTriggers` is `true` or `actionTriggers` is a non-empty list. A match is appended to the tool result. Guardrails do not block the call.
+
+## Scope
+
+`channelScope`, `agentScopePolicies`, and `agentId` partition visibility inside one account. They do not create a separate tenant. A customer who must not see another customer's data needs a separate Memory Crystal account and API key.
+
+An agent with no matching policy uses shared mode when `channelScope` is set. Use an explicit `mode: "peer"` policy for per-peer routing; session-scoped overrides also exist. See [Plugin Options](/configuration/plugin-options) and [Scoping](/concepts/scoping).
+
+## Verify
+
+```bash
+openclaw plugins info crystal-memory
+openclaw crystal_status
+openclaw crystal_doctor
+```
+
+`openclaw crystal_status` reports the effective capture setting and whether it came from config, the environment, or the default.
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash
+```
+
+See [Uninstall](/help/uninstall).
+
+## Source-checkout commands
+
+For a source installation, the repository provides these commands:
+
+```bash
+npm run crystal:bootstrap
+npm run crystal:enable
+npm run crystal:doctor
+npm run crystal:disable
+```
+
+Preview enable or disable changes first:
+
+```bash
+npm run crystal:enable -- --dry-run
+npm run crystal:disable -- --dry-run
+```
+
+`plugin/index.js` is the native entry, with the manifest in `plugin/openclaw.plugin.json`. `plugin/handler.js` and `plugin/openclaw-hook.json` remain compatibility entries. Capture and recall helpers live in `plugin/capture-hook.js` and `plugin/recall-hook.js`.
+
+## Troubleshooting
+
+Use `openclaw plugins info crystal-memory` to check registration, `openclaw crystal_status` for version, backend, and capture state, and `openclaw crystal_doctor` for deeper diagnostics. On hosts with typed hooks, rate limiting uses `before_dispatch`; guardrail warnings attach to tool results.
+
+Exercise `crystal_recall` with the known agent/channel scope, `crystal_query_knowledge_base` for a named reference, and `crystal_search_messages` for exact wording. Use `crystal_preflight` before consequential configuration changes.
+
+Do not edit the running gateway's config from inside its agent session. Review changes and apply them outside the runtime. Keep compatibility handler files that an older installation still loads. Local backend selection through the universal installer gives generic MCP guidance; it does not automatically wire the native plugin.
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.

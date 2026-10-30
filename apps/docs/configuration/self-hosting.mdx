@@ -1,0 +1,45 @@
+---
+title: Self-Hosting
+description: Run your own Convex backend, or deploy the web app and MCP bridge yourself. This is not the hosted service.
+---
+
+The hosted Memory Crystal service is Convex Cloud at `https://convex.memorycrystal.ai`. Clients reach its MCP bridge at `https://api.memorycrystal.ai/mcp`. This page is for a deployment you operate. It does not describe the hosted service.
+
+## Pick a path
+
+| Path | You operate | Start here |
+| --- | --- | --- |
+| Local-first | Docker Convex on one machine. The installer validates a hosted API key once, then provisions a local token. | [Local-First Setup](/configuration/local-first) |
+| Your own Convex backend | The data plane, anywhere you can run the Convex self-hosted backend. Point clients at `<your-url>/api/mcp`. | The local artifact's `bin/install`, or your own Convex deployment, plus [Providers](/configuration/providers) |
+| Web app or MCP bridge on Railway | The Next.js app, the Streamable HTTP bridge, or both, as separate services. This does not deploy a Convex backend. | [Railway](/self-hosting/railway) |
+
+The Railway page covers the web app and the MCP bridge. A Convex backend is a third service. Use local-first or your own Convex deployment for that process.
+
+## External self-hosted clients
+
+The universal installer accepts `--backend self-hosted` and a URL you supply. It writes client MCP config to `<your-url>/api/mcp`. It does not call the hosted license check for that mode. It also does not keep checking a hosted plan afterward.
+
+The installer prints a reminder to set `GEMINI_API_KEY` and, optionally, `OPENROUTER_API_KEY` on the backend you run. Those prompts do not match the current embedding runtime, which uses the account's personal OpenRouter key and fails closed when that key is missing. See [Providers](/configuration/providers).
+
+## Variables
+
+Client, backend, and MCP process variables are listed in [Environment Variables](/configuration/environment-variables). A self-hosted MCP bridge still requires each client to send `Authorization: Bearer <api-key>`. A key in the bridge's environment does not replace that header.
+
+## Connect to an external backend
+
+First provision your Convex backend and deploy the Memory Crystal functions. The repository's Docker provisioning path is described in [Local-First Setup](/configuration/local-first); Railway web/MCP services alone are insufficient. Configure a valid API key and the owner's provider settings on that backend before connecting clients.
+
+Then run the installer and supply your external HTTP base URL:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- \
+  --backend self-hosted --self-hosted-url https://your-backend.example
+```
+
+The installer prompts for credentials and configures the selected clients. Validate a tool call after setup; writing the client config is not proof that backend authentication or embeddings work.
+
+## Troubleshooting
+
+Local-first validates hosted credentials during setup. External mode skips that check but still needs authentication on your own backend. Neither path establishes a separate account boundary merely by setting a channel or agent id.
+
+If you want the managed service instead, use [Quick Start](/quickstart). For a self-operated installation, check the backend, web app, and MCP bridge as separate services. Run local `bin/doctor` for the packaged backend, then verify an authenticated tool call and semantic recall.

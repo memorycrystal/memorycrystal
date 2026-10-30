@@ -1,0 +1,220 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Memory Crystal",
+  "favicon": "https://memorycrystal.ai/apple-touch-icon.png",
+  "logo": {
+    "light": "https://raw.githubusercontent.com/memorycrystal/memorycrystal/main/assets/logo-dark.svg",
+    "dark": "https://raw.githubusercontent.com/memorycrystal/memorycrystal/main/assets/logo-dark.svg",
+    "href": "https://docs.memorycrystal.ai/"
+  },
+  "colors": {
+    "primary": "#2180D6",
+    "light": "#4CC1E9",
+    "dark": "#1C549F"
+  },
+  "background": {
+    "color": {
+      "dark": "#1C272F",
+      "light": "#F4F8FC"
+    }
+  },
+  "fonts": {
+    "heading": {
+      "family": "Inter",
+      "weight": 600
+    },
+    "body": {
+      "family": "Oxanium",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/memorycrystal/memorycrystal"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation",
+              "skills",
+              "pricing",
+              "changelog"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/memory-layers",
+              "concepts/how-memory-works",
+              "concepts/context-engine",
+              "concepts/memory-stores",
+              "concepts/knowledge-bases",
+              "concepts/support-tiers",
+              "concepts/scoping"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/openclaw-plugin",
+              "integrations/hermes-agent",
+              "integrations/mcp-server",
+              "integrations/claude-code",
+              "integrations/claude-desktop",
+              "integrations/codex-cli",
+              "integrations/cursor",
+              "integrations/opencode",
+              "integrations/factory-droid",
+              "integrations/grok",
+              "integrations/buzz"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/local-first",
+              "configuration/environment-variables",
+              "configuration/providers",
+              "configuration/plugin-options",
+              "configuration/local-backup-recovery",
+              {
+                "group": "Self-Hosting",
+                "pages": [
+                  "configuration/self-hosting",
+                  "self-hosting/railway"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Help",
+            "pages": [
+              "help/uninstall",
+              "help/troubleshooting",
+              "help/faq",
+              "help/lifecycle-emails",
+              "help/usage-and-allowances"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Tools & API",
+        "groups": [
+          {
+            "group": "Tools Overview",
+            "pages": [
+              "tools/overview"
+            ]
+          },
+          {
+            "group": "Memory Lookup",
+            "pages": [
+              "tools/recall",
+              "tools/search",
+              "tools/recent",
+              "tools/trace",
+              "tools/get-memory",
+              "tools/preflight"
+            ]
+          },
+          {
+            "group": "Memory Writing",
+            "pages": [
+              "tools/remember",
+              "tools/capture",
+              "tools/update",
+              "tools/supersede",
+              "tools/edit",
+              "tools/forget"
+            ]
+          },
+          {
+            "group": "Session Continuity",
+            "pages": [
+              "tools/wake",
+              "tools/checkpoint"
+            ]
+          },
+          {
+            "group": "Reasoning Helpers",
+            "pages": [
+              "tools/reasoning/overview",
+              "tools/reasoning/what-do-i-know",
+              "tools/reasoning/why-did-we"
+            ]
+          },
+          {
+            "group": "Knowledge Bases",
+            "pages": [
+              "tools/knowledge-bases/overview",
+              "tools/knowledge-bases/manage",
+              "tools/knowledge-bases/import",
+              "tools/knowledge-bases/list",
+              "tools/knowledge-bases/query"
+            ]
+          },
+          {
+            "group": "Diagnostics",
+            "pages": [
+              "tools/stats",
+              "tools/health"
+            ]
+          },
+          {
+            "group": "Research",
+            "pages": [
+              "tools/research"
+            ]
+          },
+          {
+            "group": "HTTP API",
+            "pages": [
+              "api/authentication",
+              "api/memory-endpoints",
+              "api/knowledge-base-endpoints",
+              "api/assets",
+              "api/error-reference",
+              "api/rate-limits"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "styling": {
+    "latex": false,
+    "codeblocks": "system"
+  },
+  "redirects": [
+    {
+      "source": "/tools/search-messages",
+      "destination": "/tools/search"
+    },
+    {
+      "source": "/integrations/api-reference",
+      "destination": "/api/memory-endpoints"
+    },
+    {
+      "source": "/self-hosting/environment-variables",
+      "destination": "/configuration/environment-variables"
+    },
+    {
+      "source": "/meta/source-of-truth",
+      "destination": "/introduction"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+---
+title: Health
+description: Check authenticated liveness and reported build identity.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Call `crystal_health` with no arguments. The optional `limit` argument is deprecated and ignored.
+
+## When to use
+
+Use health to check that your credentials reach the service and an authenticated database read succeeds. Use [stats](/tools/stats) for counts, and a small [recall](/tools/recall) request to inspect actual retrieval behavior.
+
+GET or POST `/api/mcp/health` returns `ok`, `computedAt`, `status`, `version`, `readiness`, `checks`, `planes`, and `build`. A successful response reports `status: "alive"` and an authenticated database read.
+
+Provider, vector, capture, and recall readiness can remain `unknown` or `not_probed`. Liveness does not establish that embedding or distillation will succeed. The response's version is a reported health value; do not use it as a universal component-version inventory.
+
+This check does not scan memories or produce a hygiene worklist. Use [stats](/tools/stats) for account counts.
+
+## Parameters
+
+| Parameter | Behavior |
+| --- | --- |
+| `limit` | Optional deprecated argument; ignored |
+
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Check liveness
+
+Request:
+
+```json
+{}
+```
+
+raw HTTP / Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "ok": true,
+  "status": "alive",
+  "readiness": "unknown",
+  "checks": {
+    "authenticatedDatabaseRead": "passed",
+    "embeddingProvider": "not_probed",
+    "distillationProvider": "not_probed",
+    "vectorBackfill": "not_probed"
+  },
+  "planes": {
+    "capture": "not_probed",
+    "recall": "not_probed"
+  }
+}
+```
+
+## Interpret readiness
+
+`alive` confirms this limited authenticated check. `not_probed` means the check did not test that component, and `unknown` is not a failure verdict. Check the affected operation when troubleshooting capture, embeddings, or distillation.
+
+## Errors and common mistakes
+
+A 401 means you must correct the credential; a 429 means you should wait according to [rate-limit guidance](/api/rate-limits). Do not interpret liveness as an end-to-end retrieval test or a complete version inventory.

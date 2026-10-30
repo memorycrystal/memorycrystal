@@ -1,0 +1,68 @@
+---
+title: Authentication
+description: Authenticate protected HTTP endpoints with your API key.
+---
+
+The hosted backend is `https://convex.memorycrystal.ai` on Convex Cloud. Protected memory, knowledge-base, research, and asset routes require an appropriate Bearer API key.
+
+Create keys in the [dashboard](https://memorycrystal.ai/dashboard). A newly created key is shown once and stored as a hash. The default active-key cap is 150 per account; revoke unused keys before creating replacements.
+
+```bash
+curl https://convex.memorycrystal.ai/api/mcp/health \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY"
+```
+
+The key identifies the account owner. A request-body `userId` cannot select another account. Resource and scope checks still apply; hidden resources can return 404 just like missing ones. Agent and channel scope partition data within an account; use separate accounts and keys for separate security boundaries.
+
+A server process's environment key does not replace the inbound Bearer credential required by a protected hosted request.
+
+## Device sign-in
+
+CLI installers can use POST `/api/device/start` and GET `/api/device/status` for browser-approved device sign-in. These routes have their own device-code contract rather than the ordinary memory Bearer flow. There is no public HTTP `issueApiKeyForUser` endpoint. Use the dashboard or the supported device flow.
+
+## Errors and rate limits
+
+Invalid, inactive, or expired keys return 401 on protected routes. Authentication bookkeeping varies by route: the main memory handler awaits its last-use update; KB and export paths schedule that bookkeeping without waiting.
+
+The shared limiter returns HTTP 429 with:
+
+```json
+{"error":"Rate limit exceeded."}
+```
+
+Its headers include `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Scope`. Do not require these on every success response or expect `X-RateLimit-Reset`. Turn capture, export, and device routes have response differences; see [rate limits](/api/rate-limits).
+
+See [memory endpoints](/api/memory-endpoints), [KB endpoints](/api/knowledge-base-endpoints), and [MCP setup](/integrations/mcp-server).
+
+## Set up and verify access
+
+1. Sign in to the [dashboard](https://memorycrystal.ai/dashboard) and create an API key.
+2. Copy the key when shown; the service stores its hash rather than a recoverable plaintext copy.
+3. Store the key in your client’s secret configuration. For shell examples, expose it as `MEMORY_CRYSTAL_API_KEY` without putting it into source control.
+4. Send the health request above. A successful authenticated response confirms that this key reaches the service.
+5. Configure your MCP client using the [MCP integration instructions](/integrations/mcp-server). Hosted MCP still requires the caller’s Bearer credential.
+
+A successful health response includes:
+
+```json
+{
+  "ok": true,
+  "status": "alive",
+  "readiness": "unknown"
+}
+```
+
+This is a response excerpt; health also returns checks and build information. It does not test every provider.
+
+## Rotate and troubleshoot
+
+Create a replacement key, update the intended clients, and verify them before revoking the old key. Revoked keys cannot authenticate new requests. If you reach the active-key cap, remove unused keys before adding another.
+
+| Symptom | What to check |
+| --- | --- |
+| 401 | Missing Bearer header, whitespace or truncation, revoked/expired key, or a research-only credential used on an ordinary memory route |
+| 404 for a known ID | Account ownership and request scope; authentication alone does not grant resource visibility |
+| 429 | The applicable key or account request window; wait using Retry-After when supplied |
+| MCP cannot connect | Hosted MCP URL and client authentication configuration; the backend base URL is a different interface |
+
+Do not send the raw key in support messages or paste an Authorization header into a public report. See [errors](/api/error-reference) for endpoint-specific responses.

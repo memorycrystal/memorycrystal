@@ -1,0 +1,90 @@
+---
+title: Factory Droid
+description: Tools-tier HTTP MCP from the universal installer. The dedicated Droid installer also writes capture hooks.
+---
+
+Factory Droid is Tools tier in the universal installer. That path registers HTTP MCP and does not install hooks or skills. The dedicated `install-droid-mcp.sh` script is a separate path: it registers the same style of HTTP MCP server and also downloads capture hooks into `~/.factory/settings.json`.
+
+Use the universal installer unless you specifically want those hooks. The dedicated script does not make Factory Droid Full tier. The capability table still lists `hooks.method: none` and `skills.method: none`.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+Paste this into Factory Droid:
+
+```text
+Install Memory Crystal for Factory Droid with the universal installer. That path registers HTTP MCP only (Tools tier): no hooks and no skills. Follow the auth and backend prompts. Do not edit Factory config unless the installer fails. Confirm with `droid mcp list` or by reopening Factory Droid.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets factory-droid
+
+Windows PowerShell:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets factory-droid
+
+The dedicated script is different. It also installs capture hooks:
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets factory-droid
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets factory-droid
+```
+
+Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first). `--targets generic-mcp` is the other Tools-tier fallback. See [Support Tiers](/concepts/support-tiers).
+
+## What the universal installer writes
+
+When `droid` is on `PATH`, it runs:
+
+```text
+droid mcp add memory-crystal <mcp-url> --type http --header "Authorization: Bearer <api-key>"
+```
+
+The cloud URL is `https://api.memorycrystal.ai/mcp`. There is no hooks file and no skill directory from this path. PowerShell performs the same MCP registration and also skips hooks, because the platform row claims none.
+
+## What the dedicated script adds
+
+`install-droid-mcp.sh` removes and re-adds the `memory-crystal` HTTP server with the same bearer header. It then downloads `crystal-hooks.mjs` and writes UserPromptSubmit, Stop, and SessionStart commands into `~/.factory/settings.json` with `--host factory-droid`.
+
+Those hooks capture on that host. They are not installed by `--targets factory-droid`. Re-running the universal installer does not remove a hooks file the dedicated script already wrote. Uninstalling the `factory-droid` target removes Memory Crystal hook entries from `~/.factory/settings.json` and leaves the rest of that file.
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-droid-mcp.sh | bash
+```
+
+## Uninstall
+
+Universal target:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets factory-droid
+```
+
+Dedicated script:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash
+```
+
+See [Uninstall](/help/uninstall).
+
+## Troubleshooting
+
+If installation says the Factory Droid CLI is missing, install `droid` first and confirm it is on `PATH`. The universal installer cannot register MCP through a missing CLI.
+
+Reopen Factory Droid or use `droid mcp list` to inspect the server. If requests fail authentication, verify the Bearer header and selected backend URL. If you expect capture, check which installer you used: only the dedicated script writes shared hooks. Universal installation remains Tools tier.
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.

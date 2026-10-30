@@ -1,0 +1,85 @@
+---
+title: Knowledge base tools
+description: Manage and query named reference corpora.
+---
+
+All seven knowledge base tools are available on hosted HTTP MCP and stdio MCP.
+
+| Task | Tool |
+| --- | --- |
+| [Create and manage access](/tools/knowledge-bases/manage) | `crystal_create_knowledge_base`, `crystal_set_knowledge_base_access` |
+| [List bases](/tools/knowledge-bases/list) | `crystal_list_knowledge_bases` |
+| [Import chunks](/tools/knowledge-bases/import) | `crystal_import_knowledge` |
+| [Query a named corpus](/tools/knowledge-bases/query) | `crystal_query_knowledge_base` |
+| [Enumerate or empty](/tools/knowledge-bases/manage) | `crystal_list_knowledge_base_memories`, `crystal_empty_knowledge_base` |
+
+Query a named KB explicitly. Broad recall does not automatically search every KB or rank them by `sourceRole`.
+
+## Access and allowances
+
+A KB row must be active and visible to the resolved identity through its agent allow-list. A channel is not an independent KB-row filter. Channel-bearing chunks have additional visibility checks; channel-less chunks are shared within the visible KB.
+
+Pass an explicit resolved `agentId` on list/query calls. Agent and channel settings partition one account; use separate accounts and keys for separate security boundaries. Owner management operations have broader access than scoped retrieval.
+
+KB chunks are excluded from the active non-KB memory allowance. These MCP schemas do not offer project/repository filters. See [HTTP KB endpoints](/api/knowledge-base-endpoints) for lifecycle operations beyond the seven tools.
+
+## When to use
+
+Use a KB for material you want to query as a named reference: manuals, procedures, or style guidance. Use [remember](/tools/remember) for an individual conversational fact and [research](/tools/research) for structured research records and run lineage.
+
+## Prepare a reference corpus
+
+1. [Create](/tools/knowledge-bases/manage) a base and set its intended allow-list.
+2. [Import](/tools/knowledge-bases/import) meaningful chunks with stable keys if you will refresh them.
+3. [List](/tools/knowledge-bases/list) using the identity that will consume the material.
+4. [Query](/tools/knowledge-bases/query) a known passage to verify access and retrieval.
+5. Reimport a changed section under its existing key. Enumerate chunks when you need to inspect the whole corpus.
+
+## Parameters
+
+| Common input | Purpose |
+| --- | --- |
+| `knowledgeBaseId` or `knowledgeBaseName` | Select the base for query/import/management tools |
+| `agentId` | Resolved identity for scoped list/query |
+| `channel` | Conversation context and chunk visibility where supported |
+| `sourceRole` | Describe the reference purpose when creating a base; not automatic broad-recall routing |
+
+## Examples
+
+Call `crystal_query_knowledge_base`:
+
+### Read the reference manual
+
+Request body:
+
+```json
+{
+  "knowledgeBaseName": "Reference manual",
+  "query": "How should I verify backups?",
+  "agentId": "<agent-id>",
+  "limit": 3
+}
+```
+
+Hosted MCP response (selected fields):
+
+```json
+{
+  "knowledgeBase": {
+    "_id": "<knowledge-base-id>",
+    "name": "Reference manual"
+  },
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ]
+}
+```
+## Errors and common mistakes
+
+If a visible base returns no chunks, check chunk scope as well as the base’s allow-list and activity. An unscoped management listing is not proof of scoped query access. `agentIds: []` closes access; it does not open it. Keep separate customers in separate accounts rather than relying on these within-account settings.

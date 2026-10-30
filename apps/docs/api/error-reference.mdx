@@ -1,0 +1,87 @@
+---
+title: Error reference
+description: Interpret endpoint-specific HTTP and MCP failures.
+---
+
+HTTP errors commonly contain an `error` string. Some endpoints add `code`, details, or retry information; there is no universal `requestId` or error envelope. MCP tools may instead return text content with `isError: true`.
+
+| HTTP status | Typical cause | Next step |
+| --- | --- | --- |
+| 400 | Missing field, invalid ID or value, no editable update fields, or content screening: `{"error":"Memory blocked: <reason> [<threatId>]"}` | Check the endpoint's request contract |
+| 401 | Missing, invalid, revoked, or expired Bearer key | Check [authentication](/api/authentication) |
+| 403 | Admission or entitlement limit | Inspect the response and account allowance |
+| 404 | Missing, foreign, or hidden resource | Use a returned ID and intended scope |
+| 409 | Protected redacted-content write (`error: "redacted_content_write"`, with `fields` and `message`), unsupported asset storage, or retry of a nonfailed asset | Inspect the endpoint-specific error |
+| 410 | Unavailable operation or expired asset read descriptor | Use the current endpoint or obtain a new descriptor |
+| 411 | Missing or empty asset upload length/body | Send a nonempty body with Content-Length |
+| 413 | Asset size or storage quota exceeded | Check upload and account limits |
+| 415 | Unsupported asset MIME type | Match Content-Type to the asset kind |
+| 429 | Request window exhausted | Follow [rate limits](/api/rate-limits) |
+| 500 / 503 | Processing or provider unavailable | Inspect the response; check your provider configuration and retry only when appropriate |
+
+## IDs, methods, and bodies
+
+Memory and KB IDs are Convex IDs, not UUIDs. Copy IDs returned by the service. Recall uses POST; health supports GET and POST. HEAD is not a universal authenticated probe.
+
+```bash
+curl -X POST https://convex.memorycrystal.ai/api/mcp/recall \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"backup procedures","limit":3}'
+```
+
+The shared 429 body is `{"error":"Rate limit exceeded."}` with `Retry-After`, limit, remaining, and scope headers. Some routes use older responses; do not require identical error shapes across the API.
+
+## Content and provider errors
+
+Update and supersede return HTTP 409 with `error: "redacted_content_write"`, plus `fields` and `message`, when a redaction placeholder would overwrite a secret-bearing stored field. Restore the intended content, or explicitly set `allowRedactedContent: true` if replacing it with the placeholder is deliberate.
+
+Content screening checks prompt injection, exfiltration, role hijacking, invisible Unicode, and encoded payloads. It is not a general violence or copyright classifier. A blocked memory write returns HTTP 400 with `{"error":"Memory blocked: <reason> [<threatId>]"}`. For example:
+
+```json
+{
+  "error": "Memory blocked: Content contains prompt injection attempt [prompt_injection]"
+}
+```
+
+Review the reason and threat identifier, then remove the flagged instructions or payload before retrying.
+
+Embedding and distillation use the owner's configured OpenRouter credentials on the hosted backend. Check the owner's settings when a provider is unavailable; a generic Gemini-key change is not the remedy for every failure. Retrieval can also return a successful but degraded result, so inspect `degraded`, `degradation`, and diagnostics where present.
+
+KB stable keys support upserts; duplicate content is not universally an error. Chunk metadata and titles are optional. A usable import body is:
+
+```json
+{"chunks":[{"content":"Reference text","dedupeKey":"reference/section"}]}
+```
+
+Do not assume a universal 10,000-chunk HTTP import limit or that a failed import rolled back earlier chunks. See [KB imports](/tools/knowledge-bases/import).
+
+## Named error codes
+
+Not every endpoint returns `code`. Read the HTTP status and `error` text as well.
+
+| Identifier | Surface / field | Meaning and action |
+| --- | --- | --- |
+| `redacted_content_write` | Update/supersede, 409, `error` field | A placeholder would overwrite a secret-bearing field; supply intended content or explicitly opt into that replacement |
+| `cost_budget_exceeded` | Retrieval diagnostics | Some retrieval work was reduced; inspect affected stage and fallback details rather than treating it as complete search |
+| `kb_retrieval_degraded` | KB query diagnostics | KB retrieval used reduced capabilities; inspect reasons and returned evidence |
+| `research_invalid_request` | Research, 400 | Correct the operation-specific request |
+| `research_not_found` | Research, 404 | Check the returned resource ID and account |
+| `research_forbidden` | Research, 403 | Inspect capability, capacity, or scope restrictions |
+| `research_capability_denied` | Research, 403 | Credential lacks the requested capability |
+| `research_scope_denied` / `research_scope_expansion_denied` | Research, 403 | Request is outside the credential’s permitted scope |
+| `research_rate_limited` | Research, 429 | Retryable; honor Retry-After |
+| `research_temporarily_unavailable` | Research, 503 | Retryable; honor Retry-After |
+
+## Debugging checklist
+
+1. Confirm the HTTP method and URL in the endpoint map.
+2. Check the Bearer credential with an authenticated health request.
+3. Parse your JSON locally and verify required fields, types, and returned IDs.
+4. Reproduce with the smallest useful request in the same account and scope.
+5. Inspect status, response body, and Retry-After. Preserve a request ID when the endpoint supplies one; it is not universal.
+6. For an import interruption or write timeout, inspect saved state before retrying.
+
+Content-screening failures identify suspicious instructions or payloads. Review the flagged material and any supplied threat identifier. Do not disguise blocked instructions to force them through. A count mismatch between stats and recall is not proof of blocking: stats is account-wide and recall is bounded and scoped.
+
+For help, send [support](mailto:hello@memorycrystal.ai) a minimal request with credentials and private content removed, the endpoint, status, response, and approximate time. Include a request ID only if one was returned.

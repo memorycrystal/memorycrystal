@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://memorycrystal.ai/schemas/telemetry/v1.schema.json",
+  "title": "Memory Crystal Telemetry Payload v1",
+  "description": "Telemetry payload POSTed by the local Convex stack to the cloud control-plane at /api/cloud/telemetry/heartbeat and /api/cloud/telemetry/aggregate. Snake_case field names follow Convex HTTP-action conventions. No end-user memory content may appear in this payload (Principle 1). The `tenant_id` and `tenantId` fields carry the same value — snake_case is used in the wire payload to match Convex conventions; the camelCase alias is documented here for cross-reference with the Convex schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "payloadVersion",
+    "payloadId",
+    "tenant_id",
+    "tenantId",
+    "mc_version",
+    "last_activity_at",
+    "memory_count",
+    "archived_count",
+    "captures_24h",
+    "storage_bytes",
+    "embedder",
+    "errors_24h",
+    "online_since"
+  ],
+  "properties": {
+    "payloadVersion": {
+      "description": "Schema version literal. Always 'v1' for this schema. Bump to 'v2' when fields are added or types change; cloud must accept both versions during the transition window.",
+      "type": "string",
+      "const": "v1"
+    },
+    "payloadId": {
+      "description": "Idempotency key for this specific payload submission. Must be a UUIDv4 or similarly collision-resistant identifier. Cloud deduplicates within a (tenantId, payloadId) pair — re-POSTing the same payloadId for the same tenant is a no-op (returns 200 without double-counting).",
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "description": "Cloud tenant identifier (Convex document ID of the tenants table row). Used as the primary partition key on the cloud side. Same value as tenantId — snake_case is canonical on the wire.",
+      "type": "string",
+      "minLength": 1
+    },
+    "tenantId": {
+      "description": "Alias of tenant_id in camelCase for cross-reference with the Convex schema. Both fields must carry the same value. Cloud handler validates equality and rejects with 400 on mismatch.",
+      "type": "string",
+      "minLength": 1
+    },
+    "mc_version": {
+      "description": "Semantic version string of the local Memory Crystal stack (e.g. '1.0.0'). Sourced from MC_VERSION env var baked into the Docker image at build time.",
+      "type": "string",
+      "minLength": 1
+    },
+    "last_activity_at": {
+      "description": "Unix epoch milliseconds of the most recent memory capture or session activity on the local stack. Used for idle-cull eligibility (M11) and the launchpad 'last seen' display.",
+      "type": "number",
+      "minimum": 0
+    },
+    "memory_count": {
+      "description": "Total number of non-archived memory records in the local crystalMemories table at the time of payload generation.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "archived_count": {
+      "description": "Total number of archived memory records in the local crystalMemories table.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "captures_24h": {
+      "description": "Number of memory captures recorded in the 24-hour window ending at the time of payload generation.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "storage_bytes": {
+      "description": "Approximate total storage consumed by the local Convex database in bytes. Sourced from the Convex /version or storage-stats API, or estimated from row counts if unavailable.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "embedder": {
+      "description": "Embedding provider active on the local stack. 'none' when embeddings are disabled.",
+      "type": "string",
+      "enum": ["gemini", "openai", "none"]
+    },
+    "errors_24h": {
+      "description": "Count of MCP-layer errors (auth failures, tool errors, transport errors) logged in the 24-hour window. Sourced from the mcp.error.* counters in the local Convex metrics table.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "online_since": {
+      "description": "Unix epoch milliseconds when the local stack last came online (cloudflared tunnel established + Convex backend healthy). Reset on each cold start. Used for fleet uptime dashboards.",
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}

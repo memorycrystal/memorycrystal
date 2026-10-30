@@ -1,0 +1,81 @@
+---
+title: Troubleshooting
+description: Auth, allowances, empty recall, embeddings, injection, and local backend checks.
+---
+
+Start with the HTTP status, then the client config. Reload the client after any config change.
+
+## HTTP status
+
+| Status | Meaning | What to do |
+| --- | --- | --- |
+| 401 | Missing or invalid Bearer token. The key is absent, inactive, expired, or not an ordinary API key. | Send `Authorization: Bearer <key>`. Create or rotate the key in the dashboard. A process environment variable on the hosted MCP server does not replace this header. |
+| 403 | The account is over a cap. Memory allowance, short-term messages, checkpoints, or turn capture that hit "Storage limit reached." | Read the error body. Archive or delete non-KB memories, delete old messages or a checkpoint, or upgrade. Knowledge-base chunks do not count toward the memory allowance. |
+| 404 | The memory is missing, belongs to another account, or is hidden from this request. | Check the id, `agentId`, `channel`, and project scope. A hidden row uses the same "Memory not found" response as a missing one. |
+| 409 | A write would replace stored text with a redaction placeholder such as `[REDACTED]`. | Send the original text, or set `allowRedactedContent` to `true` if you intend to store the placeholder. |
+| 429 | The key or the account exceeded its request quota for the current minute. | Wait the number of seconds in `Retry-After`, then retry. `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Scope` (`key` or `account`) describe the window. |
+
+Free is 60 requests per minute, Pro and Starter 600, Ultra 2,000. Unlimited has no per-minute request cap. See [Usage and allowances](/help/usage-and-allowances).
+
+## Empty recall or empty knowledge bases
+
+Recall only returns eligible rows for this account and this request's scope. An identifier shortcut or a missing embedding provider skips vector search and can still return lexical matches. The recall response says which path it took.
+
+A knowledge base returns nothing when:
+
+- the base is inactive
+- the base has an agent allow-list that does not include this `agentId` (and does not include `*`)
+- you passed no `agentId`, and the allow-list is a specific list
+- the chunks you expect carry a channel, and this request's channel does not match
+
+Listing bases with no `agentId` and no channel shows the management list, including bases this agent cannot query. Query and recall apply the filter. See [Scoping and access](/concepts/scoping).
+
+Broad recall does not search knowledge bases. Call the knowledge-base query tool.
+
+## Embeddings and health
+
+Embedding uses the OpenRouter key configured on the account. If that key is missing, embedding calls fail with `missing_openrouter_key` and retrieval can run degraded, without vectors. Add the key in the dashboard. A key in the hosted MCP process environment does not stand in for the account key, and it does not authenticate the request.
+
+`GET` health (authenticated) reports `status: "alive"` and `readiness: "unknown"`. That means the key was accepted and a database read succeeded. It does not probe the embedding provider, distillation, capture, or recall. `version` on that response is `0.10.1`.
+
+## Injection and capture
+
+Injection is off by default. Set `MEMORY_CRYSTAL_INJECT_RECALL=1` or `true`, or set `injectRecall: true` in config. A non-empty environment variable takes precedence over config. Grok ignores that setting and cannot inject. Call `crystal_recall` or `crystal_what_do_i_know`.
+
+Capture on a Full or Capture host runs when the hooks or plugin are installed and capture is not disabled. On OpenClaw, `captureTurns` defaults to on. `MEMORY_CRYSTAL_CAPTURE_TURNS` overrides it. A skill file does not turn capture or injection on.
+
+Native PowerShell installs MCP config and skills. It does not install Bash-only hooks, so Codex, Claude Code, Cursor, Factory, and Grok capture and injection from a PowerShell install need a Bash re-run. Hermes and the OpenClaw native plugin are Bash-only. See [Installation](/installation).
+
+## Local backend
+
+For a checkout of this repo:
+
+```bash
+npm run convex:local:doctor
+```
+
+For an extracted local-backend artifact:
+
+```bash
+~/.memorycrystal/local-backend/<version>/bin/doctor
+```
+
+`bin/doctor.ps1` runs the Bash doctor. It needs Bash.
+
+Check these before reinstalling:
+
+- Docker is running.
+- Ports `3210` (backend), `3211` (site), and `6791` (dashboard) are free on `127.0.0.1`.
+- Clients you chose as local use `http://127.0.0.1:3211` as the API base and `http://127.0.0.1:3211/api/mcp` for MCP. Port 3210 is the backend’s own port, not a client URL.
+
+`bin/upgrade` prints upgrade instructions. It does not swap the artifact. `bin/rollback` stops the backend.
+
+If a config write failed, restore the backup path the installer printed and run the installer again.
+
+## OpenClaw
+
+```bash
+openclaw plugins info crystal-memory
+```
+
+That confirms OpenClaw loaded the `crystal-memory` plugin. Inside a session, the plugin tools `crystal_status` and `crystal_doctor` report plugin status and config. `npm run crystal:doctor` is a repository-checkout command.

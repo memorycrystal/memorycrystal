@@ -1,0 +1,179 @@
+---
+title: Knowledge base endpoints
+description: Create, query, import, and manage owned reference corpora.
+---
+
+Base URL: `https://convex.memorycrystal.ai`. All routes below require Bearer authentication. `{id}` is a KB ID returned by the service.
+
+## Routes
+
+| Method and path | Request | Response |
+| --- | --- | --- |
+| GET `/api/knowledge-bases` | Optional includeInactive, scope, agentId query parameters | `knowledgeBases` |
+| POST `/api/knowledge-bases` | Required name; optional description, agentIds, scope, sourceType, sourceRole, peerScopePolicy | 201 with `knowledgeBaseId` |
+| GET `/api/knowledge-bases/{id}` | Optional limit | Owned KB detail with memories |
+| PATCH `/api/knowledge-bases/{id}` | Supported settings below | `updated`, `knowledgeBaseId`, `access` |
+| POST `/api/knowledge-bases/{id}/import` | `chunks` array | 201 with import counts and IDs |
+| GET `/api/knowledge-bases/{id}/memories` | Explicit limit, optional cursor | `knowledgeBaseId`, `memories`, `continueCursor`, `isDone` |
+| POST `/api/knowledge-bases/{id}/query` | Required query; optional limit, agentId, channel | KB and bounded retrieval results |
+| POST `/api/knowledge-bases/{id}/empty` | Empty object | Deletion counts; preserves KB settings |
+| DELETE `/api/knowledge-bases/{id}` | No body required | `knowledgeBaseId`, `archivedMemoryCount` |
+| POST `/api/knowledge-bases/{id}/lifecycle` | operation: archive, delete, reindex, recount | 202 with lifecycle job result |
+| GET `/api/knowledge-bases/{id}/lifecycle/{jobId}` | No body | Job state |
+| POST `/api/knowledge-bases/{id}/lifecycle/{jobId}` | state: paused, queued, cancelled | Updated job result |
+
+## List and create
+
+List rows use `_id`, `isActive`, `memoryCount`, `totalChars`, `createdAt`, and `updatedAt`, plus name and available access/source metadata. They do not use `id`, `status`, or `chunkCount` aliases.
+
+`scope` supplies channel context to listing and identity resolution; it is not an exact KB scope filter. Scoped lists enforce visibility. Fully unscoped listing is an owner management inventory.
+
+```json
+{"name":"Reference manual","description":"Reusable reference material","agentIds":[]}
+```
+
+Creation returns only the ID envelope, not the full KB object. For MCP callers, use [create and access tools](/tools/knowledge-bases/manage).
+
+## Settings and access
+
+PATCH accepts `name`, `description`, `agentIds`, `scope`, `sourceType`, `sourceRole`, `isActive`, and `peerScopePolicy` (`strict` or `permissive`). Set `agentIds: []` to close access, a nonempty array to restrict it, or `agentIds: null` to explicitly open it.
+
+```json
+{"agentIds":["<agent-id>"]}
+```
+
+The response's access mode is `open`, `closed`, or `restricted`. KB row visibility depends on activity and agent allow-lists. Channel-bearing chunks have additional visibility checks; channel-less chunks are shared within a visible base. Separate accounts, not agent/channel settings, provide separate security boundaries.
+
+## Import and enumerate
+
+```json
+{"chunks":[{"content":"Verify backups before replacement.","dedupeKey":"manual/backups","metadata":{"title":"Backups"}}]}
+```
+
+Each chunk requires content. Metadata is optional and can contain title, sourceUrl, chunkIndex, totalChunks, and sourceType. A stable `dedupeKey` replaces an existing chunk in that KB. Keyless chunks append. The standard import loop awaits embedding and salience per chunk; an exception can stop the request after earlier chunks were saved.
+
+The result contains `knowledgeBaseId`, `importedCount`, `updatedCount`, `memoryIds`, `memoryCount`, and `totalChars`.
+
+For enumeration, call `/api/knowledge-bases/{id}/memories?limit=100`. The current HTTP handler converts an omitted limit to zero and clamps it to **1**; explicitly supplying 100 avoids this. Maximum limit is 200. Pass `continueCursor` as the next `cursor` until `isDone` is true.
+
+## Query
+
+```json
+{"query":"How should I verify backups?","limit":8,"agentId":"<agent-id>"}
+```
+
+Default limit is 8, maximum 20. The handler forwards query, limit, agentId, and channel; it does not forward `threshold`. Normal results contain `knowledgeBase`, `memories`, `retrieval`, and optional `degradation`. Visibility denial can instead return the KB with an empty memories array without diagnostics.
+
+Pass an explicit identity. Direct KB queries have limited identity inference; it does not guarantee visibility in every context. Empty results can reflect visibility, bounded candidates, or degradation. Use enumeration for a complete owner inventory, not a relevance query. MCP selection uses `knowledgeBaseId` or `knowledgeBaseName`, never `kb_id`.
+
+## Empty, archive, restore, delete
+
+Empty deletes chunks and keeps the base ID/settings. It returns `knowledgeBaseId`, `deletedMemories`, `activeDeletedMemories`, and `kept: true`.
+
+The compatibility DELETE route archives a bounded set of up to 10,000 chunks and deactivates the KB; it does not permanently erase the KB. Use lifecycle jobs for large archive/delete operations. PATCH `isActive: true` reactivates the row but does not restore archived chunks automatically. A lifecycle `delete` is permanent; it is distinct from archive and empty. Obtain explicit approval before destructive operations.
+
+Embedding maintenance is available through POST `/api/knowledge-bases/{id}/backfill` with `{"type":"embeddings"}` and GET `/api/knowledge-bases/{id}/backfill-status`, which returns total/unembedded counts. This is separate from importing new content.
+
+See [rate limits](/api/rate-limits) for key quotas and the additional account envelope on KB queries.
+
+## Request and response examples
+
+These are raw HTTP bodies. Replace IDs and identity placeholders with your own values.
+
+### POST /api/knowledge-bases
+
+Request body:
+
+```json
+{
+  "name": "Reference manual",
+  "agentIds": []
+}
+```
+
+HTTP 201 response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>"
+}
+```
+
+### POST /api/knowledge-bases/{id}/import
+
+Request body:
+
+```json
+{
+  "chunks": [
+    {
+      "content": "Verify backups before replacement.",
+      "dedupeKey": "manual/backups",
+      "metadata": {
+        "title": "Backups"
+      }
+    }
+  ]
+}
+```
+
+HTTP 201 response:
+
+```json
+{
+  "knowledgeBaseId": "<knowledge-base-id>",
+  "importedCount": 1,
+  "updatedCount": 0,
+  "memoryIds": [
+    "<chunk-id>"
+  ],
+  "memoryCount": 1,
+  "totalChars": 34
+}
+```
+
+### POST /api/knowledge-bases/{id}/query
+
+Request body:
+
+```json
+{
+  "query": "How should I verify backups?",
+  "agentId": "<agent-id>",
+  "limit": 3
+}
+```
+
+HTTP response (selected fields):
+
+```json
+{
+  "knowledgeBase": {
+    "_id": "<knowledge-base-id>",
+    "name": "Reference manual"
+  },
+  "memories": [
+    {
+      "memoryId": "<chunk-id>",
+      "title": "Backups",
+      "content": "Verify backups before replacement.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "retrieval": {
+    "resultCount": 1
+  }
+}
+```
+## Import, verify, and refresh
+
+Create the base, PATCH its intended access settings, and import the sections. List with the intended identity, then query a known passage before relying on the corpus. Use stable keys when refreshing sections; omitted sections are not automatically deleted.
+
+Enumerated chunks expose `id` and stored `channel`. To update a channel-bearing chunk through `/api/mcp/update`, supply that scope as `scopeChannel` and the intended `agentId`. To forget it through `/api/mcp/forget`, supply the scope as `channel`. A management inventory does not bypass by-ID visibility checks.
+
+## Errors and common mistakes
+
+A failed import can leave earlier chunks saved. Retrying with stable keys avoids appending duplicates. A successful empty query can reflect access rather than lack of content. Do not assume the owner’s management list and an agent’s retrieval list are identical.
+
+Use `agentIds: null` only when you intend to open access throughout the account; an empty array closes it. To share a reference across identities, set the intended allow-list rather than inventing a special channel name. Separate accounts remain the security boundary.

@@ -1,0 +1,64 @@
+---
+title: Context Engine
+description: How recall chooses a bounded set of memories and messages for the current request.
+---
+
+Recall does not load everything in the account. It searches eligible, scoped candidates and returns a bounded set. Knowledge bases, assets, and research collections are separate tools. Broad recall does not query them for you.
+
+## What a request can include
+
+- durable memories that pass channel, agent, project, and archive filters
+- a bounded message lane over recent short-term messages
+- explicit filters you pass: stores, categories, tags, channel, session, project
+- a mode preset, which prefers some stores and categories and sets a default limit
+
+Mode preferences are not hard filters. An explicit store, category, or tag filter is.
+
+## What actually runs
+
+A request does not always do one vector lookup.
+
+| Path | When |
+| --- | --- |
+| Identifier shortcut | The query has a decisive identifier, lexical search finds a small set of matches, and the shortcut is enabled. Vector search is skipped. |
+| Degraded retrieval | The embedding provider is unavailable, including when the account has no OpenRouter key. The response is marked `degraded` and lexical evidence still returns. |
+| Hybrid | The usual path: a bounded durable-memory vector lookup, plus lexical fallback over recent unextracted messages, then deterministic ranking. |
+
+The response includes retrieval diagnostics: requested limit, final hits, message-match counts, filters that applied, and whether an early return was taken. Message coverage is bounded. Unscoped message-lane reads start at 50 rows, continue at 100, and the recent-message fallback pages at 200. A deadline can stop the lane before the window is exhausted. `retrieval.messageScan` reports that coverage.
+
+Session scope drops memories and messages that belong to another session when you ask for it. Channel and project scope are applied before ranking. See [Scoping and access](/concepts/scoping).
+
+Injection, where the host supports it, uses this same bounded path. It is off by default. Set `MEMORY_CRYSTAL_INJECT_RECALL=1` or `true`, or set `injectRecall: true` in config. A non-empty environment variable takes precedence over config. Grok cannot inject.
+
+## Ranking signals
+
+Scope and eligibility determine which candidates can compete. Ranking then uses:
+
+| Signal | Effect |
+| --- | --- |
+| Semantic similarity | Matches the meaning of your query when embeddings are available. |
+| Lexical overlap | Matches words in the title, text, and tags. |
+| Identifiers and exact phrases | Rewards matching identifiers; exact phrases help distinguish useful text from low-content extractions. Conflicting identifiers are filtered out. |
+| Strength and salience | Small preferences for stronger memories and content estimated to be important. |
+| Access count | A small preference for frequently accessed memories. |
+| Freshness | A small preference for newer memories, stronger when you ask about recent work. |
+| Source role | Prefers source types suited to the query’s intent. |
+| Channel and project | Adds a bounded preference for the requested scope, after visibility filtering. |
+| Mode | Prefers relevant stores and categories, such as decisions in `decision` mode. |
+| Same-topic chronology | Prefers newer candidates on the same topic unless you ask about the past; older candidates can be marked possibly outdated. |
+
+Metadata preferences are bounded: they do not make a weak topical match relevant. Results below the relevance floor are omitted, and duplicate text is collapsed. Of several near-identical episodic memories, such as summaries of overlapping periods, only the highest-ranked is returned. Knowledge-base ranking can also use the base’s agent priority when you explicitly query a knowledge base; broad recall does not search bases.
+
+## Common mistakes
+
+- **Using a mode as a filter:** `decision` prefers decisions; use `categories` when you need only decisions.
+- **Expecting every transcript match:** the message lane is bounded. Use [message search](/tools/search) and follow pagination for exact wording or a date range.
+- **Assuming empty recall means deleted data:** check channel, session, and project scope first. Query knowledge bases separately.
+- **Treating degraded recall as normal vector search:** check the response diagnostics and your embedding-provider settings.
+
+## Related
+
+- [Memory Layers](/concepts/memory-layers)
+- [How Memory Works](/concepts/how-memory-works)
+- [Search](/tools/search)
+- [Recall](/tools/recall)

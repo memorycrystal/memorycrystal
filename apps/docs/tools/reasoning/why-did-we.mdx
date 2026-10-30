@@ -1,0 +1,87 @@
+---
+title: Why did we
+description: Retrieve evidence behind a past decision.
+---
+
+`crystal_why_did_we` looks for saved decision records and, when needed, related context that can help you investigate a past choice.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+Use this helper when you need evidence for why a choice was made. Use [what do I know](/tools/reasoning/what-do-i-know) for broad context, [search](/tools/search) for original wording, and [trace](/tools/trace) for a linked source snapshot.
+
+| Parameter | Behavior |
+| --- | --- |
+| `decision` | Required description; hosted schema minimum three characters |
+| `limit` | Default 8; integer 1–20 |
+| `channel`, `sessionKey`, `agentId`, `projectId`, `repoSlug` | Optional retrieval context |
+
+`crystal_why_did_we` first recalls decision-category memories. On the API-key path, no decision matches can trigger a general-memory fallback bounded to at most five results.
+
+Hosted MCP returns a recall-shaped payload for decision matches, with memory content bounded to 500 characters. With no decision matches it returns `decision`, a literal `reasoning` label, empty `relatedMemories`, and `fallbackMemories`.
+
+Stdio returns formatted text plus `reasoning`, `relatedMemories`, `fallbackMemories`, and `fallbackUsed`. The reasoning field is a retrieval label, not synthesized analysis. Use the returned evidence to explain the decision and distinguish fallback context from direct decision records.
+
+Omitting channel does not grant unrestricted access. The stdio JWT compatibility path uses local embedding and does not forward all project context like the API-key path.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Find the schedule decision
+
+Request:
+
+```json
+{
+  "decision": "change the backup schedule",
+  "limit": 8
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Weekly backup verification",
+      "content": "Verify weekly because monthly checks left failures unnoticed.",
+      "store": "semantic",
+      "category": "decision"
+    }
+  ]
+}
+```
+
+### No recorded decision
+
+Request:
+
+```json
+{
+  "decision": "choose a new backup format",
+  "limit": 8
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "decision": "choose a new backup format",
+  "reasoning": "No decision memories matched; related non-decision context is returned separately.",
+  "relatedMemories": [],
+  "fallbackMemories": []
+}
+```
+
+## Direct evidence and fallback
+
+A decision-category hit is direct recorded evidence. General fallback memories can help you investigate but should not be presented as the recorded rationale. Quote or cite the returned source, and say when the actual reason was not found.
+
+## Errors and common mistakes
+
+Use at least three characters for `decision` on hosted MCP. Do not treat the `reasoning` field as generated reasoning or assume it contains a causal explanation. Missing results can reflect scope or an unrecorded decision; use transcript search before concluding that no discussion occurred.
