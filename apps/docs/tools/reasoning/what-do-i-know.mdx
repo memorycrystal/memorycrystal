@@ -1,0 +1,103 @@
+---
+title: What do I know
+description: Retrieve a bounded set of memories about a topic.
+---
+
+`crystal_what_do_i_know` retrieves a bounded overview of saved context about a topic so you can begin a task with relevant background.
+
+Available on hosted HTTP MCP and stdio MCP.
+
+## When to use
+
+Use this helper before planning or discussing a broad topic. Use [recall](/tools/recall) when you need category filters or a recall mode, [why did we](/tools/reasoning/why-did-we) for a decision, or [KB query](/tools/knowledge-bases/query) for a manual.
+
+| Parameter | Behavior |
+| --- | --- |
+| `topic` | Required topic; hosted schema minimum three characters |
+| `limit` | Optional integer 1–20; omitted follows recall's default of 12 on the API-key path |
+| `stores`, `tags` | Optional filters |
+| `channel`, `sessionKey`, `agentId`, `projectId`, `repoSlug` | Optional context |
+
+Hosted `crystal_what_do_i_know` calls recall and returns a recall-shaped response with memory content bounded to 500 characters.
+
+Stdio returns formatted text and JSON `{summary, memoryCount, topMemories}`. The summary joins titles from the first three returned memories. `memoryCount` counts only this bounded result; `topMemories` preserves retrieval order and takes the first five. There is no title-based deduplication step. Strength represents stored strength when available, with numeric fallbacks in the formatter; it is not calibrated topic relevance.
+
+Use [KB query](/tools/knowledge-bases/query) for a named corpus.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Scan backup knowledge
+
+Request:
+
+```json
+{
+  "topic": "backup procedures",
+  "limit": 12
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+### Focus on procedures
+
+Request:
+
+```json
+{
+  "topic": "backup verification",
+  "stores": [
+    "procedural"
+  ],
+  "tags": [
+    "backup"
+  ],
+  "limit": 5
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+## Interpret the summary
+
+The stdio summary is assembled from returned titles; it is not a fresh analysis of every memory. Read the matching content before drawing conclusions. Increase or refine the query when the first five displayed memories do not answer your question, within the supported result bound.
+
+## Errors and common mistakes
+
+Use a topic of at least three characters for the hosted schema. An empty topic scan can reflect filters or visibility. Do not present `memoryCount` as the total number of account memories about the topic. A title list is not evidence for a claim without reading the underlying record.

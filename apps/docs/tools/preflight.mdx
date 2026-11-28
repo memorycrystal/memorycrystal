@@ -1,0 +1,98 @@
+---
+title: Preflight
+description: Retrieve relevant prior guidance before an action.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Call `crystal_preflight` before consequential changes to review relevant rules, lessons, and decisions. A bounded retrieval result cannot certify that an action is safe.
+
+## When to use
+
+Use preflight before deleting data, changing a critical setting, or taking another consequential action. Describe the action specifically. Use [recall](/tools/recall) for a general question and [KB query](/tools/knowledge-bases/query) for a named policy manual.
+
+| Parameter | Behavior |
+| --- | --- |
+| `action` | Required action description; hosted schema minimum three characters |
+| `limit` | Default 10; integer 1–20 |
+| `channel`, `sessionKey`, `agentId` | Conversation, transcript, and identity context |
+| `projectId`, `repoSlug` | Project context |
+
+The API-key path sends the action as `query` to `POST /api/mcp/recall` with `mode: "preflight"`. That preset prioritizes relevant material; it does not universally apply hard category exclusions.
+
+Hosted MCP returns a recall-shaped payload with memory content limited to 400 characters. Stdio returns checklist text followed by JSON containing `action` and `itemCount`.
+
+The stdio JWT compatibility path embeds locally and does not forward project/repository context in the same way as the API-key path. Its embedding failure is an MCP tool error. Review the returned context and use your normal action approvals.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Check before replacing a backup
+
+Request:
+
+```json
+{
+  "action": "Replace the previous backup after verifying the new copy",
+  "limit": 5
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+### Check a project action
+
+Request:
+
+```json
+{
+  "action": "Change the backup verification schedule",
+  "repoSlug": "<owner/repository>",
+  "limit": 10
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+
+## Use the checklist
+
+Read each returned rule or lesson and compare it with the planned action. Fetch [full memory text](/tools/get-memory) if the excerpt is incomplete. A result is evidence to consider, not permission to proceed. Stdio checklist output and hosted recall output express the same retrieval task in different formats.
+
+## Errors and common mistakes
+
+An empty checklist does not certify safety. Include enough detail to retrieve the relevant constraints and verify scope. Do not pass `mode: "preflight"` to the public recall MCP schema; call this tool. Authentication, provider, and rate-limit failures need correction before relying on the check.

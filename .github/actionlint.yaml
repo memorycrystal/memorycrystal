@@ -1,0 +1,7 @@
+# Boat (boat.dev) runner labels used by this repository's workflows.
+self-hosted-runner:
+  labels:
+    - boat
+    - boat-small
+    - boat-large
+    - boat-xlarge

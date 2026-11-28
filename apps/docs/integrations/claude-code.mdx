@@ -1,0 +1,93 @@
+---
+title: Claude Code
+description: Full-tier install for Claude Code — HTTP MCP with bearer auth, shared capture hooks, and injection off by default.
+---
+
+Claude Code is Full tier. The current connection is Streamable HTTP with a bearer token. The universal installer is the path to use. A hand-written URL without `Authorization: Bearer` does not authenticate to the hosted bridge.
+
+Automatic recall injection is off. Capture still runs when the Bash installer writes shared hooks. Set `MEMORY_CRYSTAL_INJECT_RECALL` to `1` or `true` to inject. Shared hooks also accept `TRUE`; any other non-empty value leaves injection off. Grok invocations never inject, even with that variable set.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+Paste this into Claude Code:
+
+```text
+Install Memory Crystal for Claude Code. Run the official installer, follow the auth and backend prompts, and do not edit Claude config unless the installer fails. After installation, reopen Claude Code and confirm the memory-crystal MCP server is registered. Recall is a tool call unless MEMORY_CRYSTAL_INJECT_RECALL=true.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-code
+
+Windows PowerShell registers MCP and installs skills. Shared capture hooks require the Bash installer:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets claude-code
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets claude-code
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets claude-code
+```
+
+Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first).
+
+## What the Bash installer writes
+
+| Piece | Where |
+| --- | --- |
+| HTTP MCP server `memory-crystal`, user scope, with `Authorization: Bearer` | `claude mcp add` (`~/.claude.json`) |
+| Shared capture hooks (`--host claude-code`) | `~/.claude/settings.json` |
+| Skill suite | `~/.claude/skills` |
+| Managed Block | `~/.claude/CLAUDE.md` |
+
+Hooks are host-attributed. The hook command carries `--host claude-code` so captures from this host are not labelled with another host that shares `~/.memory-crystal/config.json`. Re-run the installer on each host so the argument is present.
+
+`hooks.shells` for Claude Code is `bash`. Native PowerShell registers MCP, installs skills, and skips shared hooks. Use the Bash installer, including Git Bash on Windows, when you want capture hooks and the managed instructions in `CLAUDE.md`.
+
+The dedicated installer remains available:
+
+```bash
+curl -fsSL https://memorycrystal.ai/install-claude-mcp.sh | bash
+```
+
+## Manual registration
+
+Point at the hosted bridge only if you also send the bearer token:
+
+```bash
+claude mcp add --scope user memory-crystal --transport http https://api.memorycrystal.ai/mcp \
+  --header "Authorization: Bearer your-api-key"
+```
+
+A local bridge on port 3100 uses the same header. See [MCP Server](/integrations/mcp-server).
+
+Claude Desktop is a separate Tools-tier target. The universal installer configures it with HTTP as well. It does not require the stdio package. See [Claude Desktop](/integrations/claude-desktop).
+
+## Uninstall
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-claude-mcp.sh | bash
+```
+
+See [Uninstall](/help/uninstall).
+
+## Verify and troubleshoot
+
+Reopen Claude Code and confirm the `memory-crystal` server is available. The installer stores shared support files under `~/.memory-crystal` and backs up configuration before changing it.
+
+If tools are unavailable, check that you configured Claude Code rather than Claude Desktop. For manual registration, verify both the backend URL and Bearer header. A bridge on `127.0.0.1:3100` must be running locally; the hosted URL does not require that local process.
+
+If tools work but capture does not, check the hooks in `~/.claude/settings.json` and that their command can launch Node. PowerShell installs skills and MCP, but shared capture hooks require Bash. Recall remains a deliberate tool call until you enable injection.
+
+## Detect clients automatically
+
+Omit `--targets` to detect installed clients and choose which ones to configure:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash
+```
+
+The installer offers cloud, local, and external backend choices and backs up config files before writing them. For OpenClaw, native plugin installation is the cloud Bash path; other backend choices use generic MCP guidance.

@@ -1,0 +1,113 @@
+---
+title: Local-First Setup
+description: Run the data plane in Docker on your machine. Hosted sign-in validates the API key at install time.
+---
+
+Local-first mode keeps the Memory Crystal data plane on your machine. The installer still checks your API key against the hosted service at `https://convex.memorycrystal.ai` before it provisions a local credential. That check happens at install time.
+
+<Warning>
+Local-first is not an accountless install. Cloud and local modes both require a hosted API key that passes `GET /api/mcp/auth` during setup. Passing `--api-key` or `MEMORY_CRYSTAL_API_KEY` skips the browser prompt when that key validates. An invalid explicit `--api-key` fails validation. With a rejected environment key, interactive Bash setup can offer browser sign-in again.
+</Warning>
+
+The hosted Memory Crystal service runs on Convex Cloud at `https://convex.memorycrystal.ai`. Local-first is a separate data plane you operate. It is not the hosted service.
+
+## Recommended command
+
+macOS, Linux, WSL, and Git Bash:
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --backend local
+```
+
+Native Windows PowerShell:
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Backend local
+```
+
+The installer detects supported clients, summarizes what it found, and asks before configuring each target. `--yes` selects the cloud backend instead of prompting, so pass `--backend local` when you want local mode without a prompt.
+
+## Cloud, local, and self-hosted
+
+| Mode | Data plane | What the installer checks | MCP URL written for clients |
+| --- | --- | --- | --- |
+| Cloud | Hosted Convex Cloud | Hosted API key | `https://api.memorycrystal.ai/mcp` |
+| Local | Docker Convex on `127.0.0.1` | Hosted API key, then a local auth smoke | `http://127.0.0.1:3211/api/mcp` |
+| External self-hosted | A Convex deployment you operate | No hosted license check | `<your-url>/api/mcp` |
+
+External self-hosting is documented in [Self-Hosting](/configuration/self-hosting). Provider keys for embeddings are a separate setup. See [Providers](/configuration/providers).
+
+## What runs locally
+
+The installer places a versioned artifact at:
+
+```text
+~/.memorycrystal/local-backend/<version>
+```
+
+You do not need a repository checkout to run it. The artifact's `bin` commands do this:
+
+| Command | What it actually does |
+| --- | --- |
+| `bin/install` | Runs provisioning (`convex-local-up`). |
+| `bin/doctor` | Runs diagnostics. |
+| `bin/upgrade` | Prints instructions to download a newer artifact and run its `bin/install`. It does not download or swap versions. |
+| `bin/rollback` and `bin/down` | Stop the local backend. They do not restore an older artifact. |
+
+The PowerShell install, doctor, rollback, and down wrappers call Bash scripts. The upgrade wrapper only prints instructions. Native PowerShell alone is not enough to provision or stop this backend; Bash must be on `PATH`.
+
+Storage defaults to embedded SQLite. Pass `--storage=postgres` to `bin/install` for the Postgres profile. `CRYSTAL_LOCAL_STORAGE_MODE` accepts `embedded` or `postgres`.
+
+| Service | URL |
+| --- | --- |
+| Convex backend | `http://127.0.0.1:3210` |
+| Convex HTTP actions | `http://127.0.0.1:3211` |
+| Convex dashboard | `http://127.0.0.1:6791` |
+
+The installer prints the local dashboard URL and the local admin key after setup. That dashboard inspects the local backend. Hosted billing and account pages stay on the hosted site.
+
+Ports `3210`, `3211`, and `6791` must be free on `127.0.0.1`. Docker CLI and a running Docker daemon are required. The installer does not change packages or services without a prompt.
+
+Backup and restore of the local volume are separate commands. See [Local Backup and Recovery](/configuration/local-backup-recovery).
+
+## Clients the installer can configure
+
+| Target | Tier | Notes |
+| --- | --- | --- |
+| `claude-code` | Full | Bash writes MCP and shared hooks. PowerShell writes MCP and skills without hooks. |
+| `claude-desktop` | Tools | HTTP MCP. No hooks. |
+| `codex-cli` and `codex-desktop` | Full | Shared `CODEX_HOME` config. Hooks are Bash-only. |
+| `cursor` | Full | Bash writes MCP, hooks, skills, and the local plugin. PowerShell writes MCP and skills without hooks. |
+| `grok` | Capture | MCP and skills on both shells. Hooks and the Managed Block are Bash-only. |
+| `opencode` | Tools | Remote MCP and command files. No hooks. |
+| `factory-droid` | Tools | HTTP MCP. No hooks from this installer. |
+| `hermes` | Full | Bash only. PowerShell rejects this target. |
+| `openclaw` | Full | Native plugin on Bash with the cloud backend only. Local and self-hosted backends, and every PowerShell install, write generic MCP config instead. |
+| `generic-mcp` | Tools | Writes `~/.memorycrystal/mcp-config.json`. |
+
+Declining a target leaves that client's config untouched. The installer creates timestamped config backups and attempts owner-only permissions (or a restricted Windows ACL) before editing.
+
+If validation fails after a config write, restore the backup the installer printed.
+
+To point a client back at the hosted service, re-run the installer with `--backend cloud`.
+
+To stop the local process, run `bin/rollback` or `bin/down` in the artifact directory. Removing `~/.memorycrystal/local-backend/<version>` deletes that artifact's files. It does not by itself delete a Docker volume the backend already created.
+
+## Credentials
+
+After the hosted key validates, the installer provisions a local user id and token for the Docker backend. Client config receives the local token, not the hosted bearer. The local backend stores a hash of that token. Reinstall keeps an existing usable `local-auth.json` so the same local user still sees existing rows.
+
+A later change to your hosted plan does not, by itself, keep re-checking this local token. Local API-key revocation is enforced by the local key record: an inactive or deleted installer key is treated as revoked on the next local request.
+
+If local auth fails, run `bin/doctor`, then re-run the installer.
+
+| Symptom | Check |
+| --- | --- |
+| Installer says Docker is unavailable | Start Docker, then re-run with `--backend local`. |
+| Local dashboard does not load | Port `6791` must be free. Run `bin/doctor`. |
+| Client still uses the hosted URL | Confirm you accepted that client and its config points at `127.0.0.1`. |
+| Hosted auth fails during setup | The API key was rejected by `GET /api/mcp/auth`. Sign in again or paste a current key. |
+| Need to undo one client | Restore the printed config backup. |
+
+See [Uninstall](/help/uninstall) to remove client config.

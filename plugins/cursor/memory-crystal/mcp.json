@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "memory-crystal": {
+      "url": "https://api.memorycrystal.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MEMORY_CRYSTAL_API_KEY}"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{ "command": "node ./hooks/cursor-hooks.mjs" }],
+    "beforeSubmitPrompt": [{ "command": "node ./hooks/cursor-hooks.mjs" }],
+    "afterAgentResponse": [{ "command": "node ./hooks/cursor-hooks.mjs" }],
+    "stop": [{ "command": "node ./hooks/cursor-hooks.mjs" }],
+    "postToolUse": [{ "command": "node ./hooks/cursor-hooks.mjs", "timeout": 16 }]
+  }
+}

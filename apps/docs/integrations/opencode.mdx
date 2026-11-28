@@ -1,0 +1,69 @@
+---
+title: OpenCode
+description: Tools-tier remote MCP for OpenCode, plus command files. No automatic hooks.
+---
+
+OpenCode is Tools tier. The installer writes a remote MCP server and installs the skill suite as OpenCode command files. It does not install capture hooks or recall injection. There is no hook surface on this target.
+
+## Recommended: universal installer
+
+### Agent Instructions
+
+```text
+Install Memory Crystal for OpenCode. Run the official installer, follow the auth and backend prompts, and do not edit OpenCode config unless the installer fails. Restart opencode or start a new session. This install is tools only: remote MCP and command files, no capture hooks.
+
+macOS/Linux/WSL:
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets opencode
+
+Windows PowerShell:
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1; .\install.ps1 -Targets opencode
+```
+
+```bash
+curl -fsSL https://memorycrystal.ai/crystal | bash -s -- --targets opencode
+```
+
+```powershell
+iwr https://memorycrystal.ai/install.ps1 -OutFile install.ps1
+.\install.ps1 -Targets opencode
+```
+
+Add `--backend local` or `-Backend local` for local data storage. See [Local-First Setup](/configuration/local-first). See [Support Tiers](/concepts/support-tiers).
+
+## What the installer writes
+
+| Piece | Path |
+| --- | --- |
+| Remote MCP server `memory-crystal` | `${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json` under `mcp` |
+| Skill suite as command files | `${XDG_CONFIG_HOME:-$HOME/.config}/opencode/commands/<skill>.md` |
+
+The MCP entry:
+
+```json
+{
+  "mcp": {
+    "memory-crystal": {
+      "type": "remote",
+      "url": "https://api.memorycrystal.ai/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+A local backend uses `http://127.0.0.1:3211/api/mcp`. Restart `opencode`, or start a new session, so it loads the server.
+
+Each command file is the skill body with a `description` frontmatter field. OpenCode does not gain SessionStart, UserPromptSubmit, or Stop hooks from this install. Call `crystal_recall` when you need past context.
+
+## Remove
+
+OpenCode is not in the default uninstall target list. Select it explicitly:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets opencode
+```
+
+This removes the MCP entry. Delete the installed Crystal command files yourself if you no longer want them; this target does not declare skill cleanup. See [Uninstall](/help/uninstall).

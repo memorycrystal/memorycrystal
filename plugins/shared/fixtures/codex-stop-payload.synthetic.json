@@ -1,0 +1,10 @@
+{
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "transcript_path": "__TRANSCRIPT_PATH__",
+  "cwd": "__CWD__",
+  "hook_event_name": "Stop",
+  "model": "synthetic-model",
+  "turn_id": "synthetic-turn-beta",
+  "stop_hook_active": false,
+  "last_assistant_message": "Synthetic answer beta"
+}

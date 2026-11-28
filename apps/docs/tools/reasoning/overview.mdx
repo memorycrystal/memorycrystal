@@ -1,0 +1,63 @@
+---
+title: Reasoning helpers
+description: Retrieve and format bounded prior knowledge.
+---
+
+Both helpers are available on hosted HTTP MCP and stdio MCP. They retrieve prior context; they do not guarantee vector-only retrieval or generated analysis.
+
+| Tool | Use | Hosted output | Stdio output |
+| --- | --- | --- | --- |
+| [What do I know](/tools/reasoning/what-do-i-know) | Scan a topic | Trimmed recall payload | Summary, returned count, first five memories |
+| [Why did we](/tools/reasoning/why-did-we) | Find decision evidence | Trimmed recall or explicit fallback payload | Retrieval label, decision memories, optional fallback memories |
+
+Results are bounded. Query [named knowledge bases](/tools/knowledge-bases/query) explicitly for reference material. Supply identity, conversation, and project context where supported. These settings partition an account; they do not create separate tenant security boundaries.
+
+## When to use
+
+Start with **What do I know** when you need an overview for planning. Choose **Why did we** when you have a particular decision to investigate. Use [recall](/tools/recall) for explicit mode/category control and [search](/tools/search) for transcript wording.
+
+## Parameters
+
+| Helper | Required input | Optional controls |
+| --- | --- | --- |
+| `crystal_what_do_i_know` | `topic` (at least 3 characters on hosted MCP) | `limit` 1–20, stores, tags, conversation/identity/project context |
+| `crystal_why_did_we` | `decision` (at least 3 characters on hosted MCP) | `limit` 1–20, conversation/identity/project context |
+
+## Examples
+
+### Begin with a topic
+
+Request body:
+
+```json
+{
+  "topic": "backup procedures",
+  "limit": 5
+}
+```
+
+Hosted MCP response (selected fields):
+
+```json
+{
+  "memories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "messageMatches": [],
+  "assetContexts": [],
+  "degraded": false
+}
+```
+## Use the evidence
+
+Read the returned records, separate recorded decisions from related context, and follow up with [get memory](/tools/get-memory) or [trace](/tools/trace). The stdio title summary and reasoning label are presentation aids; they do not add facts to the source material.
+
+## Errors and common mistakes
+
+A bounded scan cannot enumerate everything you know. Check scope and filters when results are empty, and query a named KB directly when that is the expected source. Do not present fallback context as proof of why a decision was made.

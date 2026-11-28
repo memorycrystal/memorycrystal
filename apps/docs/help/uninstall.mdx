@@ -1,0 +1,89 @@
+---
+title: Uninstall
+description: Remove Memory Crystal client wiring, and optionally stop or wipe a local backend.
+---
+
+The uninstaller is a Bash script and needs Node. It removes Memory Crystal wiring from the clients you name. It does not delete hosted memories. A local backend is a separate choice: stop it, keep it running, or wipe its Docker volumes.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash
+```
+
+Preview without writing:
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --dry-run
+```
+
+## What a default run does
+
+With no `--targets`, the script walks this list:
+
+`openclaw`, `hermes`, `claude-code`, `claude-desktop`, `codex-cli`, `factory-droid`, `cursor`, `grok`, `generic-mcp`, `local-backend`.
+
+For each client it removes the Memory Crystal MCP entry, Memory Crystal hooks, the managed block, and the installed `crystal-*` skills. Other MCP servers and hooks stay. Then it stops a local backend if one is installed, and keeps the Docker volumes.
+
+`codex-desktop` and `opencode` are not in that default list. Pass them explicitly. Any id in the installer platform table is accepted. An unknown id is skipped with a warning.
+
+## Targets
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --targets codex-cli,codex-desktop
+```
+
+| Target | What is removed |
+| --- | --- |
+| `openclaw` | Plugin wiring in `openclaw.json`, the internal hook command, and the memory slot reset to `memory-core`. `--purge` also removes the plugin bundle. |
+| `hermes` | `crystal-memory` plugin and `memory_crystal` MCP entries, and Memory Crystal keys in the Hermes env file. `--purge` also removes the staged plugin bundle. |
+| `claude-code`, `claude-desktop` | The `memory-crystal` MCP server and Memory Crystal hooks. |
+| `codex-cli`, `codex-desktop` | The shared Codex MCP block and hooks. See below. |
+| `opencode` | The OpenCode MCP entry and installed commands. |
+| `factory-droid` | The `memory-crystal` MCP server and Memory Crystal hooks. |
+| `cursor` | MCP, hooks, skills, and the staged local plugin path. |
+| `grok` | Hooks, the MCP entry, skills, and the managed block in `AGENTS.md`. |
+| `generic-mcp` | `~/.memorycrystal/mcp-config.json`. |
+| `local-backend` | See flags. This id is not a client row. |
+
+Codex CLI and Codex Desktop share `${CODEX_HOME:-~/.codex}/config.toml` and `hooks.json`. Uninstalling either target removes that shared MCP block and those hooks for both.
+
+## Flags
+
+| Flag | Effect |
+| --- | --- |
+| `--targets list` | Comma-separated ids. Replaces the default list. |
+| `--dry-run` | Print what would change. Write nothing. |
+| `--no-restart` | Skip `openclaw gateway restart`. Use this when you run the uninstaller from inside an OpenClaw session. Without the flag, a default or `openclaw` run restarts the gateway when the `openclaw` CLI is on `PATH`. |
+| `--keep-local-backend` | Leave the local backend running. No `bin/down`. |
+| `--wipe-local-backend` | Run `bin/down --wipe` and remove Docker volumes. Without this flag, `bin/down` stops the backend and keeps the volumes. |
+| `--purge` | Remove local helper files under `~/.memory-crystal` and `~/.memorycrystal`, the local credential bridge, the local-backend directory, and staged plugin bundles for the targets you selected. This does not wipe Docker volumes. Volume deletion is `--wipe-local-backend`. |
+
+```bash
+# Disconnect clients and leave a local backend running
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --keep-local-backend
+
+# Stop the local backend and delete its volumes
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --wipe-local-backend
+
+# Also delete local helper files and the backend artifact
+curl -fsSL https://memorycrystal.ai/uninstall.sh | bash -s -- --purge --wipe-local-backend
+```
+
+`--purge` while another client on the machine still uses Memory Crystal removes shared helpers that client still needs. Disconnect only the client you are leaving, and skip `--purge`, until the last client is gone.
+
+## Single-client scripts
+
+These do the same client cleanup as `--targets` for one product. They do not stop a local backend.
+
+```bash
+curl -fsSL https://memorycrystal.ai/uninstall-claude-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/uninstall-codex-mcp.sh | bash
+curl -fsSL https://memorycrystal.ai/uninstall-droid-mcp.sh | bash
+```
+
+Each accepts `--purge` for that client's local helper files. The Codex script edits the shared `~/.codex` config, so it affects Codex Desktop as well.
+
+## After uninstall
+
+Hosted memories stay on the account until you delete them in the dashboard. A local backend you only stopped still has its volumes. Re-run the [installer](/installation) to connect a client again.
+
+To switch a local install back to the hosted backend without uninstalling, re-run the installer and choose the hosted URL, or restore the config backup the installer printed.

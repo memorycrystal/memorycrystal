@@ -1,0 +1,135 @@
+---
+title: Asset endpoints
+description: Upload bytes and retrieve scoped asset content.
+---
+
+Use Bearer authentication at `https://convex.memorycrystal.ai`. Upload bytes through POST `/api/mcp/asset/upload`; direct raw `storageKey` registration at `/api/mcp/asset` returns 410.
+
+## Upload
+
+Send the file as the raw request body, not JSON or multipart form data.
+
+| Header | Requirement |
+| --- | --- |
+| `Authorization` | Bearer API key |
+| `Content-Length` | Required positive byte length |
+| `Content-Type` | Required MIME type accepted for the kind |
+| `X-Crystal-Asset-Kind` | image, audio, video, pdf, or text |
+| `X-Crystal-Idempotency-Key` | Optional reusable upload key |
+| `X-Crystal-Checksum` | Optional 64-character hexadecimal SHA-256 checksum of bytes |
+| `X-Crystal-Title`, `X-Crystal-Tags` | Optional title and comma-separated tags |
+| `X-Crystal-Channel`, `X-Crystal-Session-Key` | Optional scope and session |
+
+Repeated `tag` URL parameters are also accepted.
+
+```bash
+curl -X POST https://convex.memorycrystal.ai/api/mcp/asset/upload \
+  -H "Authorization: Bearer $MEMORY_CRYSTAL_API_KEY" \
+  -H 'Content-Type: text/plain' \
+  -H 'X-Crystal-Asset-Kind: text' \
+  --data-binary @reference.txt
+```
+
+Curl supplies the byte length for this file body. A successful upload returns `ok` and `id`; a reused idempotency key can additionally return `deduped: true`. Text processing is scheduled after upload.
+
+| Kind | Maximum bytes | Accepted MIME family |
+| --- | --- | --- |
+| Image | 5 MiB | image/ |
+| Audio | 10 MiB | audio/ |
+| Video | 50 MiB | video/ |
+| PDF | 10 MiB | application/pdf |
+| Text | 2 MiB | text/, application/json, application/xml, application/x-ndjson |
+
+One MiB is 1,048,576 bytes. Both declared and measured body sizes are checked. Missing length or an empty body returns 411; size/quota failures return 413; MIME mismatch returns 415; checksum mismatch returns 400.
+
+## Storage allowance
+
+| Capacity policy | Default storage admission allowance |
+| --- | --- |
+| Free | 250 MiB |
+| Starter / Pro | 2 GiB |
+| Ultra | 10 GiB |
+| Unlimited / self-hosted unmetered | No product cap |
+
+Account-specific overrides can apply. These byte allowances are distinct from the non-KB memory count allowance. A quota failure may return `quotaBytes`, `usedBytes`, and `availableBytes`.
+
+## Read and manage
+
+The following POST routes accept required `assetId` and optional `channel`, `knowledgeBaseIds`, and `peerScope` for visibility.
+
+| Route | Result |
+| --- | --- |
+| `/api/mcp/asset/metadata` | `ok`, `asset` with scoped metadata and extracted context |
+| `/api/mcp/asset/read-url` | `ok`, `read` descriptor with provider, method (`proxy`), URL, and expiresAt |
+| `/api/mcp/asset/delete` | `ok`; soft-deletes with a seven-day retention deadline |
+| `/api/mcp/asset/retry` | `ok`; queues failed asset processing again |
+
+```json
+{"assetId":"<asset-id>"}
+```
+
+Resolve the returned relative URL against the backend base URL and use GET `/api/assets/{id}/read`. The proxy still requires Bearer authentication and rechecks scope. It is not a public download link. An expired descriptor returns 410; request a new one. Non-Convex storage returns 409 from read-url and requires reupload into supported storage.
+
+Missing or hidden assets return 404. Retry returns 409 when the asset is not failed. A successful delete response does not promise immediate physical erasure of stored bytes.
+
+## Examples
+
+The raw-byte upload command above returns this JSON on a new upload:
+
+```json
+{
+  "ok": true,
+  "id": "<asset-id>"
+}
+```
+
+Retain that ID for the following requests. Metadata and extraction can become available after the upload response.
+
+### POST /api/mcp/asset/read-url
+
+Request body:
+
+```json
+{
+  "assetId": "<asset-id>"
+}
+```
+
+HTTP response:
+
+```json
+{
+  "ok": true,
+  "read": {
+    "provider": "convex",
+    "method": "proxy",
+    "url": "/api/assets/<asset-id>/read?expiresAt=1791936300000",
+    "expiresAt": 1791936300000
+  }
+}
+```
+Use the newly returned URL, not the illustrative expired timestamp above:
+
+```javascript
+const descriptor = await fetch(`${baseUrl}/api/mcp/asset/read-url`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ assetId }),
+});
+const result = await descriptor.json();
+if (!descriptor.ok) throw new Error(result.error);
+const file = await fetch(new URL(result.read.url, baseUrl), {
+  headers: { Authorization: `Bearer ${apiKey}` },
+});
+if (!file.ok) throw new Error(`Asset read failed: HTTP ${file.status}`);
+const bytes = await file.arrayBuffer();
+```
+
+## Errors and common mistakes
+
+Do not wrap the upload in JSON or multipart form data. Measure bytes, not characters, when supplying Content-Length for Unicode text. A matching MIME type and kind are required even if the filename has a familiar extension.
+
+Use the same idempotency key for a retry of the same upload, not as a permanent key for unrelated files. A successful upload does not guarantee extraction has finished. Inspect metadata before retrying failed processing; `/asset/retry` is only valid for a failed asset. Keep the same visibility context when requesting and using a read descriptor.

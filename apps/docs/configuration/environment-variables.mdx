@@ -1,0 +1,149 @@
+---
+title: Environment Variables
+description: Which process reads each variable, and the default when you leave it unset.
+---
+
+Names overlap. A variable on a client does not configure the backend, and a key on the hosted MCP process does not authenticate incoming clients.
+
+## Client and installer
+
+| Variable | Who reads it | Default |
+| --- | --- | --- |
+| `MEMORY_CRYSTAL_API_KEY` | Installer, hooks, stdio package, plugins | None. Required for cloud and local installs when browser sign-in is unavailable. |
+| `MEMORY_CRYSTAL_API_URL` | Plugins and the MCP servers, as the backend base URL | Hosted bridge requires it. There is no default in that process. |
+| `MEMORY_CRYSTAL_URL` | Shared hooks, overriding the backend URL in `~/.memory-crystal/config.json` | `https://convex.memorycrystal.ai` |
+| `MEMORY_CRYSTAL_AGENT_ID` | Hooks and both MCP servers, as an explicit agent identity | Empty. Hooks then use the host slug when the hook command has `--host`. |
+| `MEMORY_CRYSTAL_INJECT_RECALL` | Shared hooks, the OpenClaw plugin, and the Hermes plugin | Off. Shared hooks accept exactly `1`, `true`, or `TRUE`. The OpenClaw plugin accepts `1` or `true` in any letter case. Use `1` or `true` for portability. Hermes accepts `1`, `true`, `yes`, or `on` in any letter case. Other non-empty values disable injection in the shared hooks and OpenClaw plugin. Grok never injects. |
+| `MEMORY_CRYSTAL_CAPTURE_TURNS` | OpenClaw plugin | Unset uses the plugin default, which is capture on. `false`, `0`, `off`, or `no` disables capture. This wins over `MEMORY_CRYSTAL_TURN_CAPTURE`. |
+| `MEMORY_CRYSTAL_ALLOW_STDIN_PROMPTS` | Bash installer | Unset. Set to `1` to allow prompts on stdin when `/dev/tty` is missing. |
+
+The hosted bridge (`packages/mcp-server`) ignores `MEMORY_CRYSTAL_API_KEY` for incoming requests. Send `Authorization: Bearer <api-key>` on `/mcp`.
+
+## Backend and self-hosting
+
+| Variable | Values | Default |
+| --- | --- | --- |
+| `MEMORY_CRYSTAL_COMPACT_RECALL` | Read by the backend. Only the exact value `false` (any case, after trimming) disables compact recall. | On. A memory with `recallText` returns that text. |
+| `CRYSTAL_STALE_ARCHIVE` | `off`, `dry_run`, or `on`. Anything other than `dry_run` or `on` skips the nightly run. | Off. The run archives stale non-KB auto-extractions. Archived memories are restorable; the run does not delete them. `dry_run` writes a report and does not archive. On the hosted service this is being enabled in October 2026 after a trial. It is not on by default. |
+| `CRYSTAL_FORGETTING_ENFORCEMENT` | `1` enables overage archival after distillation by default. Other values leave this default off; explicit enforcement requests can still enable a run. | Off. Forgetting archives only the non-KB memories past the allowance, lowest memory value first, and never a memory younger than about 24 hours. |
+| `MC_ACCOUNT_RATE_LIMIT_MULTIPLIER` | Non-negative integer. `0` disables the account envelope. | `4`. An account's request budget is this multiplier times the tier's per-key limit. |
+
+For self-hosted project-scoped message recall, you can adjust the per-lane scan budgets:
+
+| Variable | Values | Default |
+| --- | --- | --- |
+| `RECALL_PROJECT_LANE_RAW_CAP` | Positive decimal integer, clamped to 200–1,500 raw rows read per lane. | `200` |
+| `RECALL_PROJECT_LANE_VISIBLE_CAP` | Positive decimal integer, clamped to 100–1,000 distinct visible rows examined per lane, then limited to the effective raw cap minus 100. | `100` |
+
+Both values accept surrounding whitespace. Unset, empty, zero, negative, or non-integer values use the defaults. These budgets apply when message recall is scoped by `projectId` or `repoSlug`; they do not change unscoped scan budgets.
+
+`CONVEX_URL` is the Convex client URL for a backend process you run. It is not the client MCP variable. For the hosted service, clients use `https://convex.memorycrystal.ai`.
+
+Embedding and extraction keys are account settings on the hosted service, not these process variables. Local and self-hosted installers still prompt for `GEMINI_API_KEY` and `OPENROUTER_API_KEY`. That prompt does not match current hosted embedding selection. See [Providers](/configuration/providers).
+
+## Stdio package
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CRYSTAL_MCP_MODE` | `stdio` | Compared case-insensitively; values other than `stdio` start the optional HTTP listener. |
+| `CRYSTAL_MCP_HOST` | `127.0.0.1` | Bind address for that listener. |
+| `CRYSTAL_MCP_PORT` | `8788` | Port for that listener. |
+
+The optional listener also needs `CONVEX_URL` (or `MEMORY_CRYSTAL_LOCAL_CONVEX_URL`) for Bearer validation against the local backend and its API-key records. Setting a process API key alone does not authenticate incoming requests. See [MCP Server](/integrations/mcp-server).
+
+This listener is not the hosted bridge. The bridge uses `HOST` (default `0.0.0.0`) and `PORT` (default `3100`).
+
+`OBSIDIAN_VAULT_PATH` is optional. When set, the stdio `crystal_remember` handler also writes a note into that vault. The backend does not read it.
+
+## Unscoped message labels
+
+`RECALL_WORK_CHANNEL_LABELS` is a comma-separated list of bare channel labels. Unset or empty means the allowlist is empty, so unscoped message reads treat bare labels as private and drop them.
+
+Unscoped reads are bounded. The public recent-messages query reads one page of at most 200 rows. An unscoped recent scan reads at most 1,000 rows in pages of 200. Unscoped search reads at most 200 text-index rows plus 200 recent rows in separate transactions. Rows past those bounds are not returned unless the request includes `channel` or `sessionKey`.
+
+## Recall cost breaker
+
+This is a retrieval-work budget. It is not the HTTP rate limit. See [Rate Limits](/api/rate-limits) for request quotas.
+
+The breaker is on unless `MC_COST_BREAKER_ENABLED` is `0`. It counts estimated vector and text work per UTC day.
+
+Unlimited accounts skip the per-user envelope. Their usage is still recorded and still counts toward the global row. Set `MC_COST_BREAKER_UNLIMITED_EXEMPT` to `0` to apply the user envelope to Unlimited accounts. Any other value keeps them exempt.
+
+Thresholds are bytes. A user variable sets the threshold for each non-exempt account. A global variable applies to the shared row. When a threshold is unset, the `kb` default is 4x the recall envelope; the `recall` and `messages` surfaces use the base default.
+
+| Variable | Default bytes |
+| --- | --- |
+| `MC_COST_BREAKER_USER_WARN_VECTOR_BYTES` | 214958080000 |
+| `MC_COST_BREAKER_USER_EMERGENCY_VECTOR_BYTES` | 429916160000 |
+| `MC_COST_BREAKER_USER_WARN_TEXT_BYTES` | 47185920000 |
+| `MC_COST_BREAKER_USER_EMERGENCY_TEXT_BYTES` | 94371840000 |
+| `MC_COST_BREAKER_GLOBAL_WARN_VECTOR_BYTES` | 42991616000000 |
+| `MC_COST_BREAKER_GLOBAL_EMERGENCY_VECTOR_BYTES` | 85983232000000 |
+| `MC_COST_BREAKER_GLOBAL_WARN_TEXT_BYTES` | 9437184000000 |
+| `MC_COST_BREAKER_GLOBAL_EMERGENCY_TEXT_BYTES` | 18874368000000 |
+
+One recall unit is 820 MiB of vector work and 180 MiB of text work. The text amount is three indexes at 60 MiB each. A standalone message search is charged 60 MiB of text work. A recall that names knowledge bases is charged one unit per knowledge base. A standalone knowledge-base query is charged one vector unit and three text-index units.
+
+The default envelope, in those units:
+
+| Scope | Surface | Warn | Emergency |
+| --- | --- | --- | --- |
+| User | Recall units | 250 | 500 |
+| Global | Recall units | 50,000 | 100,000 |
+| User | Message searches | 750 | 1,500 |
+| Global | Message searches | 150,000 | 300,000 |
+| User | KB units | 1,000 | 2,000 |
+| Global | KB units | 200,000 | 400,000 |
+
+A four-KB recall reaches the user warn and emergency KB thresholds at 250 and 500 calls. A 12-KB recall reaches them at about 84 and 167 calls. Broad recall without knowledge-base scope has no KB charge.
+
+Each account can add at most its own user emergency threshold to the global row, per surface and dimension. The debit that crosses the threshold counts in full. Later debits add zero for that dimension.
+
+Ultra and Unlimited skip vector-depth reduction and text-search skipping on recall, knowledge-base query, `/api/mcp/search-messages`, and both message-search lanes.
+
+Surfaces that charge:
+
+- `/api/mcp/recall` (recall, plus KB when `knowledgeBaseIds` is set)
+- `/api/mcp/search-messages` (messages)
+- `/api/knowledge-bases/{id}/query` (KB)
+- The public recall, message-search, and knowledge-base query actions
+
+The public message-search action counts toward the per-account global cap and is not degraded: it still runs text search when the messages surface is in emergency.
+
+Dashboard, research, dedupe, and seeding operations are not charged.
+
+Threshold changes apply to later debits. Restoring the default byte values restores the base thresholds. The global contribution cap, lane credits, and tier exemption stay in effect.
+
+## Example: command-launched MCP
+
+Supply the API key and backend URL to the process your client launches. Add the vault path only if you want Obsidian export:
+
+```env
+MEMORY_CRYSTAL_API_KEY=your-api-key
+MEMORY_CRYSTAL_API_URL=https://convex.memorycrystal.ai
+CRYSTAL_MCP_MODE=stdio
+OBSIDIAN_VAULT_PATH=/path/to/your/obsidian/vault
+```
+
+These settings do not configure your account's embedding provider key. Save that separately in [Provider settings](/configuration/providers).
+
+## Provider variables and diagnostics
+
+| Variable | Current consumer or limitation |
+| --- | --- |
+| `GEMINI_API_KEY` | Local provisioning and older doctor checks still request it. It does not replace the owner's OpenRouter credential in the current embedding runtime. |
+| `OPENROUTER_API_KEY` | Backend shared-key fallback only where a caller permits shared credentials. User embedding and extraction paths request personal credentials instead. |
+| `EMBEDDING_PROVIDER` | The source-checkout doctor branches on `gemini`, `openai`, or `ollama`; this is not a selector for current user embeddings. |
+| `GEMINI_EMBEDDING_MODEL` | Appears in example environment files but does not select the current backend embedding model. |
+
+From an OpenClaw source checkout, run:
+
+```bash
+npm run crystal:doctor
+```
+
+Its provider checks can warn about the older Gemini setup. A passing doctor check does not prove your account's OpenRouter embeddings work. For a packaged local backend use `bin/doctor` instead.
+
+Do not use a Memory Crystal Bearer token as a provider key. If a client fails before making a request, check that its process received `MEMORY_CRYSTAL_API_URL` and `MEMORY_CRYSTAL_API_KEY`. A successful `/health` response is not a provider readiness test.
+
+Cost-breaker usage resets at UTC midnight. Explicit threshold overrides apply unchanged across surfaces; remove an override to restore the KB surface's four-times default. Raising a threshold changes subsequent budget decisions, not the recorded work already performed.

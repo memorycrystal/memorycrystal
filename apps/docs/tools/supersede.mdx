@@ -1,0 +1,69 @@
+---
+title: Supersede a memory
+description: Replace stale guidance with a linked successor.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_supersede` atomically creates a successor, archives its predecessor, and links the two records.
+
+## When to use
+
+Use supersede when a decision, rule, or fact has been replaced and you need a link between old and new guidance. Use [update](/tools/update) for a small correction that should keep the same ID, or [forget](/tools/forget) when there is no successor.
+
+| Parameter | Behavior |
+| --- | --- |
+| `oldMemoryId` | Required predecessor ID |
+| `title` | Required successor title; MCP length 5–500 |
+| `content` | Required successor content; MCP length 1–50,000 |
+| `store`, `category`, `tags`, `metadata` | Optional successor values |
+| `confidence`, `strength`, `arousal` | Optional 0–1 values |
+| `valence` | Optional −1 to 1 value |
+| `actionTriggers` | Optional string array |
+| `scopeChannel`, `agentId` | Visibility context for the predecessor |
+| `channel` | Successor channel; defaults to the predecessor's channel |
+| `reason` | Optional explanation for replacement |
+| `allowRedactedContent` | Explicit opt-in to write placeholders over secret-bearing predecessor fields |
+
+Raw HTTP uses `POST /api/mcp/supersede`. If you change channels, pass the old scope as `scopeChannel`. The successor inherits scope and identity from the predecessor where applicable; a request `agentId` is not a new identity stamp.
+
+The same [redacted-write protection](/tools/update) applies: protected writes return 409 `redacted_content_write`. Missing or hidden predecessors return 404. Use the returned successor ID for subsequent reads; the archived predecessor retains its supersession link.
+
+A successful response contains `success`, `action: "superseded"`, `oldMemoryId`, `newMemoryId`, and the supplied `reason`, with applicable contradiction advisory fields.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Replace an outdated schedule
+
+Request:
+
+```json
+{
+  "oldMemoryId": "<memory-id>",
+  "title": "Weekly backup verification",
+  "content": "Verify backups every week.",
+  "reason": "The verification interval changed."
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "success": true,
+  "action": "superseded",
+  "oldMemoryId": "<memory-id>",
+  "newMemoryId": "<successor-id>",
+  "reason": "The verification interval changed."
+}
+```
+
+## Follow the successor
+
+Save `newMemoryId` for later reads and changes. Use [get memory](/tools/get-memory) to inspect supersession links. The old record is archived, so ordinary recall should not be treated as an inventory of historical versions.
+
+## Errors and common mistakes
+
+Supply both successor title and content, even when other fields are inherited. Verify the old ID before submitting. Retrying after an uncertain network result can create another successor; inspect the predecessor and its links first. Protected redacted writes return 409; missing or hidden predecessors return 404.

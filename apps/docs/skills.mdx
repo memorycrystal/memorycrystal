@@ -1,0 +1,41 @@
+---
+title: Skill Suite
+description: Five skills the installer copies next to clients that have a skill or command directory.
+---
+
+The installer copies five skills next to the MCP config. They are instructions for the agent. Installing them does not enable capture or context injection, and it does not prove that the host can do either.
+
+Opt out with `--no-skills` (PowerShell: `-NoSkills`). A host with no skill surface is skipped.
+
+Bash installs the hook runtime those skills assume on Full and Capture hosts. Native PowerShell copies skills and MCP config, skips shared hooks, and does not write the Managed Block. A PowerShell install can show the skills while capture and injection are still absent.
+
+## Where they land
+
+| Host | Destination | Notes |
+| --- | --- | --- |
+| Claude Code | `~/.claude/skills/` | |
+| Codex CLI and Codex Desktop | `$CODEX_HOME/skills/` (default `~/.codex/skills/`) | Shared directory |
+| OpenCode | `$XDG_CONFIG_HOME/opencode/commands/` (default `~/.config/opencode/commands/`) | Command files, not a skills directory |
+| Hermes Agent | `$HERMES_HOME/skills/` (default `~/.hermes/skills/`) | |
+| OpenClaw | `$OPENCLAW_DIR/skills/` (default `~/.openclaw/skills/`) | |
+| Cursor | `~/.cursor/skills/` | |
+| Grok Build | `$GROK_HOME/skills/` (default `~/.grok/skills/`) | |
+| Claude Desktop, Factory Droid, generic MCP | none | `skills.method` is `none` |
+
+## Skills
+
+| Skill | What it tells the agent to do |
+| --- | --- |
+| `crystal-brief` | Check that the MCP server responds, load context, then follow the memory rules. |
+| `crystal-kb` | Import with a `dedupeKey` (one key replaces one chunk), list, edit, empty in place, and set agent access. |
+| `crystal-architect` | Write a re-runnable architecture knowledge base. Re-imports update the same chunks. |
+| `crystal-hygiene` | Resolve contradictions with `crystal_supersede`. Do not silently delete. |
+| `crystal-checkpoint` | Save a checkpoint and a durable summary, then verify both. |
+
+Each skill only calls Memory Crystal MCP tools. If the tools are missing, the skill stops and points at the installer.
+
+## Endpoints the skills expect
+
+Hosted API base: `https://convex.memorycrystal.ai`. Hosted MCP: `https://api.memorycrystal.ai/mcp`.
+
+If an agent reports errors from an obsolete backend URL, re-run the installer. It rewrites configs it manages to the hosted base above. Self-hosted users keep the Convex site URL they set.

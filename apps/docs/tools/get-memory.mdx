@@ -1,0 +1,63 @@
+---
+title: Get a memory
+description: Read the untruncated resolved text for a memory ID.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Use `crystal_get_memory` after recall flags a result as `truncated`.
+
+## When to use
+
+Use this after [recall](/tools/recall) gives you an ID and a truncated excerpt. Use [trace](/tools/trace) for a source conversation snapshot, or recall when you do not yet know the ID.
+
+| Parameter | Behavior |
+| --- | --- |
+| `memoryId` | Required ID returned by the service |
+| `channel`, `agentId` | Visibility context |
+| `projectId`, `repoSlug` | Context for optional same-project visibility widening; not general exclusion filters for an ID lookup |
+
+`POST /api/mcp/memory` returns `{memory: …}` with `id`, title, content, metadata, store, category, tags, timestamps, access counts, strength, confidence, source, channel, archive state, and available supersession links. Optional fields may be absent.
+
+Content is untruncated **resolved recall text**. It can prefer compact text or a summary over original stored content. A raw-content tombstone does not imply empty text when usable recall text or a summary survives. Secret-bearing fields are redacted on agent reads.
+
+The read schedules access bookkeeping. Missing, foreign, or hidden memories return HTTP 404, so you cannot distinguish them through this endpoint.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Read a retrieved procedure
+
+Request:
+
+```json
+{
+  "memoryId": "<memory-id>"
+}
+```
+
+raw HTTP / Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "memory": {
+    "id": "<memory-id>",
+    "title": "Backup verification rule",
+    "content": "Verify a backup before replacing the previous copy.",
+    "store": "procedural",
+    "category": "rule",
+    "archived": false
+  }
+}
+```
+
+## Reading the result
+
+Check archive state and supersession links before treating an old record as current. Read content as the resolved text returned by the service; this endpoint does not promise recovery of discarded raw text. Keep secret redaction placeholders out of subsequent updates.
+
+## Errors and common mistakes
+
+Use an ID returned by the service, not a title or a fabricated UUID. Send the same scope used to retrieve it. A 404 deliberately covers missing, foreign, and hidden records. A successful read does not return the complete source conversation.
+
+The literal `Memory not found` text is specific to the hosted server; stdio wraps backend errors differently. A whitespace-only ID is rejected locally by stdio. Hosted trims and forwards it to the backend.

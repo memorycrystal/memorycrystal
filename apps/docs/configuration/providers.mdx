@@ -1,0 +1,70 @@
+---
+title: Providers
+description: Hosted embeddings use your personal OpenRouter key. Installer prompts for Gemini do not configure that path.
+---
+
+Hosted semantic search embeds text with the OpenRouter key stored on your account. A missing personal key fails that embedding. It does not fall back to a shared key.
+
+## Hosted service
+
+1. Open [Settings](https://memorycrystal.ai/settings#provider-keys) in the dashboard.
+2. Under **Provider Keys → OpenRouter**, paste your OpenRouter key and save it. The key must start with `sk-or-`.
+3. Confirm the status is **CONNECTED**, then try recall for content you have already stored. OpenRouter bills provider usage to your OpenRouter account.
+
+This stores a personal credential (`source: "personal"`) for the signed-in account. A saved key's format alone does not prove the provider will accept requests.
+
+The embedding call uses the model `google/gemini-embedding-2-preview` through OpenRouter. The backend resolves the key with shared keys excluded. If the stored credential is missing, or the only available credential is a shared one, the call fails with `missing_openrouter_key` and the message `OpenRouter API key not set for user`.
+
+What still works without the key:
+
+- Writes that do not need a new embedding.
+- Lookups that can answer from text match alone.
+
+What degrades:
+
+- Semantic recall and other paths that must embed the query or a new memory.
+- Durable extraction, distillation, and reflection jobs that call OpenRouter. Without a personal key, those jobs skip provider work; a dry run can report without making a provider call.
+
+Removing the key prevents new provider calls that need that credential. Already cached vectors can still be reused; removing a key does not erase stored memories.
+
+## Local and self-hosted installers
+
+Two installer paths still ask for a Gemini key. That is not how the hosted embedding runtime selects a key.
+
+| Path | What it prompts |
+| --- | --- |
+| `scripts/convex-local-up.sh` (local artifact `bin/install`) | Requires a Gemini key for "semantic embeddings". If you leave it empty, it writes the stub `local-dev-gemini-stub`. Its warning says to set `GEMINI_API_KEY`, but that does not configure the current personal-OpenRouter embedding path. It prompts for OpenRouter as optional extraction configuration. |
+| Universal installer, `--backend self-hosted` | Warns that the backend needs `GEMINI_API_KEY` for semantic recall and that `OPENROUTER_API_KEY` is optional for extraction. The installer does not set those variables on your server. It can prompt for the keys and prints instructions, but does not configure the remote backend. |
+
+Treat the Gemini prompt as an installer mismatch with the current embedding runtime. For a backend you operate, configure the same personal-OpenRouter path the runtime calls, or expect semantic recall to fail closed when that key is absent. Setting `EMBEDDING_PROVIDER=gemini` in an env file does not switch the hosted runtime off the personal OpenRouter key.
+
+Durable memory extraction is a separate OpenRouter call. It is not the embedding call, and it is not distillation. Distillation processes retained conversation windows into durable memories using your personal key. It is separate from overage forgetting and stale-memory archival.
+
+## What not to set
+
+| Mistake | Result |
+| --- | --- |
+| Putting a Memory Crystal API key in `GEMINI_API_KEY` or `OPENROUTER_API_KEY` | The provider rejects it. The Memory Crystal key authenticates you to Memory Crystal. |
+| Setting `MEMORY_CRYSTAL_API_KEY` on the hosted MCP bridge and omitting the client bearer token | Incoming `/mcp` requests stay unauthorized. |
+| Expecting `GEMINI_API_KEY` on the hosted service to embed your queries | Hosted embeddings use the personal OpenRouter key on the account. |
+
+## LLM model selection
+
+Embedding and language-model calls use separate models:
+
+| Operation | Selection |
+| --- | --- |
+| Text embeddings | Fixed `google/gemini-embedding-2-preview` through OpenRouter. |
+| Durable extraction and reflection-cycle distillation | Your selected distillation model in Settings; default `openai/gpt-5.6-luna`. |
+| Low-salience memory review | `openai/gpt-4o-mini` through OpenRouter. |
+
+The distillation selector uses the compatible OpenRouter catalog. If a selected non-default model is no longer available, the backend reports an error rather than silently choosing another model.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| `missing_openrouter_key` | Save a personal key on the account owning the memories. A shared process key is excluded from this lookup. |
+| Recall is marked `degraded` with `embedding_unavailable` | The semantic lane could not embed the query. Lexical results may still return; they do not prove semantic search is working. |
+| Provider rejects requests after saving | Check the key's validity and provider account balance/access. Saving validates the key format, not a successful embedding request. |
+| Local setup succeeded but semantic recall fails | Installer Gemini prompts do not configure the owner credential. Your local identity needs its own personal provider setting; hosted settings are not automatically copied to that local user. |

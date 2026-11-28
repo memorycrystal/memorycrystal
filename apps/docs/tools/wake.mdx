@@ -1,0 +1,98 @@
+---
+title: Wake briefing
+description: Resume work with a bounded opening briefing.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+`crystal_wake` accepts optional `channel` and `agentId`.
+
+## When to use
+
+Use wake at the start of a session to get a brief orientation. Follow with [recall](/tools/recall) for a focused task or [recent](/tools/recent) for more transcript context. A wake call reads context; it does not create a checkpoint.
+
+| Surface | Response |
+| --- | --- |
+| Raw HTTP: GET or POST `/api/mcp/wake` | `briefing`, `recentMessages`, `recentTurns`, `recentMemories`, `lastCheckpoint` |
+| Hosted MCP | Briefing, checkpoint label/date, up to five recent memories (200-character content) and five messages (150-character content) |
+| Stdio MCP | Formatted briefing plus JSON with `briefing`, `openGoals`, `recentDecisions` |
+
+The HTTP briefing selects up to five goals from prospective-store or goal-category memories and up to five decision-category memories. It does not promise an active-status filter or fixed seven-day window. The HTTP handler does not require query embedding.
+
+The stdio API-key formatter expects goal and decision arrays that the HTTP response does not supply. Those arrays can therefore be empty even when the briefing includes goals and decisions.
+
+The authenticated key selects your account. Omitting channel still applies bounded message visibility; it does not expose every private conversation.
+
+## Parameters
+
+| Parameter | Behavior |
+| --- | --- |
+| `channel` | Optional conversation scope |
+| `agentId` | Optional resolved identity used for visibility |
+
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Resume work
+
+Request:
+
+```json
+{}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "briefing": "Recent context includes backup verification.",
+  "lastCheckpoint": null,
+  "recentMemories": [
+    {
+      "memoryId": "<memory-id>",
+      "title": "Backup verification rule",
+      "content": "Verify a backup before replacing the previous copy.",
+      "store": "procedural",
+      "category": "rule"
+    }
+  ],
+  "recentMessages": [
+    {
+      "role": "assistant",
+      "content": "The backup verification completed successfully.",
+      "timestamp": 1791936000000
+    }
+  ]
+}
+```
+
+### Resume in an explicit scope
+
+Request:
+
+```json
+{
+  "channel": "<channel>",
+  "agentId": "<agent-id>"
+}
+```
+
+Hosted MCP response (selected fields; other fields omitted):
+
+```json
+{
+  "lastCheckpoint": null,
+  "recentMemories": [],
+  "recentMessages": []
+}
+```
+
+## Read the briefing
+
+Treat the briefing as an orientation, then verify any decision you act on with a focused lookup. A null checkpoint is normal when none is available. The recent-memory and message arrays are bounded; they do not describe the whole account.
+
+## Errors and common mistakes
+
+Do not infer that goals are complete or active from their presence here. Stdio empty goal/decision arrays can reflect its formatter rather than an empty account. Use the supplied briefing and a focused recall to investigate. Check account and scope when a session looks unfamiliar.

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" width="120" height="120" fill="none">
+  <defs>
+    <linearGradient id="mc-base" gradientUnits="userSpaceOnUse" x1="50" x2="1150" y1="600" y2="600">
+      <stop offset="0.03" stop-color="#97F0F7"/>
+      <stop offset="0.45" stop-color="#4CC1E9"/>
+      <stop offset="1"    stop-color="#1E6DBB"/>
+    </linearGradient>
+    <linearGradient id="mc-left" gradientUnits="userSpaceOnUse" x1="50" x2="600" y1="600" y2="600">
+      <stop offset="0.03" stop-color="#4CC1E9"/>
+      <stop offset="1"    stop-color="#2180D6"/>
+    </linearGradient>
+    <linearGradient id="mc-right" gradientUnits="userSpaceOnUse" x1="600" x2="1150" y1="600" y2="600">
+      <stop offset="0.03" stop-color="#2180D6"/>
+      <stop offset="1"    stop-color="#1C549F"/>
+    </linearGradient>
+  </defs>
+  <path d="M600 76.919 L50 476.517 L260.081 1123.081 L939.919 1123.081 L1150 476.517 Z" fill="url(#mc-base)"/>
+  <path d="M600 76.919 L50 476.517 L260.081 1123.081 Z" fill="url(#mc-left)"/>
+  <path d="M600 76.919 L939.919 1123.081 L1150 476.517 Z" fill="url(#mc-right)"/>
+</svg>

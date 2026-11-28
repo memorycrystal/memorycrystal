@@ -1,0 +1,138 @@
+---
+title: Remember a memory
+description: Save a durable fact, decision, or lesson.
+---
+
+Available on hosted HTTP MCP and stdio MCP.
+
+Use `crystal_remember` for information you deliberately want to retain. Automatic transcript capture uses a [separate endpoint](/tools/capture).
+
+## When to use
+
+Save a durable fact, decision, lesson, or rule as soon as you want it retained. Use [update](/tools/update) for a correction to the same record, [supersede](/tools/supersede) for changed guidance, and [turn capture](/tools/capture) for verbatim conversation history. A [checkpoint](/tools/checkpoint) is a separately requested backup.
+
+| Parameter | Behavior |
+| --- | --- |
+| `title` | Required; MCP length 5–80 characters |
+| `content` | Required memory text |
+| `store`, `category` | Required; see [allowed values](/tools/overview), including category `skill` |
+| `tags` | Optional string array |
+| `confidence` | 0–1; backend default 0.9 |
+| `valence` | −1 to 1 |
+| `arousal` | 0–1; backend default 0.3 |
+| `channel`, `agentId` | Stored conversation and identity context |
+| `projectId`, `repoSlug` | Project context |
+
+Raw `POST /api/mcp/capture` returns `ok`, `id`, and `relatedExisting`, with applicable advisory fields. Related-existing hints contain up to three active same-scope lexical matches, using `memoryId`, `title`, and `createdAt`. Inspect them before creating duplicates.
+
+Embedding and salience are scheduled after the durable write. The response is not a guarantee that retrieval enrichment has completed.
+
+Stdio adds presentation fields including `memoryId`, title, store, category, and an optional Obsidian path. Obsidian export is an optional stdio feature, not a hosted write guarantee. Its export fallback confidence of 0.7 does not change the backend default of 0.9.
+
+Use [update](/tools/update) to correct the same record or [supersede](/tools/supersede) to replace stale guidance and preserve the relationship. Both protect stored secrets from accidental writes of redaction placeholders.
+
+## Examples
+
+Examples use placeholder IDs. Replace them with IDs returned by your account. MCP examples show the JSON tool arguments and the JSON inside the tool result, not the outer MCP envelope.
+
+### Save a rule
+
+Request:
+
+```json
+{
+  "title": "Backup verification rule",
+  "content": "Verify a backup before replacing the previous copy.",
+  "store": "procedural",
+  "category": "rule",
+  "tags": [
+    "backup"
+  ]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "ok": true,
+  "id": "<memory-id>",
+  "relatedExisting": []
+}
+```
+
+### Record a decision and its reason
+
+Request:
+
+```json
+{
+  "title": "Weekly backup verification",
+  "content": "Verify backups weekly because monthly checks left failures unnoticed.",
+  "store": "semantic",
+  "category": "decision",
+  "confidence": 0.9
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "ok": true,
+  "id": "<decision-id>",
+  "relatedExisting": []
+}
+```
+
+### Save a future goal
+
+Request:
+
+```json
+{
+  "title": "Complete the restore exercise",
+  "content": "Restore a sample backup and document the verification result.",
+  "store": "prospective",
+  "category": "goal",
+  "tags": [
+    "backup"
+  ]
+}
+```
+
+Hosted MCP response:
+
+```json
+{
+  "ok": true,
+  "id": "<goal-id>",
+  "relatedExisting": []
+}
+```
+
+## Choose a store and category
+
+| Store | Use for |
+| --- | --- |
+| `sensory` | Observations and impressions |
+| `episodic` | A specific event or conversation |
+| `semantic` | Facts, decisions, and lessons |
+| `procedural` | Rules and repeatable procedures |
+| `prospective` | Goals and intentions |
+
+Categories describe the kind of information within a store: `decision`, `lesson`, `person`, `rule`, `event`, `fact`, `goal`, `skill`, `workflow`, or `conversation`. Keep the reason for a decision in the content so later recall can explain it.
+
+## Tags and attribution
+
+Use a few consistent, descriptive tags rather than a different spelling for each memory. Tags are strings, not a comma-separated string. Save unrelated facts separately so you can update or supersede each one independently.
+
+Pass `agentId` explicitly when attribution matters. Hosted remember forwards an explicit identity; stdio can fill its configured identity, and the OpenClaw plugin can fill its resolved identity. A channel prefix alone is not a stored author stamp. Update preserves the existing stamp, and supersede inherits it from the predecessor.
+
+## Write and enrichment
+
+The durable record is saved first. Embedding and salience work follow asynchronously, so immediate retrieval may not yet have all ranking signals. An optional stdio Obsidian export is a separate local copy; a local export problem does not mean the durable write failed.
+
+## Errors and common mistakes
+
+Use a specific 5–80-character title, a supported store/category, and numeric values within the parameter ranges. Do not retry a successful write just because retrieval has not caught up; that can create duplicates. Inspect `relatedExisting` and use supersede when the older record is stale. Keep secrets out of memory content. A blocked write should be reviewed, not repeatedly submitted unchanged.

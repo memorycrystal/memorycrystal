@@ -1,0 +1,57 @@
+---
+title: Usage and allowances
+description: What counts toward the memory allowance, and the other caps beside it.
+---
+
+The memory allowance is one cap. Messages, checkpoints, assets, and request rate are separate. Prices and plan names are on [Pricing](/pricing). How rows leave active recall is on [How Memory Works](/concepts/how-memory-works).
+
+## What the allowance counts
+
+**Active memories that are not knowledge-base chunks.**
+
+| Included | Excluded |
+| --- | --- |
+| Active non-KB memories in every store | Knowledge-base chunks |
+| | Archived memories (they have left the active count) |
+
+The dashboard reports that non-KB number as memories used, and reports knowledge-base chunks beside it. A separate active-memory total can still include the chunks. Do not treat that total as the allowance.
+
+| Tier | Active non-KB memories |
+| --- | ---: |
+| Free | 1,000 |
+| Starter (legacy Pro alias) | 10,000 |
+| Pro | 10,000 |
+| Ultra | 50,000 |
+| Unlimited | no cap |
+
+Starter is not a public checkout plan. It uses Pro's allowance. Unlimited is a backend entitlement, not a self-serve plan. A self-hosted backend you operate does not inherit these caps unless you enforce them.
+
+A write past a capped allowance is refused with HTTP 403 and a "Storage limit reached" error. Ultra's message tells you to archive memories. Other capped tiers point at the dashboard settings page. Unlimited is not refused for this cap.
+
+## Forgetting and the stale archive
+
+Forgetting, when `CRYSTAL_FORGETTING_ENFORCEMENT=1`, archives only the overage past this allowance. It skips knowledge-base chunks and memories from the last 24 hours. It does not delete the row. Enforcement is off by default.
+
+The stale archive is a different job. It is off unless `CRYSTAL_STALE_ARCHIVE` is `dry_run` or `on`. See [How Memory Works](/concepts/how-memory-works) for eligibility and hosted availability. Distillation does not change the allowance.
+
+## Other caps
+
+| Cap | Free | Starter and Pro | Ultra | Unlimited |
+| --- | ---: | ---: | ---: | ---: |
+| Short-term messages | 500 | 25,000 | no cap | no cap |
+| Channels on the published plan | 3 | no cap | no cap | no cap |
+| Retained checkpoints | 1 | 5 | 10 | 20 |
+| Entries in one checkpoint snapshot | 50 | 200 | 500 | 1,000 |
+| Multimodal asset storage | 250 MB | 2 GB | 10 GB | no cap |
+| API requests per minute | 60 | 600 | 2,000 | no cap |
+| Managed Gemini calls per day | none | 500 | no default cap; BYOK and a custom cap are allowed | same as Ultra |
+
+Message and checkpoint writes that pass their cap return HTTP 403. Checkpoint errors include "Checkpoint allowance reached". Asset uploads that pass the byte quota are refused with an asset storage quota error. Those bytes are the capacity storage quota, separate from the memory allowance.
+
+The channel row is the figure on the public pricing page. Memory, message, checkpoint, and asset writes are the refusals described above.
+
+Request limits are per minute. A key with no resolved user falls back to 60. The account window allows four times the tier's per-minute limit. Unlimited has no request cap, so that window is open too. A 429 includes `Retry-After`. See [Troubleshooting](/help/troubleshooting).
+
+## Retention
+
+On the hosted service and by default when self-hosting, raw messages and raw sensory content stay until you delete them. Self-hosters who set `CRYSTAL_RETENTION_READY=1` enable age-based expiry jobs; retention then follows the tier’s expiry policy. See [How Memory Works](/concepts/how-memory-works).

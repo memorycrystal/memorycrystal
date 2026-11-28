@@ -1,0 +1,14 @@
+{"timestamp":"2026-01-01T00:00:00.000Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000001","timestamp":"2026-01-01T00:00:00.000Z","cwd":"/tmp/synthetic-repo","originator":"codex_cli_rs","cli_version":"0.0.0","instructions":null}}
+{"timestamp":"2026-01-01T00:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/tmp/synthetic-repo</cwd>\n</environment_context>"}]}}
+{"timestamp":"2026-01-01T00:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Synthetic prompt alpha"}]}}
+{"timestamp":"2026-01-01T00:00:02.000Z","type":"event_msg","payload":{"type":"user_message","message":"Synthetic prompt alpha","images":[]}}
+{"timestamp":"2026-01-01T00:00:03.000Z","type":"turn_context","payload":{"cwd":"/tmp/synthetic-repo","approval_policy":"on-request","model":"synthetic-model"}}
+{"timestamp":"2026-01-01T00:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Synthetic answer alpha"}]}}
+{"timestamp":"2026-01-01T00:00:04.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Synthetic answer alpha"}}
+{"timestamp":"2026-01-01T00:00:05.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Synthetic prompt beta"}]}}
+{"timestamp":"2026-01-01T00:00:05.000Z","type":"event_msg","payload":{"type":"user_message","message":"Synthetic prompt beta","images":[]}}
+{"timestamp":"2026-01-01T00:00:06.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Synthetic reasoning"}]}}
+{"timestamp":"2026-01-01T00:00:07.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"true\"]}","call_id":"call_synthetic"}}
+{"timestamp":"2026-01-01T00:00:08.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_synthetic","output":"{\"output\":\"\"}"}}
+{"timestamp":"2026-01-01T00:00:09.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Synthetic answer beta"}]}}
+{"timestamp":"2026-01-01T00:00:09.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Synthetic answer beta"}}
